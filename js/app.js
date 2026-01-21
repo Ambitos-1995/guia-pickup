@@ -12,32 +12,32 @@ const procesosData = {
         pasos: [
             {
                 imagen: "img/IMG_4966.JPG",
-                highlightX: 35,
+                highlightX: 33,
                 highlightY: 28,
                 texto: "Pulsa <strong>REPARTIDOR</strong>"
             },
             {
                 imagen: "img/IMG_4968.JPG",
-                highlightX: 38,
-                highlightY: 32,
+                highlightX: 35,
+                highlightY: 35,
                 texto: "Pulsa <strong>RECEPCION DE PAQUETES</strong>"
             },
             {
                 imagen: "img/IMG_4970.JPG",
-                highlightX: 38,
-                highlightY: 33,
+                highlightX: 35,
+                highlightY: 35,
                 texto: "Pulsa <strong>SEUR</strong>"
             },
             {
                 imagen: "img/IMG_4971.JPG",
-                highlightX: 42,
-                highlightY: 35,
+                highlightX: 38,
+                highlightY: 32,
                 texto: "Pulsa el <strong>boton grande</strong>.<br>Escanea cada paquete."
             },
             {
                 imagen: "img/IMG_4971.JPG",
                 highlightX: 92,
-                highlightY: 18,
+                highlightY: 12,
                 texto: "Pulsa <strong>CONTINUAR</strong>"
             }
         ],
@@ -56,19 +56,19 @@ const procesosData = {
         pasos: [
             {
                 imagen: "img/IMG_4966.JPG",
-                highlightX: 35,
-                highlightY: 55,
+                highlightX: 33,
+                highlightY: 50,
                 texto: "Pulsa <strong>CLIENTE</strong>"
             },
             {
                 imagen: "img/IMG_4967.JPG",
-                highlightX: 58,
-                highlightY: 32,
+                highlightX: 55,
+                highlightY: 35,
                 texto: "Pulsa <strong>DEPOSITO DE PAQUETES</strong>"
             },
             {
                 imagen: "img/IMG_4972.JPG",
-                highlightX: 40,
+                highlightX: 38,
                 highlightY: 32,
                 texto: "Pulsa <strong>Una etiqueta de envio</strong>"
             },
@@ -94,19 +94,19 @@ const procesosData = {
         pasos: [
             {
                 imagen: "img/IMG_4966.JPG",
-                highlightX: 35,
-                highlightY: 55,
+                highlightX: 33,
+                highlightY: 50,
                 texto: "Pulsa <strong>CLIENTE</strong>"
             },
             {
                 imagen: "img/IMG_4967.JPG",
-                highlightX: 58,
-                highlightY: 32,
+                highlightX: 55,
+                highlightY: 35,
                 texto: "Pulsa <strong>DEPOSITO DE PAQUETES</strong>"
             },
             {
                 imagen: "img/IMG_4972.JPG",
-                highlightX: 58,
+                highlightX: 57,
                 highlightY: 32,
                 texto: "Pulsa <strong>Un codigo QR</strong>"
             },
@@ -138,14 +138,14 @@ const procesosData = {
         pasos: [
             {
                 imagen: "img/IMG_4966.JPG",
-                highlightX: 35,
-                highlightY: 55,
+                highlightX: 33,
+                highlightY: 50,
                 texto: "Pulsa <strong>CLIENTE</strong>"
             },
             {
                 imagen: "img/IMG_4967.JPG",
-                highlightX: 38,
-                highlightY: 32,
+                highlightX: 35,
+                highlightY: 35,
                 texto: "Pulsa <strong>RECOGIDA DE PAQUETES</strong>"
             },
             {
