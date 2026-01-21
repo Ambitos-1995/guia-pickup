@@ -24,8 +24,8 @@ const procesosData = {
             },
             {
                 imagen: "img/IMG_4970.JPG",
-                highlightX: 35,
-                highlightY: 35,
+                highlightX: 33,
+                highlightY: 33,
                 texto: "Pulsa <strong>SEUR</strong>"
             },
             {
@@ -36,8 +36,8 @@ const procesosData = {
             },
             {
                 imagen: "img/IMG_4971.JPG",
-                highlightX: 92,
-                highlightY: 12,
+                highlightX: 90,
+                highlightY: 10,
                 texto: "Pulsa <strong>CONTINUAR</strong>"
             }
         ],
@@ -68,7 +68,7 @@ const procesosData = {
             },
             {
                 imagen: "img/IMG_4972.JPG",
-                highlightX: 38,
+                highlightX: 35,
                 highlightY: 32,
                 texto: "Pulsa <strong>Una etiqueta de envio</strong>"
             },
@@ -106,7 +106,7 @@ const procesosData = {
             },
             {
                 imagen: "img/IMG_4972.JPG",
-                highlightX: 57,
+                highlightX: 55,
                 highlightY: 32,
                 texto: "Pulsa <strong>Un codigo QR</strong>"
             },
