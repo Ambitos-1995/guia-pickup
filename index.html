@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#E31E24">
+    <meta name="description" content="Guia interactiva paso a paso para gestionar paquetes SEUR/TIPSA en tu tienda.">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Guia Pickup">
+    <meta name="application-name" content="Guia Pickup">
+    <meta name="msapplication-TileColor" content="#E31E24">
+    <meta name="msapplication-tap-highlight" content="no">
+
+    <title>Guia Pickup</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+    <!-- Estilos -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- PANTALLA DE INICIO -->
+        <div id="home-screen" class="screen active">
+            <header class="header">
+                <div class="logo">
+                    <span class="logo-icon">📦</span>
+                    <h1>Guia Pickup</h1>
+                </div>
+                <p class="subtitle">Ayuda paso a paso</p>
+            </header>
+
+            <main class="main-content">
+                <section class="processes-section">
+                    <h2>¿Que quieres hacer?</h2>
+                    <div class="process-grid">
+                        <button class="process-card" data-process="recepcion-repartidor">
+                            <span class="process-icon">🚚</span>
+                            <span class="process-title">Recibir paquetes del repartidor</span>
+                            <span class="process-desc">Llega el repartidor con paquetes</span>
+                        </button>
+
+                        <button class="process-card" data-process="deposito-etiqueta">
+                            <span class="process-icon">🏷️</span>
+                            <span class="process-title">Cliente deja un paquete</span>
+                            <span class="process-desc">Tiene etiqueta impresa</span>
+                        </button>
+
+                        <button class="process-card" data-process="deposito-qr">
+                            <span class="process-icon">📱</span>
+                            <span class="process-title">Devolucion con QR</span>
+                            <span class="process-desc">Cliente tiene QR en el movil</span>
+                        </button>
+
+                        <button class="process-card" data-process="entrega-cliente">
+                            <span class="process-icon">🎁</span>
+                            <span class="process-title">Cliente recoge paquete</span>
+                            <span class="process-desc">Viene a buscar su paquete</span>
+                        </button>
+                    </div>
+                </section>
+
+                <section class="info-section">
+                    <button class="info-toggle" id="info-toggle">
+                        <span>Datos de la tienda</span>
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                    <div class="info-content" id="info-content">
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Codigo tienda</span>
+                                <span class="info-value">ES26626</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">PIN</span>
+                                <span class="info-value">5500</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Horario</span>
+                                <span class="info-value">9-14 y 17-20</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Tamano maximo</span>
+                                <span class="info-value">50x50x50 cm</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Dias guardado</span>
+                                <span class="info-value">10 dias</span>
+                            </div>
+                            <div class="info-item highlight-warning">
+                                <span class="info-label">Cobrar</span>
+                                <span class="info-value">SOLO tarjeta. Nunca dinero.</span>
+                            </div>
+                        </div>
+
+                        <div class="other-functions">
+                            <h3>Otros botones de la app</h3>
+                            <ul>
+                                <li><strong>Acciones Pendientes:</strong> Ver tareas sin hacer</li>
+                                <li><strong>Buscar:</strong> Encontrar un paquete</li>
+                                <li><strong>Almacenamiento:</strong> Ver todos los paquetes</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- PANTALLA DE PROCESO (PASOS) -->
+        <div id="process-screen" class="screen">
+            <header class="process-header">
+                <button class="back-btn" id="back-to-home">
+                    <span>←</span> Inicio
+                </button>
+                <h2 id="process-title">Proceso</h2>
+            </header>
+
+            <div class="progress-bar">
+                <span class="progress-text" id="progress-text">Paso <span class="current-step">1</span> de 5</span>
+            </div>
+
+            <main class="step-content">
+                <div class="image-container" id="image-container">
+                    <img id="step-image" src="" alt="Pantalla de la app">
+                    <div class="highlight-circle" id="highlight"></div>
+                </div>
+
+                <div class="no-image-placeholder" id="no-image-placeholder">
+                    <span class="placeholder-icon">📝</span>
+                    <span class="placeholder-text">Sigue las instrucciones</span>
+                </div>
+
+                <div class="step-text" id="step-text">
+                    <!-- Instruccion del paso -->
+                </div>
+            </main>
+
+            <footer class="step-navigation">
+                <button class="nav-btn prev-btn" id="prev-btn">
+                    <span>←</span> Atras
+                </button>
+                <button class="nav-btn next-btn" id="next-btn">
+                    Siguiente <span>→</span>
+                </button>
+            </footer>
+        </div>
+
+        <!-- PANTALLA COMPLETADO -->
+        <div id="complete-screen" class="screen">
+            <header class="process-header">
+                <button class="back-btn" id="back-to-home-final">
+                    <span>←</span> Inicio
+                </button>
+                <h2 id="complete-title">Completado</h2>
+            </header>
+
+            <main class="complete-content">
+                <div class="complete-icon">✅</div>
+                <h3>¡Bien hecho!</h3>
+
+                <div class="success-message" id="success-message">
+                    <!-- Mensaje de exito -->
+                </div>
+
+                <div class="special-warning" id="special-warning" style="display: none;">
+                    <!-- Aviso especial (cobro) -->
+                </div>
+
+                <div class="notes-section">
+                    <h4>Recuerda</h4>
+                    <ul id="notes-list">
+                        <!-- Notas del proceso -->
+                    </ul>
+                </div>
+
+                <button class="home-btn" id="finish-btn">
+                    Volver al inicio
+                </button>
+            </main>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        // Registrar Service Worker para funcionamiento offline
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((registration) => {
+                        console.log('Service Worker registrado:', registration.scope);
+
+                        // Verificar actualizaciones
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            console.log('Nueva version del Service Worker encontrada');
+
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // Nueva version disponible
+                                    console.log('Nueva version disponible');
+                                }
+                            });
+                        });
+                    })
+                    .catch((error) => {
+                        console.warn('Error al registrar Service Worker:', error);
+                    });
+            });
+        }
+
+        // Detectar si la app fue instalada
+        window.addEventListener('appinstalled', () => {
+            console.log('Guia Pickup instalada correctamente');
+        });
+
+        // Manejar el prompt de instalacion
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Guardar el evento para usarlo despues
+            deferredPrompt = e;
+            console.log('App lista para instalar');
+        });
+    </script>
+</body>
+</html>

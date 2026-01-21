@@ -1,0 +1,50 @@
+{
+  "name": "Guia Pickup - Ayuda paso a paso",
+  "short_name": "Guia Pickup",
+  "description": "Guia interactiva para empleados de tienda. Ayuda paso a paso para gestionar paquetes SEUR/TIPSA.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#E31E24",
+  "background_color": "#FFFFFF",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "utilities"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Recibir paquetes",
+      "short_name": "Repartidor",
+      "description": "Recibir paquetes del repartidor",
+      "url": "/index.html?proceso=recepcion-repartidor",
+      "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Cliente deja paquete",
+      "short_name": "Deposito",
+      "description": "Cliente deja un paquete",
+      "url": "/index.html?proceso=deposito-etiqueta",
+      "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
+    }
+  ]
+}

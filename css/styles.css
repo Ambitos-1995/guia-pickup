@@ -1,0 +1,677 @@
+/* =====================================================
+   GUIA PICKUP - ESTILOS ACCESIBILIDAD COGNITIVA
+   ===================================================== */
+
+/* Variables de accesibilidad */
+:root {
+    --texto-base: 20px;
+    --texto-grande: 28px;
+    --texto-instruccion: 32px;
+    --texto-boton: 22px;
+    --espaciado: 1.8;
+
+    --color-fondo: #FFFFFF;
+    --color-fondo-claro: #F8F8F8;
+    --color-texto: #1a1a1a;
+    --color-texto-secundario: #444444;
+    --color-acento: #E31E24;
+    --color-acento-oscuro: #B91820;
+    --color-exito: #4CAF50;
+    --color-exito-fondo: #E8F5E9;
+    --color-aviso: #FF9800;
+    --color-aviso-fondo: #FFF3E0;
+    --color-gris-claro: #E0E0E0;
+
+    --boton-altura: 65px;
+    --radio-bordes: 16px;
+    --sombra: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --transicion: all 0.3s ease;
+}
+
+/* Reset y base */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: 'Inter', 'Open Sans', Arial, sans-serif;
+    font-size: var(--texto-base);
+    line-height: var(--espaciado);
+    background: var(--color-fondo);
+    color: var(--color-texto);
+    min-height: 100vh;
+}
+
+/* App container */
+#app {
+    max-width: 100%;
+    min-height: 100vh;
+}
+
+/* Pantallas */
+.screen {
+    display: none;
+    min-height: 100vh;
+    flex-direction: column;
+}
+
+.screen.active {
+    display: flex;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* =====================================================
+   PANTALLA DE INICIO
+   ===================================================== */
+
+/* Header simplificado */
+.header {
+    background: linear-gradient(135deg, var(--color-acento) 0%, var(--color-acento-oscuro) 100%);
+    color: var(--color-fondo);
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.logo-icon {
+    font-size: 2.5rem;
+}
+
+.logo h1 {
+    font-size: var(--texto-grande);
+    font-weight: 700;
+}
+
+.subtitle {
+    font-size: var(--texto-base);
+    opacity: 0.95;
+    font-weight: 500;
+}
+
+/* Main content */
+.main-content {
+    flex: 1;
+    padding: 2rem 1.5rem;
+}
+
+/* Seccion de procesos */
+.processes-section h2 {
+    font-size: var(--texto-grande);
+    color: var(--color-texto);
+    margin-bottom: 1.5rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.process-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+}
+
+/* Tarjetas de proceso - GRANDES y CLARAS */
+.process-card {
+    background: var(--color-fondo);
+    border: 3px solid var(--color-gris-claro);
+    border-radius: var(--radio-bordes);
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: var(--sombra);
+    transition: var(--transicion);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 140px;
+}
+
+.process-card:hover {
+    border-color: var(--color-acento);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.process-card:active {
+    transform: translateY(0);
+}
+
+.process-icon {
+    font-size: 3rem;
+}
+
+.process-title {
+    font-size: var(--texto-grande);
+    font-weight: 700;
+    color: var(--color-texto);
+    line-height: 1.3;
+}
+
+.process-desc {
+    font-size: var(--texto-base);
+    color: var(--color-texto-secundario);
+    line-height: 1.5;
+}
+
+/* Seccion de informacion - Colapsada por defecto */
+.info-section {
+    margin-top: 2.5rem;
+}
+
+.info-toggle {
+    width: 100%;
+    background: var(--color-fondo-claro);
+    border: 2px solid var(--color-gris-claro);
+    border-radius: var(--radio-bordes);
+    padding: 1.25rem;
+    font-size: var(--texto-base);
+    font-weight: 600;
+    color: var(--color-texto-secundario);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: var(--transicion);
+}
+
+.info-toggle:hover {
+    background: var(--color-gris-claro);
+}
+
+.toggle-icon {
+    font-size: 1.25rem;
+    transition: transform 0.3s ease;
+}
+
+.info-toggle.active .toggle-icon {
+    transform: rotate(180deg);
+}
+
+.info-content {
+    display: none;
+    background: var(--color-fondo);
+    border: 2px solid var(--color-gris-claro);
+    border-top: none;
+    border-radius: 0 0 var(--radio-bordes) var(--radio-bordes);
+    padding: 1.5rem;
+}
+
+.info-content.active {
+    display: block;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.info-item {
+    background: var(--color-fondo-claro);
+    padding: 1rem;
+    border-radius: 12px;
+}
+
+.info-item.highlight-warning {
+    background: var(--color-aviso-fondo);
+    grid-column: 1 / -1;
+    border-left: 5px solid var(--color-aviso);
+}
+
+.info-label {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--color-texto-secundario);
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+.info-value {
+    display: block;
+    font-weight: 700;
+    font-size: var(--texto-base);
+    color: var(--color-texto);
+}
+
+.highlight-warning .info-value {
+    color: var(--color-acento);
+}
+
+.other-functions {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--color-gris-claro);
+}
+
+.other-functions h3 {
+    font-size: var(--texto-base);
+    color: var(--color-texto-secundario);
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.other-functions ul {
+    list-style: none;
+    font-size: var(--texto-base);
+}
+
+.other-functions li {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--color-gris-claro);
+    line-height: 1.6;
+}
+
+.other-functions li:last-child {
+    border-bottom: none;
+}
+
+/* =====================================================
+   PANTALLA DE PROCESO (PASOS)
+   ===================================================== */
+
+.process-header {
+    background: var(--color-fondo);
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: var(--sombra);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.back-btn {
+    background: none;
+    border: none;
+    font-size: var(--texto-base);
+    color: var(--color-acento);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    margin: -0.75rem;
+    border-radius: 12px;
+    transition: var(--transicion);
+    font-weight: 600;
+}
+
+.back-btn:hover {
+    background: var(--color-fondo-claro);
+}
+
+.process-header h2 {
+    font-size: var(--texto-grande);
+    font-weight: 700;
+    flex: 1;
+    color: var(--color-texto);
+}
+
+/* Indicador de progreso - MUY CLARO */
+.progress-bar {
+    background: var(--color-fondo-claro);
+    padding: 1rem 1.5rem;
+    text-align: center;
+    border-bottom: 2px solid var(--color-gris-claro);
+}
+
+.progress-fill {
+    display: none; /* Ocultamos la barra, usamos solo texto */
+}
+
+.progress-text {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-texto);
+}
+
+.progress-text .current-step {
+    font-size: 2.5rem;
+    color: var(--color-acento);
+}
+
+/* Contenido del paso */
+.step-content {
+    flex: 1;
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    align-items: center;
+}
+
+/* Contenedor de imagen */
+.image-container {
+    position: relative;
+    width: 100%;
+    max-width: 450px;
+    margin: 0 auto;
+    border-radius: var(--radio-bordes);
+    overflow: hidden;
+    box-shadow: var(--sombra);
+    background: var(--color-fondo-claro);
+}
+
+.image-container img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Circulo de highlight - SUAVE */
+.highlight-circle {
+    position: absolute;
+    width: 90px;
+    height: 90px;
+    border: 6px solid var(--color-acento);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    animation: pulsoSuave 2s ease-in-out infinite;
+    background: rgba(227, 30, 36, 0.1);
+}
+
+@keyframes pulsoSuave {
+    0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.15);
+        opacity: 0.8;
+    }
+}
+
+/* Placeholder sin imagen */
+.no-image-placeholder {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: var(--color-fondo);
+    padding: 3rem 2rem;
+    border-radius: var(--radio-bordes);
+    max-width: 450px;
+    margin: 0 auto;
+    width: 100%;
+    min-height: 180px;
+    text-align: center;
+}
+
+.no-image-placeholder.active {
+    display: flex;
+}
+
+.placeholder-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.placeholder-text {
+    font-size: var(--texto-grande);
+    font-weight: 600;
+}
+
+/* Texto del paso - INSTRUCCION GRANDE Y CLARA */
+.step-text {
+    background: var(--color-fondo);
+    padding: 2rem;
+    border-radius: var(--radio-bordes);
+    box-shadow: var(--sombra);
+    font-size: var(--texto-instruccion);
+    line-height: 1.5;
+    text-align: center;
+    max-width: 500px;
+    width: 100%;
+    font-weight: 500;
+}
+
+.step-text strong {
+    color: var(--color-acento);
+    font-size: 2.25rem;
+    font-weight: 700;
+    display: inline;
+}
+
+/* Navegacion - BOTONES GRANDES */
+.step-navigation {
+    display: flex;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: var(--color-fondo);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.nav-btn {
+    flex: 1;
+    padding: 1.25rem;
+    border: none;
+    border-radius: var(--radio-bordes);
+    font-size: var(--texto-boton);
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    transition: var(--transicion);
+    min-height: var(--boton-altura);
+}
+
+.prev-btn {
+    background: var(--color-gris-claro);
+    color: var(--color-texto);
+}
+
+.prev-btn:hover {
+    background: #d0d0d0;
+}
+
+.prev-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.next-btn {
+    background: var(--color-acento);
+    color: var(--color-fondo);
+}
+
+.next-btn:hover {
+    background: var(--color-acento-oscuro);
+}
+
+/* =====================================================
+   PANTALLA COMPLETADO
+   ===================================================== */
+
+.complete-content {
+    flex: 1;
+    padding: 2.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.complete-icon {
+    font-size: 5rem;
+    margin-bottom: 1.5rem;
+}
+
+.complete-content h3 {
+    font-size: 2rem;
+    color: var(--color-exito);
+    margin-bottom: 2rem;
+    font-weight: 700;
+}
+
+/* Mensaje de exito */
+.success-message {
+    background: var(--color-exito-fondo);
+    border-left: 6px solid var(--color-exito);
+    padding: 1.5rem 2rem;
+    border-radius: 0 var(--radio-bordes) var(--radio-bordes) 0;
+    font-size: var(--texto-grande);
+    margin-bottom: 2rem;
+    max-width: 500px;
+    width: 100%;
+    text-align: left;
+    font-weight: 600;
+}
+
+.notes-section {
+    width: 100%;
+    max-width: 500px;
+    background: var(--color-fondo);
+    padding: 1.5rem 2rem;
+    border-radius: var(--radio-bordes);
+    box-shadow: var(--sombra);
+    text-align: left;
+    margin-bottom: 2rem;
+}
+
+.notes-section h4 {
+    font-size: var(--texto-base);
+    color: var(--color-texto-secundario);
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--color-gris-claro);
+    font-weight: 600;
+}
+
+.notes-section ul {
+    list-style: none;
+}
+
+.notes-section li {
+    padding: 0.75rem 0;
+    padding-left: 2rem;
+    position: relative;
+    font-size: var(--texto-base);
+    border-bottom: 1px solid var(--color-gris-claro);
+    line-height: 1.6;
+}
+
+.notes-section li:last-child {
+    border-bottom: none;
+}
+
+.notes-section li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: var(--color-acento);
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+/* Aviso especial */
+.special-warning {
+    background: var(--color-aviso-fondo);
+    border-left: 6px solid var(--color-aviso);
+    padding: 1.5rem 2rem;
+    border-radius: 0 var(--radio-bordes) var(--radio-bordes) 0;
+    font-size: var(--texto-grande);
+    margin-bottom: 2rem;
+    max-width: 500px;
+    width: 100%;
+    text-align: left;
+    font-weight: 600;
+}
+
+.home-btn {
+    background: var(--color-acento);
+    color: var(--color-fondo);
+    border: none;
+    padding: 1.25rem 2.5rem;
+    font-size: var(--texto-boton);
+    font-weight: 700;
+    border-radius: var(--radio-bordes);
+    cursor: pointer;
+    transition: var(--transicion);
+    min-height: var(--boton-altura);
+}
+
+.home-btn:hover {
+    background: var(--color-acento-oscuro);
+}
+
+/* =====================================================
+   RESPONSIVE - TABLET Y DESKTOP
+   ===================================================== */
+
+@media (min-width: 600px) {
+    .process-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .info-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .process-card {
+        min-height: 160px;
+    }
+}
+
+@media (min-width: 900px) {
+    #app {
+        max-width: 800px;
+        margin: 0 auto;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .header {
+        padding: 3rem 2rem;
+    }
+
+    .main-content {
+        padding: 2.5rem;
+    }
+
+    .step-content {
+        padding: 2.5rem;
+    }
+}
+
+/* =====================================================
+   UTILIDADES
+   ===================================================== */
+
+.hidden {
+    display: none !important;
+}
+
+/* Focus visible para accesibilidad */
+button:focus-visible,
+.process-card:focus-visible {
+    outline: 4px solid var(--color-acento);
+    outline-offset: 3px;
+}

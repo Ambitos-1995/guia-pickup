@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fondo rojo -->
+  <rect width="512" height="512" rx="80" fill="#E31E24"/>
+
+  <!-- Caja/paquete -->
+  <g transform="translate(256, 240)">
+    <!-- Cuerpo de la caja -->
+    <path d="M-120 20 L0 -60 L120 20 L120 100 L0 180 L-120 100 Z" fill="#FFFFFF" stroke="#1a1a1a" stroke-width="4"/>
+
+    <!-- Tapa superior -->
+    <path d="M-120 20 L0 -60 L120 20 L0 100 Z" fill="#F5F5F5" stroke="#1a1a1a" stroke-width="4"/>
+
+    <!-- Linea central vertical -->
+    <line x1="0" y1="-60" x2="0" y2="180" stroke="#1a1a1a" stroke-width="4"/>
+
+    <!-- Linea central de la tapa -->
+    <line x1="-120" y1="20" x2="120" y2="20" stroke="#1a1a1a" stroke-width="4"/>
+  </g>
+
+  <!-- Flecha hacia abajo (entrega) -->
+  <g transform="translate(256, 380)">
+    <path d="M0 -30 L30 0 L10 0 L10 40 L-10 40 L-10 0 L-30 0 Z" fill="#FFFFFF"/>
+  </g>
+</svg>
