@@ -12,3 +12,10 @@ Thumbs.db
 *.tmp
 *.temp
 nul
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Scripts de desarrollo (no necesarios en produccion)
+generate-icons.js

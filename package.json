@@ -1,0 +1,23 @@
+{
+  "name": "seur",
+  "version": "1.0.0",
+  "description": "",
+  "main": "sw.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ambitos-1995/guia-pickup.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Ambitos-1995/guia-pickup/issues"
+  },
+  "homepage": "https://github.com/Ambitos-1995/guia-pickup#readme",
+  "devDependencies": {
+    "sharp": "^0.34.5"
+  }
+}

@@ -17,8 +17,44 @@
       "purpose": "any"
     },
     {
+      "src": "icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "icons/icon-192.png",
       "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-384.png",
+      "sizes": "384x384",
       "type": "image/png",
       "purpose": "any"
     },
@@ -30,20 +66,19 @@
     }
   ],
   "categories": ["business", "productivity", "utilities"],
-  "screenshots": [],
   "shortcuts": [
     {
       "name": "Recibir paquetes",
       "short_name": "Repartidor",
       "description": "Recibir paquetes del repartidor",
-      "url": "/index.html?proceso=recepcion-repartidor",
+      "url": "./index.html?proceso=recepcion-repartidor",
       "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
     },
     {
       "name": "Cliente deja paquete",
       "short_name": "Deposito",
       "description": "Cliente deja un paquete",
-      "url": "/index.html?proceso=deposito-etiqueta",
+      "url": "./index.html?proceso=deposito-etiqueta",
       "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
     }
   ]
