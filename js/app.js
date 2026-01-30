@@ -3,41 +3,32 @@
    ===================================================== */
 
 // Datos de los procesos con TEXTOS SIMPLIFICADOS
+// Las imagenes ya tienen los circulos dibujados
 const procesosData = {
-    "recepcion-repartidor": {
-        id: "recepcion-repartidor",
-        titulo: "Recibir paquetes del repartidor",
-        descripcion: "Llega el repartidor con paquetes",
+    "recepcion-repartidor-seur": {
+        id: "recepcion-repartidor-seur",
+        titulo: "Recibir paquetes SEUR",
+        descripcion: "Llega el repartidor de SEUR",
         icono: "🚚",
         pasos: [
             {
-                imagen: "img/IMG_4966.JPG",
-                highlightX: 33,
-                highlightY: 28,
+                imagen: "img/fotos con circulos/1.png",
                 texto: "Pulsa <strong>REPARTIDOR</strong>"
             },
             {
-                imagen: "img/IMG_4968.JPG",
-                highlightX: 35,
-                highlightY: 35,
+                imagen: "img/fotos con circulos/5.png",
                 texto: "Pulsa <strong>RECEPCION DE PAQUETES</strong>"
             },
             {
-                imagen: "img/IMG_4970.JPG",
-                highlightX: 33,
-                highlightY: 33,
+                imagen: "img/fotos con circulos/7.png",
                 texto: "Pulsa <strong>SEUR</strong>"
             },
             {
-                imagen: "img/IMG_4971.JPG",
-                highlightX: 38,
-                highlightY: 32,
+                imagen: "img/fotos con circulos/9.png",
                 texto: "Pulsa el <strong>boton grande</strong>.<br>Escanea cada paquete."
             },
             {
-                imagen: "img/IMG_4971.JPG",
-                highlightX: 90,
-                highlightY: 10,
+                imagen: null,
                 texto: "Pulsa <strong>CONTINUAR</strong>"
             }
         ],
@@ -48,34 +39,94 @@ const procesosData = {
         ],
         avisoEspecial: null
     },
+    "recepcion-repartidor-tipsa": {
+        id: "recepcion-repartidor-tipsa",
+        titulo: "Recibir paquetes TIPSA",
+        descripcion: "Llega el repartidor de TIPSA",
+        icono: "🚚",
+        pasos: [
+            {
+                imagen: "img/fotos con circulos/1.png",
+                texto: "Pulsa <strong>REPARTIDOR</strong>"
+            },
+            {
+                imagen: "img/fotos con circulos/5.png",
+                texto: "Pulsa <strong>RECEPCION DE PAQUETES</strong>"
+            },
+            {
+                imagen: "img/fotos con circulos/8.png",
+                texto: "Pulsa <strong>TIPSA</strong>"
+            },
+            {
+                imagen: "img/fotos con circulos/9.png",
+                texto: "Pulsa el <strong>boton grande</strong>.<br>Escanea cada paquete."
+            },
+            {
+                imagen: null,
+                texto: "Pulsa <strong>CONTINUAR</strong>"
+            }
+        ],
+        mensajeExito: "Los paquetes estan guardados.",
+        notas: [
+            "Escanea todos los paquetes",
+            "Cuenta que esten todos"
+        ],
+        avisoEspecial: null
+    },
+    "recogida-repartidor": {
+        id: "recogida-repartidor",
+        titulo: "Repartidor recoge paquetes",
+        descripcion: "Se lleva los paquetes depositados",
+        icono: "📦",
+        pasos: [
+            {
+                imagen: "img/fotos con circulos/1.png",
+                texto: "Pulsa <strong>REPARTIDOR</strong>"
+            },
+            {
+                imagen: "img/fotos con circulos/6.png",
+                texto: "Pulsa <strong>RECOGIDA DE PAQUETES</strong>"
+            },
+            {
+                imagen: "img/fotos con circulos/7.png",
+                texto: "Pulsa <strong>SEUR</strong> o <strong>TIPSA</strong>"
+            },
+            {
+                imagen: "img/fotos con circulos/9.png",
+                texto: "Escanea cada paquete que se lleva."
+            },
+            {
+                imagen: null,
+                texto: "Pulsa <strong>CONTINUAR</strong>"
+            }
+        ],
+        mensajeExito: "Los paquetes estan registrados.",
+        notas: [
+            "Escanea todos los paquetes",
+            "El repartidor se los lleva"
+        ],
+        avisoEspecial: null
+    },
     "deposito-etiqueta": {
         id: "deposito-etiqueta",
-        titulo: "Cliente deja un paquete",
+        titulo: "Cliente deja paquete",
         descripcion: "Tiene etiqueta impresa",
         icono: "🏷️",
         pasos: [
             {
-                imagen: "img/IMG_4966.JPG",
-                highlightX: 33,
-                highlightY: 50,
+                imagen: "img/fotos con circulos/2.png",
                 texto: "Pulsa <strong>CLIENTE</strong>"
             },
             {
-                imagen: "img/IMG_4967.JPG",
-                highlightX: 55,
-                highlightY: 35,
+                imagen: "img/fotos con circulos/4.png",
                 texto: "Pulsa <strong>DEPOSITO DE PAQUETES</strong>"
             },
             {
-                imagen: "img/IMG_4972.JPG",
-                highlightX: 35,
-                highlightY: 32,
+                imagen: "img/fotos con circulos/10.png",
                 texto: "Pulsa <strong>Una etiqueta de envio</strong>"
             },
             {
                 imagen: null,
-                highlightX: null,
-                highlightY: null,
                 texto: "Escanea la etiqueta.<br>Pide el <strong>telefono</strong> al cliente.<br>Pulsa <strong>CONTINUAR</strong>."
             }
         ],
@@ -93,33 +144,23 @@ const procesosData = {
         icono: "📱",
         pasos: [
             {
-                imagen: "img/IMG_4966.JPG",
-                highlightX: 33,
-                highlightY: 50,
+                imagen: "img/fotos con circulos/2.png",
                 texto: "Pulsa <strong>CLIENTE</strong>"
             },
             {
-                imagen: "img/IMG_4967.JPG",
-                highlightX: 55,
-                highlightY: 35,
+                imagen: "img/fotos con circulos/4.png",
                 texto: "Pulsa <strong>DEPOSITO DE PAQUETES</strong>"
             },
             {
-                imagen: "img/IMG_4972.JPG",
-                highlightX: 55,
-                highlightY: 32,
+                imagen: "img/fotos con circulos/11.png",
                 texto: "Pulsa <strong>Un codigo QR</strong>"
             },
             {
                 imagen: null,
-                highlightX: null,
-                highlightY: null,
                 texto: "Escanea el <strong>QR del movil</strong> del cliente."
             },
             {
                 imagen: null,
-                highlightX: null,
-                highlightY: null,
                 texto: "Escribe en una etiqueta:<br><strong>El codigo + ES26626</strong><br>Pegala en el paquete."
             }
         ],
@@ -137,33 +178,23 @@ const procesosData = {
         icono: "🎁",
         pasos: [
             {
-                imagen: "img/IMG_4966.JPG",
-                highlightX: 33,
-                highlightY: 50,
+                imagen: "img/fotos con circulos/2.png",
                 texto: "Pulsa <strong>CLIENTE</strong>"
             },
             {
-                imagen: "img/IMG_4967.JPG",
-                highlightX: 35,
-                highlightY: 35,
+                imagen: "img/fotos con circulos/3.png",
                 texto: "Pulsa <strong>RECOGIDA DE PAQUETES</strong>"
             },
             {
                 imagen: null,
-                highlightX: null,
-                highlightY: null,
                 texto: "Pregunta: <strong>¿Tienes QR o DNI?</strong><br>Pulsa la opcion."
             },
             {
                 imagen: null,
-                highlightX: null,
-                highlightY: null,
                 texto: "Busca el paquete.<br>Escanea la <strong>etiqueta</strong>."
             },
             {
                 imagen: null,
-                highlightX: null,
-                highlightY: null,
                 texto: "El cliente <strong>firma en la pantalla</strong>.<br>Dale su paquete."
             }
         ],
@@ -241,19 +272,16 @@ function updateStep() {
     progressText.innerHTML = `Paso <span class="current-step">${currentStep + 1}</span> de ${totalPasos}`;
 
     // Mostrar imagen o placeholder
+    // Los circulos ya estan dibujados en las imagenes
     if (paso.imagen) {
         imageContainer.style.display = 'block';
         noImagePlaceholder.classList.remove('active');
         stepImage.src = paso.imagen;
-
-        // Posicionar el highlight
-        highlight.style.display = 'block';
-        highlight.style.left = `${paso.highlightX}%`;
-        highlight.style.top = `${paso.highlightY}%`;
+        // Ocultar highlight (ya no se usa, los circulos estan en las fotos)
+        if (highlight) highlight.style.display = 'none';
     } else {
         imageContainer.style.display = 'none';
         noImagePlaceholder.classList.add('active');
-        highlight.style.display = 'none';
     }
 
     // Actualizar texto (instruccion simplificada)

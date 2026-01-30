@@ -383,30 +383,6 @@ body {
     display: block;
 }
 
-/* Circulo de highlight - SUAVE */
-.highlight-circle {
-    position: absolute;
-    width: 90px;
-    height: 90px;
-    border: 6px solid var(--color-acento);
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    animation: pulsoSuave 2s ease-in-out infinite;
-    background: rgba(227, 30, 36, 0.1);
-}
-
-@keyframes pulsoSuave {
-    0%, 100% {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 1;
-    }
-    50% {
-        transform: translate(-50%, -50%) scale(1.15);
-        opacity: 0.8;
-    }
-}
-
 /* Placeholder sin imagen */
 .no-image-placeholder {
     display: none;

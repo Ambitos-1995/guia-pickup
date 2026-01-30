@@ -3,8 +3,8 @@
    PWA con estrategia Cache-First para uso offline
    ===================================================== */
 
-const CACHE_NAME = 'guia-pickup-v2';
-const CACHE_VERSION = 2;
+const CACHE_NAME = 'guia-pickup-v3';
+const CACHE_VERSION = 3;
 
 // Archivos a cachear durante la instalacion
 const PRECACHE_URLS = [
@@ -14,12 +14,17 @@ const PRECACHE_URLS = [
     './js/app.js',
     './manifest.json',
     './icons/icon.svg',
-    './img/IMG_4966.JPG',
-    './img/IMG_4967.JPG',
-    './img/IMG_4968.JPG',
-    './img/IMG_4970.JPG',
-    './img/IMG_4971.JPG',
-    './img/IMG_4972.JPG'
+    './img/fotos con circulos/1.png',
+    './img/fotos con circulos/2.png',
+    './img/fotos con circulos/3.png',
+    './img/fotos con circulos/4.png',
+    './img/fotos con circulos/5.png',
+    './img/fotos con circulos/6.png',
+    './img/fotos con circulos/7.png',
+    './img/fotos con circulos/8.png',
+    './img/fotos con circulos/9.png',
+    './img/fotos con circulos/10.png',
+    './img/fotos con circulos/11.png'
 ];
 
 // =====================================================
