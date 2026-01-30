@@ -3,8 +3,8 @@
    PWA con estrategia Cache-First para uso offline
    ===================================================== */
 
-const CACHE_NAME = 'guia-pickup-v3';
-const CACHE_VERSION = 3;
+const CACHE_NAME = 'guia-pickup-v4';
+const CACHE_VERSION = 4;
 
 // Archivos a cachear durante la instalacion
 const PRECACHE_URLS = [

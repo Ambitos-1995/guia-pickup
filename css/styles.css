@@ -37,6 +37,9 @@
 
 html {
     font-size: 16px;
+    /* Viewport units para PWA - svh es mas estable en moviles */
+    height: 100vh;
+    height: 100svh;
 }
 
 body {
@@ -45,20 +48,25 @@ body {
     line-height: var(--espaciado);
     background: var(--color-fondo);
     color: var(--color-texto);
-    min-height: 100vh;
+    /* Altura fija sin scroll */
+    height: 100vh;
+    height: 100svh;
+    overflow: hidden;
 }
 
 /* App container */
 #app {
     max-width: 100%;
-    min-height: 100vh;
+    height: 100%;
+    overflow: hidden;
 }
 
-/* Pantallas */
+/* Pantallas - altura fija sin scroll */
 .screen {
     display: none;
-    min-height: 100vh;
+    height: 100%;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .screen.active {
@@ -75,114 +83,124 @@ body {
    PANTALLA DE INICIO
    ===================================================== */
 
-/* Header simplificado */
+/* Header simplificado - COMPACTO */
 .header {
     background: linear-gradient(135deg, var(--color-acento) 0%, var(--color-acento-oscuro) 100%);
     color: var(--color-fondo);
-    padding: 2.5rem 1.5rem;
+    padding: 1rem 1rem;
     text-align: center;
+    flex-shrink: 0;
 }
 
 .logo {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 1rem;
-    margin-bottom: 0.75rem;
+    gap: 0.5rem;
 }
 
 .logo-icon {
-    font-size: 2.5rem;
+    font-size: 1.75rem;
 }
 
 .logo h1 {
-    font-size: var(--texto-grande);
+    font-size: 1.5rem;
     font-weight: 700;
 }
 
 .subtitle {
-    font-size: var(--texto-base);
-    opacity: 0.95;
-    font-weight: 500;
+    display: none; /* Ocultar para ahorrar espacio */
 }
 
-/* Main content */
+/* Main content - ocupa el resto de la pantalla */
 .main-content {
     flex: 1;
-    padding: 2rem 1.5rem;
+    padding: 0.75rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Seccion de procesos */
+.processes-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
 .processes-section h2 {
-    font-size: var(--texto-grande);
+    font-size: 1.25rem;
     color: var(--color-texto);
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.75rem;
     text-align: center;
     font-weight: 600;
+    flex-shrink: 0;
 }
 
+/* Grid 2x3 para que quepan las 6 tarjetas */
 .process-grid {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 1.25rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    flex: 1;
 }
 
-/* Tarjetas de proceso - GRANDES y CLARAS */
+/* Tarjetas de proceso - COMPACTAS */
 .process-card {
     background: var(--color-fondo);
-    border: 3px solid var(--color-gris-claro);
-    border-radius: var(--radio-bordes);
-    padding: 1.5rem;
+    border: 2px solid var(--color-gris-claro);
+    border-radius: 12px;
+    padding: 0.5rem;
     text-align: center;
     cursor: pointer;
-    box-shadow: var(--sombra);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
     transition: var(--transicion);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
-    min-height: 140px;
+    justify-content: center;
+    gap: 0.25rem;
 }
 
 .process-card:hover {
     border-color: var(--color-acento);
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .process-card:active {
-    transform: translateY(0);
+    transform: scale(0.98);
 }
 
 .process-icon {
-    font-size: 3rem;
+    font-size: 1.75rem;
 }
 
 .process-title {
-    font-size: var(--texto-grande);
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--color-texto);
-    line-height: 1.3;
+    line-height: 1.2;
 }
 
 .process-desc {
-    font-size: var(--texto-base);
+    font-size: 0.75rem;
     color: var(--color-texto-secundario);
-    line-height: 1.5;
+    line-height: 1.3;
 }
 
 /* Seccion de informacion - Colapsada por defecto */
 .info-section {
-    margin-top: 2.5rem;
+    margin-top: 0.5rem;
+    flex-shrink: 0;
 }
 
 .info-toggle {
     width: 100%;
     background: var(--color-fondo-claro);
     border: 2px solid var(--color-gris-claro);
-    border-radius: var(--radio-bordes);
-    padding: 1.25rem;
-    font-size: var(--texto-base);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: var(--color-texto-secundario);
     cursor: pointer;
@@ -295,28 +313,27 @@ body {
 
 .process-header {
     background: var(--color-fondo);
-    padding: 1.25rem 1.5rem;
+    padding: 0.75rem 1rem;
     display: flex;
     align-items: center;
-    gap: 1rem;
-    box-shadow: var(--sombra);
-    position: sticky;
-    top: 0;
+    gap: 0.75rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
     z-index: 100;
 }
 
 .back-btn {
     background: none;
     border: none;
-    font-size: var(--texto-base);
+    font-size: 1rem;
     color: var(--color-acento);
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    margin: -0.75rem;
-    border-radius: 12px;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    margin: -0.5rem;
+    border-radius: 8px;
     transition: var(--transicion);
     font-weight: 600;
 }
@@ -326,60 +343,71 @@ body {
 }
 
 .process-header h2 {
-    font-size: var(--texto-grande);
+    font-size: 1.1rem;
     font-weight: 700;
     flex: 1;
     color: var(--color-texto);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Indicador de progreso - MUY CLARO */
+/* Indicador de progreso - COMPACTO */
 .progress-bar {
     background: var(--color-fondo-claro);
-    padding: 1rem 1.5rem;
+    padding: 0.5rem 1rem;
     text-align: center;
     border-bottom: 2px solid var(--color-gris-claro);
+    flex-shrink: 0;
 }
 
 .progress-fill {
-    display: none; /* Ocultamos la barra, usamos solo texto */
+    display: none;
 }
 
 .progress-text {
-    font-size: 1.5rem;
+    font-size: 1rem;
     font-weight: 700;
     color: var(--color-texto);
 }
 
 .progress-text .current-step {
-    font-size: 2.5rem;
+    font-size: 1.5rem;
     color: var(--color-acento);
 }
 
-/* Contenido del paso */
+/* Contenido del paso - ocupa espacio disponible */
 .step-content {
     flex: 1;
-    padding: 2rem 1.5rem;
+    padding: 0.5rem;
     display: flex;
     flex-direction: column;
-    gap: 2rem;
+    gap: 0.5rem;
     align-items: center;
+    overflow: hidden;
+    min-height: 0; /* Importante para flexbox */
 }
 
-/* Contenedor de imagen */
+/* Contenedor de imagen - se adapta al espacio */
 .image-container {
     position: relative;
     width: 100%;
-    max-width: 450px;
+    max-width: 350px;
     margin: 0 auto;
-    border-radius: var(--radio-bordes);
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: var(--sombra);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     background: var(--color-fondo-claro);
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
 }
 
 .image-container img {
     width: 100%;
-    height: auto;
+    height: 100%;
+    object-fit: contain;
     display: block;
 }
 
@@ -391,12 +419,13 @@ body {
     justify-content: center;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: var(--color-fondo);
-    padding: 3rem 2rem;
-    border-radius: var(--radio-bordes);
-    max-width: 450px;
+    padding: 1.5rem 1rem;
+    border-radius: 12px;
+    max-width: 350px;
     margin: 0 auto;
     width: 100%;
-    min-height: 180px;
+    flex: 1;
+    min-height: 0;
     text-align: center;
 }
 
@@ -405,59 +434,61 @@ body {
 }
 
 .placeholder-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
 }
 
 .placeholder-text {
-    font-size: var(--texto-grande);
+    font-size: 1.25rem;
     font-weight: 600;
 }
 
-/* Texto del paso - INSTRUCCION GRANDE Y CLARA */
+/* Texto del paso - COMPACTO PERO LEGIBLE */
 .step-text {
     background: var(--color-fondo);
-    padding: 2rem;
-    border-radius: var(--radio-bordes);
-    box-shadow: var(--sombra);
-    font-size: var(--texto-instruccion);
-    line-height: 1.5;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    font-size: 1.1rem;
+    line-height: 1.4;
     text-align: center;
-    max-width: 500px;
+    max-width: 350px;
     width: 100%;
     font-weight: 500;
+    flex-shrink: 0;
 }
 
 .step-text strong {
     color: var(--color-acento);
-    font-size: 2.25rem;
+    font-size: 1.35rem;
     font-weight: 700;
     display: inline;
 }
 
-/* Navegacion - BOTONES GRANDES */
+/* Navegacion - BOTONES CLAROS PERO COMPACTOS */
 .step-navigation {
     display: flex;
-    gap: 1rem;
-    padding: 1.5rem;
+    gap: 0.75rem;
+    padding: 0.75rem;
     background: var(--color-fondo);
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
 }
 
 .nav-btn {
     flex: 1;
-    padding: 1.25rem;
+    padding: 1rem;
     border: none;
-    border-radius: var(--radio-bordes);
-    font-size: var(--texto-boton);
+    border-radius: 12px;
+    font-size: 1.1rem;
     font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
     transition: var(--transicion);
-    min-height: var(--boton-altura);
+    min-height: 50px;
 }
 
 .prev-btn {
@@ -489,34 +520,35 @@ body {
 
 .complete-content {
     flex: 1;
-    padding: 2.5rem 1.5rem;
+    padding: 1rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
+    overflow-y: auto;
 }
 
 .complete-icon {
-    font-size: 5rem;
-    margin-bottom: 1.5rem;
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
 }
 
 .complete-content h3 {
-    font-size: 2rem;
+    font-size: 1.5rem;
     color: var(--color-exito);
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     font-weight: 700;
 }
 
 /* Mensaje de exito */
 .success-message {
     background: var(--color-exito-fondo);
-    border-left: 6px solid var(--color-exito);
-    padding: 1.5rem 2rem;
-    border-radius: 0 var(--radio-bordes) var(--radio-bordes) 0;
-    font-size: var(--texto-grande);
-    margin-bottom: 2rem;
-    max-width: 500px;
+    border-left: 4px solid var(--color-exito);
+    padding: 0.75rem 1rem;
+    border-radius: 0 10px 10px 0;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    max-width: 400px;
     width: 100%;
     text-align: left;
     font-weight: 600;
@@ -524,20 +556,20 @@ body {
 
 .notes-section {
     width: 100%;
-    max-width: 500px;
+    max-width: 400px;
     background: var(--color-fondo);
-    padding: 1.5rem 2rem;
-    border-radius: var(--radio-bordes);
-    box-shadow: var(--sombra);
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     text-align: left;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
 }
 
 .notes-section h4 {
-    font-size: var(--texto-base);
+    font-size: 0.9rem;
     color: var(--color-texto-secundario);
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
     border-bottom: 2px solid var(--color-gris-claro);
     font-weight: 600;
 }
@@ -547,12 +579,12 @@ body {
 }
 
 .notes-section li {
-    padding: 0.75rem 0;
-    padding-left: 2rem;
+    padding: 0.4rem 0;
+    padding-left: 1.25rem;
     position: relative;
-    font-size: var(--texto-base);
+    font-size: 0.9rem;
     border-bottom: 1px solid var(--color-gris-claro);
-    line-height: 1.6;
+    line-height: 1.4;
 }
 
 .notes-section li:last-child {
@@ -565,18 +597,18 @@ body {
     left: 0;
     color: var(--color-acento);
     font-weight: bold;
-    font-size: 1.5rem;
+    font-size: 1.25rem;
 }
 
 /* Aviso especial */
 .special-warning {
     background: var(--color-aviso-fondo);
-    border-left: 6px solid var(--color-aviso);
-    padding: 1.5rem 2rem;
-    border-radius: 0 var(--radio-bordes) var(--radio-bordes) 0;
-    font-size: var(--texto-grande);
-    margin-bottom: 2rem;
-    max-width: 500px;
+    border-left: 4px solid var(--color-aviso);
+    padding: 0.75rem 1rem;
+    border-radius: 0 10px 10px 0;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    max-width: 400px;
     width: 100%;
     text-align: left;
     font-weight: 600;
@@ -586,13 +618,14 @@ body {
     background: var(--color-acento);
     color: var(--color-fondo);
     border: none;
-    padding: 1.25rem 2.5rem;
-    font-size: var(--texto-boton);
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
     font-weight: 700;
-    border-radius: var(--radio-bordes);
+    border-radius: 12px;
     cursor: pointer;
     transition: var(--transicion);
-    min-height: var(--boton-altura);
+    min-height: 50px;
+    flex-shrink: 0;
 }
 
 .home-btn:hover {
@@ -603,37 +636,64 @@ body {
    RESPONSIVE - TABLET Y DESKTOP
    ===================================================== */
 
+/* Pantallas mas altas - mostrar 3x2 grid */
+@media (min-height: 700px) {
+    .process-card {
+        padding: 0.75rem;
+    }
+
+    .process-icon {
+        font-size: 2rem;
+    }
+
+    .process-title {
+        font-size: 1rem;
+    }
+
+    .step-text {
+        font-size: 1.25rem;
+        padding: 1rem;
+    }
+
+    .step-text strong {
+        font-size: 1.5rem;
+    }
+}
+
+/* Tablets */
 @media (min-width: 600px) {
     .process-grid {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
     }
 
     .info-grid {
         grid-template-columns: repeat(3, 1fr);
     }
 
-    .process-card {
-        min-height: 160px;
+    .image-container {
+        max-width: 400px;
     }
 }
 
+/* Desktop */
 @media (min-width: 900px) {
     #app {
-        max-width: 800px;
+        max-width: 600px;
         margin: 0 auto;
         box-shadow: 0 0 40px rgba(0, 0, 0, 0.1);
     }
 
     .header {
-        padding: 3rem 2rem;
+        padding: 1.5rem;
     }
 
     .main-content {
-        padding: 2.5rem;
+        padding: 1rem;
     }
 
     .step-content {
-        padding: 2.5rem;
+        padding: 1rem;
     }
 }
 
