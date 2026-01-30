@@ -145,12 +145,12 @@ body {
     flex: 1;
 }
 
-/* Tarjetas de proceso - COMPACTAS */
+/* Tarjetas de proceso - ACCESIBILIDAD COGNITIVA */
 .process-card {
     background: var(--color-fondo);
     border: 2px solid var(--color-gris-claro);
     border-radius: 12px;
-    padding: 0.5rem;
+    padding: 0.6rem;
     text-align: center;
     cursor: pointer;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
@@ -159,7 +159,7 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.25rem;
+    gap: 0.4rem;
 }
 
 .process-card:hover {
@@ -171,19 +171,33 @@ body {
     transform: scale(0.98);
 }
 
+/* Colores por tipo de proceso (accesibilidad cognitiva) */
+/* Fondo de color completo + borde izquierdo grueso */
+.process-card.card-repartidor {
+    background: linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%);
+    border-left: 8px solid #FF9800;
+    border-top: 2px solid #FFE082;
+}
+
+.process-card.card-cliente {
+    background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+    border-left: 8px solid #2196F3;
+    border-top: 2px solid #90CAF9;
+}
+
 .process-icon {
-    font-size: 1.75rem;
+    font-size: 3.5rem;
 }
 
 .process-title {
-    font-size: 0.95rem;
+    font-size: 1.15rem;
     font-weight: 700;
     color: var(--color-texto);
     line-height: 1.2;
 }
 
 .process-desc {
-    font-size: 0.75rem;
+    font-size: 0.9rem;
     color: var(--color-texto-secundario);
     line-height: 1.3;
 }
@@ -376,7 +390,7 @@ body {
     color: var(--color-acento);
 }
 
-/* Contenido del paso - ocupa espacio disponible */
+/* Contenido del paso - OPTIMIZADO para llenar espacio */
 .step-content {
     flex: 1;
     padding: 0.5rem;
@@ -385,23 +399,25 @@ body {
     gap: 0.5rem;
     align-items: center;
     overflow: hidden;
-    min-height: 0; /* Importante para flexbox */
+    min-height: 0; /* CLAVE para flexbox */
 }
 
-/* Contenedor de imagen - se adapta al espacio */
+/* Contenedor de imagen - SIN FONDO, llena todo el espacio */
 .image-container {
     position: relative;
     width: 100%;
-    max-width: 350px;
+    max-width: none; /* Sin límite */
     margin: 0 auto;
-    border-radius: 12px;
+    border-radius: 0;
     overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    background: var(--color-fondo-claro);
+    box-shadow: none; /* Sin sombra */
+    background: transparent; /* Sin fondo gris */
     flex: 1;
-    min-height: 0;
+    min-height: 0; /* CLAVE - permite que se encoja/crezca */
     display: flex;
     align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
 }
 
 .image-container img {
@@ -421,7 +437,7 @@ body {
     color: var(--color-fondo);
     padding: 1.5rem 1rem;
     border-radius: 12px;
-    max-width: 350px;
+    max-width: 500px; /* Aumentado de 350px */
     margin: 0 auto;
     width: 100%;
     flex: 1;
@@ -452,7 +468,7 @@ body {
     font-size: 1.1rem;
     line-height: 1.4;
     text-align: center;
-    max-width: 350px;
+    max-width: 500px; /* Aumentado de 350px */
     width: 100%;
     font-weight: 500;
     flex-shrink: 0;
@@ -524,6 +540,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center; /* Centrar verticalmente */
     text-align: center;
     overflow-y: auto;
 }
@@ -636,18 +653,23 @@ body {
    RESPONSIVE - TABLET Y DESKTOP
    ===================================================== */
 
-/* Pantallas mas altas - mostrar 3x2 grid */
+/* Pantallas mas altas - iconos aun mas grandes */
 @media (min-height: 700px) {
     .process-card {
-        padding: 0.75rem;
+        padding: 1rem;
+        gap: 0.6rem;
     }
 
     .process-icon {
-        font-size: 2rem;
+        font-size: 4rem;
     }
 
     .process-title {
-        font-size: 1rem;
+        font-size: 1.2rem;
+    }
+
+    .process-desc {
+        font-size: 0.95rem;
     }
 
     .step-text {
@@ -660,19 +682,15 @@ body {
     }
 }
 
-/* Tablets */
+/* Tablets - mantener 2 columnas para tarjetas */
 @media (min-width: 600px) {
     .process-grid {
-        grid-template-columns: repeat(3, 1fr);
         gap: 0.75rem;
+        /* Mantener 2 columnas, NO cambiar a 3 */
     }
 
     .info-grid {
         grid-template-columns: repeat(3, 1fr);
-    }
-
-    .image-container {
-        max-width: 400px;
     }
 }
 
