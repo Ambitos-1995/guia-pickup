@@ -274,18 +274,25 @@ function updateStep() {
     // Mostrar imagen o placeholder
     // Los circulos ya estan dibujados en las imagenes
     if (paso.imagen) {
+        // CON imagen: mostrar imagen arriba, instrucciones abajo
         imageContainer.style.display = 'block';
         noImagePlaceholder.classList.remove('active');
         stepImage.src = paso.imagen;
-        // Ocultar highlight (ya no se usa, los circulos estan en las fotos)
         if (highlight) highlight.style.display = 'none';
+        // Instrucciones en el recuadro de abajo
+        stepText.innerHTML = paso.texto;
     } else {
+        // SIN imagen: instrucciones DENTRO del placeholder morado
         imageContainer.style.display = 'none';
         noImagePlaceholder.classList.add('active');
+        // Poner las instrucciones DENTRO del placeholder
+        noImagePlaceholder.innerHTML = `
+            <span class="placeholder-icon">📋</span>
+            <div class="placeholder-instructions">${paso.texto}</div>
+        `;
+        // Abajo solo indicar que lean arriba
+        stepText.innerHTML = '<span class="read-above">↑ Leer arriba</span>';
     }
-
-    // Actualizar texto (instruccion simplificada)
-    stepText.innerHTML = paso.texto;
 
     // Actualizar botones de navegacion
     prevBtn.disabled = currentStep === 0;

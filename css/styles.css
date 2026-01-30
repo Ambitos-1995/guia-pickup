@@ -366,10 +366,10 @@ body {
     text-overflow: ellipsis;
 }
 
-/* Indicador de progreso - COMPACTO */
+/* Indicador de progreso - GRANDE Y VISIBLE */
 .progress-bar {
     background: var(--color-fondo-claro);
-    padding: 0.5rem 1rem;
+    padding: 0.75rem 1rem;
     text-align: center;
     border-bottom: 2px solid var(--color-gris-claro);
     flex-shrink: 0;
@@ -380,13 +380,13 @@ body {
 }
 
 .progress-text {
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: var(--color-texto);
 }
 
 .progress-text .current-step {
-    font-size: 1.5rem;
+    font-size: 2rem;
     color: var(--color-acento);
 }
 
@@ -427,7 +427,7 @@ body {
     display: block;
 }
 
-/* Placeholder sin imagen */
+/* Placeholder sin imagen - INSTRUCCIONES DENTRO */
 .no-image-placeholder {
     display: none;
     flex-direction: column;
@@ -435,14 +435,15 @@ body {
     justify-content: center;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: var(--color-fondo);
-    padding: 1.5rem 1rem;
-    border-radius: 12px;
-    max-width: 500px; /* Aumentado de 350px */
+    padding: 1.5rem;
+    border-radius: 16px;
+    max-width: 500px;
     margin: 0 auto;
     width: 100%;
     flex: 1;
     min-height: 0;
     text-align: center;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
 }
 
 .no-image-placeholder.active {
@@ -450,13 +451,35 @@ body {
 }
 
 .placeholder-icon {
-    font-size: 2.5rem;
-    margin-bottom: 0.5rem;
+    font-size: 3rem;
+    margin-bottom: 1rem;
 }
 
 .placeholder-text {
     font-size: 1.25rem;
     font-weight: 600;
+}
+
+/* Instrucciones DENTRO del placeholder */
+.placeholder-instructions {
+    font-size: 1.4rem;
+    line-height: 1.6;
+    font-weight: 500;
+    padding: 0.5rem;
+}
+
+.placeholder-instructions strong {
+    color: #FFD54F;
+    font-size: 1.6rem;
+    font-weight: 700;
+    display: inline;
+}
+
+/* Texto "Leer arriba" */
+.read-above {
+    color: #999;
+    font-size: 1rem;
+    font-style: italic;
 }
 
 /* Texto del paso - COMPACTO PERO LEGIBLE */
@@ -534,58 +557,62 @@ body {
    PANTALLA COMPLETADO
    ===================================================== */
 
+/* PANTALLA COMPLETADO - REDISEÑADA para accesibilidad cognitiva */
 .complete-content {
     flex: 1;
-    padding: 1rem;
+    padding: 1.5rem;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center; /* Centrar verticalmente */
+    justify-content: center;
     text-align: center;
     overflow-y: auto;
+    background: linear-gradient(180deg, #E8F5E9 0%, #FFFFFF 50%);
 }
 
 .complete-icon {
-    font-size: 3rem;
-    margin-bottom: 0.5rem;
+    font-size: 5rem;
+    margin-bottom: 0.75rem;
+    filter: drop-shadow(0 4px 8px rgba(76, 175, 80, 0.3));
 }
 
 .complete-content h3 {
-    font-size: 1.5rem;
+    font-size: 2rem;
     color: var(--color-exito);
-    margin-bottom: 1rem;
+    margin-bottom: 1.25rem;
     font-weight: 700;
 }
 
-/* Mensaje de exito */
+/* Mensaje de exito - MÁS GRANDE */
 .success-message {
     background: var(--color-exito-fondo);
-    border-left: 4px solid var(--color-exito);
-    padding: 0.75rem 1rem;
-    border-radius: 0 10px 10px 0;
-    font-size: 1rem;
+    border-left: 6px solid var(--color-exito);
+    padding: 1rem 1.25rem;
+    border-radius: 0 12px 12px 0;
+    font-size: 1.2rem;
     margin-bottom: 1rem;
-    max-width: 400px;
+    max-width: 450px;
     width: 100%;
     text-align: left;
     font-weight: 600;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.15);
 }
 
 .notes-section {
     width: 100%;
-    max-width: 400px;
+    max-width: 450px;
     background: var(--color-fondo);
-    padding: 0.75rem 1rem;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     text-align: left;
     margin-bottom: 1rem;
 }
 
 .notes-section h4 {
-    font-size: 0.9rem;
+    font-size: 1rem;
     color: var(--color-texto-secundario);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
     border-bottom: 2px solid var(--color-gris-claro);
     font-weight: 600;
@@ -596,12 +623,12 @@ body {
 }
 
 .notes-section li {
-    padding: 0.4rem 0;
-    padding-left: 1.25rem;
+    padding: 0.5rem 0;
+    padding-left: 1.5rem;
     position: relative;
-    font-size: 0.9rem;
+    font-size: 1.05rem;
     border-bottom: 1px solid var(--color-gris-claro);
-    line-height: 1.4;
+    line-height: 1.5;
 }
 
 .notes-section li:last-child {
@@ -614,39 +641,44 @@ body {
     left: 0;
     color: var(--color-acento);
     font-weight: bold;
-    font-size: 1.25rem;
+    font-size: 1.5rem;
 }
 
-/* Aviso especial */
+/* Aviso especial - MÁS VISIBLE */
 .special-warning {
     background: var(--color-aviso-fondo);
-    border-left: 4px solid var(--color-aviso);
-    padding: 0.75rem 1rem;
-    border-radius: 0 10px 10px 0;
-    font-size: 1rem;
+    border-left: 6px solid var(--color-aviso);
+    padding: 1rem 1.25rem;
+    border-radius: 0 12px 12px 0;
+    font-size: 1.15rem;
     margin-bottom: 1rem;
-    max-width: 400px;
+    max-width: 450px;
     width: 100%;
     text-align: left;
     font-weight: 600;
+    box-shadow: 0 2px 8px rgba(255, 152, 0, 0.15);
 }
 
+/* Botón de volver - MÁS GRANDE */
 .home-btn {
     background: var(--color-acento);
     color: var(--color-fondo);
     border: none;
-    padding: 1rem 2rem;
-    font-size: 1.1rem;
+    padding: 1.25rem 2.5rem;
+    font-size: 1.3rem;
     font-weight: 700;
-    border-radius: 12px;
+    border-radius: 14px;
     cursor: pointer;
     transition: var(--transicion);
-    min-height: 50px;
+    min-height: 60px;
     flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(227, 30, 36, 0.3);
 }
 
 .home-btn:hover {
     background: var(--color-acento-oscuro);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(227, 30, 36, 0.4);
 }
 
 /* =====================================================
