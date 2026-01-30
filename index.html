@@ -207,24 +207,47 @@
 
     <script src="js/app.js"></script>
 
-    <!-- PWA Service Worker Registration -->
+    <!-- PWA Service Worker Registration con Auto-Update -->
     <script>
         // Registrar Service Worker para funcionamiento offline
         if ('serviceWorker' in navigator) {
+            // Recargar automaticamente cuando hay nueva version
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refreshing) return;
+                refreshing = true;
+                console.log('Nueva version detectada, recargando...');
+                window.location.reload();
+            });
+
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
                     .then((registration) => {
                         console.log('Service Worker registrado:', registration.scope);
 
-                        // Verificar actualizaciones
+                        // Verificar actualizaciones cada 60 segundos
+                        setInterval(() => {
+                            registration.update();
+                            console.log('Verificando actualizaciones...');
+                        }, 60000);
+
+                        // Verificar actualizaciones al volver a la app (visibilitychange)
+                        document.addEventListener('visibilitychange', () => {
+                            if (document.visibilityState === 'visible') {
+                                registration.update();
+                            }
+                        });
+
+                        // Detectar cuando hay nueva version instalada
                         registration.addEventListener('updatefound', () => {
                             const newWorker = registration.installing;
                             console.log('Nueva version del Service Worker encontrada');
 
                             newWorker.addEventListener('statechange', () => {
                                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    // Nueva version disponible
-                                    console.log('Nueva version disponible');
+                                    console.log('Nueva version lista, activando...');
+                                    // El skipWaiting en sw.js activara el nuevo SW
+                                    // y el controllerchange de arriba recargara la pagina
                                 }
                             });
                         });
@@ -243,7 +266,6 @@
         // Manejar el prompt de instalacion
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
-            // Guardar el evento para usarlo despues
             deferredPrompt = e;
             console.log('App lista para instalar');
         });
