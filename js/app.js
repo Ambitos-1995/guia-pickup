@@ -1,441 +1,194 @@
 /* =====================================================
-   GUIA PICKUP - JAVASCRIPT (ACCESIBILIDAD COGNITIVA)
+   APP - Main router, session, navigation, modal
    ===================================================== */
+var App = (function () {
+    'use strict';
 
-// Datos de los procesos con TEXTOS SIMPLIFICADOS
-// Las imagenes ya tienen los circulos dibujados
-const procesosData = {
-    "recepcion-repartidor-seur": {
-        id: "recepcion-repartidor-seur",
-        titulo: "Recibir paquetes SEUR",
-        descripcion: "Llega el repartidor de SEUR",
-        icono: "🚚",
-        pasos: [
-            {
-                imagen: "img/fotos con circulos/1.png",
-                texto: "Pulsa <strong>REPARTIDOR</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/5.png",
-                texto: "Pulsa <strong>RECEPCION DE PAQUETES</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/7.png",
-                texto: "Pulsa <strong>SEUR</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/9.png",
-                texto: "Pulsa el <strong>boton grande</strong>.<br>Escanea cada paquete."
-            },
-            {
-                imagen: null,
-                texto: "Pulsa <strong>CONTINUAR</strong>"
+    var session = null;
+    var currentScreen = 'screen-menu';
+    var menuClockTimer = null;
+    var modalCallback = null;
+
+    function init() {
+        // Init all modules
+        Pin.init();
+        Schedule.init();
+        Clock.init();
+        Guia.init();
+        Payment.init();
+        Admin.init();
+        Install.init();
+
+        // Menu card navigation
+        document.getElementById('menu-grid').addEventListener('click', function (e) {
+            var card = e.target.closest('.menu-card');
+            if (!card) return;
+
+            // Admin always requires PIN
+            if (card.id === 'card-admin') {
+                Pin.openForAdmin();
+                navigate('screen-pin');
+                return;
             }
-        ],
-        mensajeExito: "Los paquetes estan guardados.",
-        notas: [
-            "Escanea todos los paquetes",
-            "Cuenta que esten todos"
-        ],
-        avisoEspecial: null
-    },
-    "recepcion-repartidor-tipsa": {
-        id: "recepcion-repartidor-tipsa",
-        titulo: "Recibir paquetes TIPSA",
-        descripcion: "Llega el repartidor de TIPSA",
-        icono: "🚚",
-        pasos: [
-            {
-                imagen: "img/fotos con circulos/1.png",
-                texto: "Pulsa <strong>REPARTIDOR</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/5.png",
-                texto: "Pulsa <strong>RECEPCION DE PAQUETES</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/8.png",
-                texto: "Pulsa <strong>TIPSA</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/9.png",
-                texto: "Pulsa el <strong>boton grande</strong>.<br>Escanea cada paquete."
-            },
-            {
-                imagen: null,
-                texto: "Pulsa <strong>CONTINUAR</strong>"
+
+            // Fichar always requires employee PIN
+            if (card.id === 'card-fichar') {
+                Pin.openForEmployee('screen-clock');
+                navigate('screen-pin');
+                return;
             }
-        ],
-        mensajeExito: "Los paquetes estan guardados.",
-        notas: [
-            "Escanea todos los paquetes",
-            "Cuenta que esten todos"
-        ],
-        avisoEspecial: null
-    },
-    "recogida-repartidor": {
-        id: "recogida-repartidor",
-        titulo: "Repartidor recoge paquetes",
-        descripcion: "Se lleva los paquetes depositados",
-        icono: "📦",
-        pasos: [
-            {
-                imagen: "img/fotos con circulos/1.png",
-                texto: "Pulsa <strong>REPARTIDOR</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/6.png",
-                texto: "Pulsa <strong>RECOGIDA DE PAQUETES</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/7.png",
-                texto: "Pulsa <strong>SEUR</strong> o <strong>TIPSA</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/9.png",
-                texto: "Escanea cada paquete que se lleva."
-            },
-            {
-                imagen: null,
-                texto: "Pulsa <strong>CONTINUAR</strong>"
-            }
-        ],
-        mensajeExito: "Los paquetes estan registrados.",
-        notas: [
-            "Escanea todos los paquetes",
-            "El repartidor se los lleva"
-        ],
-        avisoEspecial: null
-    },
-    "deposito-etiqueta": {
-        id: "deposito-etiqueta",
-        titulo: "Cliente deja paquete",
-        descripcion: "Tiene etiqueta impresa",
-        icono: "🏷️",
-        pasos: [
-            {
-                imagen: "img/fotos con circulos/2.png",
-                texto: "Pulsa <strong>CLIENTE</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/4.png",
-                texto: "Pulsa <strong>DEPOSITO DE PAQUETES</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/10.png",
-                texto: "Pulsa <strong>Una etiqueta de envio</strong>"
-            },
-            {
-                imagen: null,
-                texto: "Escanea la etiqueta.<br>Pide el <strong>telefono</strong> al cliente.<br>Pulsa <strong>CONTINUAR</strong>."
-            }
-        ],
-        mensajeExito: "Guarda el paquete en la estanteria.",
-        notas: [
-            "La etiqueta va pegada al paquete",
-            "Apunta el telefono del cliente"
-        ],
-        avisoEspecial: null
-    },
-    "deposito-qr": {
-        id: "deposito-qr",
-        titulo: "Devolucion con QR",
-        descripcion: "Cliente tiene QR en el movil",
-        icono: "📱",
-        pasos: [
-            {
-                imagen: "img/fotos con circulos/2.png",
-                texto: "Pulsa <strong>CLIENTE</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/4.png",
-                texto: "Pulsa <strong>DEPOSITO DE PAQUETES</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/11.png",
-                texto: "Pulsa <strong>Un codigo QR</strong>"
-            },
-            {
-                imagen: null,
-                texto: "Escanea el <strong>QR del movil</strong> del cliente."
-            },
-            {
-                imagen: null,
-                texto: "Escribe en una etiqueta:<br><strong>El codigo + ES26626</strong><br>Pegala en el paquete."
-            }
-        ],
-        mensajeExito: "Guarda el paquete en la estanteria.",
-        notas: [
-            "Siempre pon etiqueta al paquete",
-            "Escribe claro el codigo"
-        ],
-        avisoEspecial: null
-    },
-    "entrega-cliente": {
-        id: "entrega-cliente",
-        titulo: "Cliente recoge paquete",
-        descripcion: "Viene a buscar su paquete",
-        icono: "🎁",
-        pasos: [
-            {
-                imagen: "img/fotos con circulos/2.png",
-                texto: "Pulsa <strong>CLIENTE</strong>"
-            },
-            {
-                imagen: "img/fotos con circulos/3.png",
-                texto: "Pulsa <strong>RECOGIDA DE PAQUETES</strong>"
-            },
-            {
-                imagen: null,
-                texto: "Pregunta: <strong>¿Tienes QR o DNI?</strong><br>Pulsa la opcion."
-            },
-            {
-                imagen: null,
-                texto: "Busca el paquete.<br>Escanea la <strong>etiqueta</strong>."
-            },
-            {
-                imagen: null,
-                texto: "El cliente <strong>firma en la pantalla</strong>.<br>Dale su paquete."
-            }
-        ],
-        mensajeExito: "El cliente ya tiene su paquete.",
-        notas: [
-            "Si no tiene QR, usa el DNI",
-            "El cliente debe firmar"
-        ],
-        avisoEspecial: "Si hay que cobrar: SOLO con tarjeta. Nunca dinero."
-    }
-};
 
-// Estado de la aplicacion
-let currentProcess = null;
-let currentStep = 0;
+            var target = card.dataset.screen;
+            if (target) navigate(target);
+        });
 
-// Elementos del DOM
-const homeScreen = document.getElementById('home-screen');
-const processScreen = document.getElementById('process-screen');
-const completeScreen = document.getElementById('complete-screen');
+        document.getElementById('pin-public-schedule').addEventListener('click', function () {
+            navigate('screen-menu');
+        });
 
-const processCards = document.querySelectorAll('.process-card');
-const infoToggle = document.getElementById('info-toggle');
-const infoContent = document.getElementById('info-content');
+        // All back buttons
+        document.querySelectorAll('.back-btn[data-back]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                navigate(btn.dataset.back);
+            });
+        });
 
-const backToHomeBtn = document.getElementById('back-to-home');
-const backToHomeFinalBtn = document.getElementById('back-to-home-final');
-const prevBtn = document.getElementById('prev-btn');
-const nextBtn = document.getElementById('next-btn');
-const finishBtn = document.getElementById('finish-btn');
+        // Logout
+        document.getElementById('logout-btn').addEventListener('click', logout);
 
-const processTitle = document.getElementById('process-title');
-const progressText = document.getElementById('progress-text');
-const imageContainer = document.getElementById('image-container');
-const stepImage = document.getElementById('step-image');
-const highlight = document.getElementById('highlight');
-const noImagePlaceholder = document.getElementById('no-image-placeholder');
-const stepText = document.getElementById('step-text');
+        // Modal
+        document.getElementById('modal-cancel').addEventListener('click', closeModal);
+        document.getElementById('modal-ok').addEventListener('click', function () {
+            var cb = modalCallback;
+            closeModal();
+            if (cb) cb();
+        });
 
-const completeTitle = document.getElementById('complete-title');
-const successMessage = document.getElementById('success-message');
-const notesList = document.getElementById('notes-list');
-const specialWarning = document.getElementById('special-warning');
-
-// Funciones de navegacion entre pantallas
-function showScreen(screen) {
-    homeScreen.classList.remove('active');
-    processScreen.classList.remove('active');
-    completeScreen.classList.remove('active');
-    screen.classList.add('active');
-
-    // Scroll al inicio
-    window.scrollTo(0, 0);
-}
-
-function goToHome() {
-    currentProcess = null;
-    currentStep = 0;
-    showScreen(homeScreen);
-}
-
-function startProcess(processId) {
-    currentProcess = procesosData[processId];
-    currentStep = 0;
-    processTitle.textContent = currentProcess.titulo;
-    showScreen(processScreen);
-    updateStep();
-}
-
-function updateStep() {
-    const paso = currentProcess.pasos[currentStep];
-    const totalPasos = currentProcess.pasos.length;
-
-    // Actualizar indicador de progreso (grande y claro)
-    progressText.innerHTML = `Paso <span class="current-step">${currentStep + 1}</span> de ${totalPasos}`;
-
-    // Mostrar imagen o placeholder
-    // Los circulos ya estan dibujados en las imagenes
-    if (paso.imagen) {
-        // CON imagen: mostrar imagen arriba, instrucciones abajo
-        imageContainer.style.display = 'block';
-        noImagePlaceholder.classList.remove('active');
-        stepImage.src = paso.imagen;
-        if (highlight) highlight.style.display = 'none';
-        // Instrucciones en el recuadro de abajo
-        stepText.innerHTML = paso.texto;
-    } else {
-        // SIN imagen: instrucciones DENTRO del placeholder morado
-        imageContainer.style.display = 'none';
-        noImagePlaceholder.classList.add('active');
-        // Poner las instrucciones DENTRO del placeholder
-        noImagePlaceholder.innerHTML = `
-            <span class="placeholder-icon">📋</span>
-            <div class="placeholder-instructions">${paso.texto}</div>
-        `;
-        // Abajo solo indicar que lean arriba
-        stepText.innerHTML = '<span class="read-above">↑ Leer arriba</span>';
+        navigate('screen-menu');
     }
 
-    // Actualizar botones de navegacion
-    prevBtn.disabled = currentStep === 0;
-    prevBtn.style.visibility = currentStep === 0 ? 'hidden' : 'visible';
+    // ---- NAVIGATION ----
 
-    if (currentStep === totalPasos - 1) {
-        nextBtn.innerHTML = 'Terminar <span>✓</span>';
-    } else {
-        nextBtn.innerHTML = 'Siguiente <span>→</span>';
-    }
-
-    // Scroll al inicio del paso
-    window.scrollTo(0, 0);
-}
-
-function nextStep() {
-    const totalPasos = currentProcess.pasos.length;
-
-    if (currentStep < totalPasos - 1) {
-        currentStep++;
-        updateStep();
-    } else {
-        showCompleteScreen();
-    }
-}
-
-function prevStep() {
-    if (currentStep > 0) {
-        currentStep--;
-        updateStep();
-    }
-}
-
-function showCompleteScreen() {
-    completeTitle.textContent = currentProcess.titulo;
-
-    // Mensaje de exito
-    if (successMessage) {
-        successMessage.innerHTML = `✅ ¡Bien hecho! ${currentProcess.mensajeExito}`;
-    }
-
-    // Renderizar notas
-    notesList.innerHTML = currentProcess.notas
-        .map(nota => `<li>${nota}</li>`)
-        .join('');
-
-    // Mostrar aviso especial si existe
-    if (specialWarning) {
-        if (currentProcess.avisoEspecial) {
-            specialWarning.innerHTML = `💳 ${currentProcess.avisoEspecial}`;
-            specialWarning.style.display = 'block';
-        } else {
-            specialWarning.style.display = 'none';
+    function navigate(screenId) {
+        // Leave current screen — clear session when leaving admin or clock
+        if (currentScreen === 'screen-admin') {
+            session = null;
+            Pin.clearPin();
         }
+        if (currentScreen === 'screen-clock') {
+            Clock.hide();
+            session = null;
+            Pin.clearPin();
+        }
+        if (currentScreen === 'screen-menu' && menuClockTimer) {
+            clearInterval(menuClockTimer);
+            menuClockTimer = null;
+        }
+
+        // Switch screens
+        var screens = document.querySelectorAll('.screen');
+        screens.forEach(function (s) { s.classList.remove('active'); });
+        var target = document.getElementById(screenId);
+        if (target) target.classList.add('active');
+        currentScreen = screenId;
+
+        // Enter new screen
+        if (screenId === 'screen-menu') showMenu();
+        if (screenId === 'screen-schedule') Schedule.show();
+        if (screenId === 'screen-clock') Clock.show();
+        if (screenId === 'screen-guia') Guia.show();
+        if (screenId === 'screen-payment') Payment.show();
+        if (screenId === 'screen-admin') Admin.show();
     }
 
-    showScreen(completeScreen);
-}
+    function isScreen(screenId) {
+        return currentScreen === screenId;
+    }
 
-// Toggle de informacion
-function toggleInfo() {
-    infoToggle.classList.toggle('active');
-    infoContent.classList.toggle('active');
-}
+    // ---- SESSION ----
 
-// Event listeners
-processCards.forEach(card => {
-    card.addEventListener('click', () => {
-        const processId = card.dataset.process;
-        startProcess(processId);
+    function setSession(data) {
+        session = data;
+    }
+
+    function getSession() {
+        return session;
+    }
+
+    function logout() {
+        session = null;
+        Pin.clearPin();
+        navigate('screen-menu');
+    }
+
+    // ---- MENU ----
+
+    function showMenu() {
+        var greetingEl = document.getElementById('greeting');
+        var statusEl = document.getElementById('fichar-status');
+        var ficharCard = document.getElementById('card-fichar');
+        var paymentCard = document.getElementById('card-payment');
+        var adminCard = document.getElementById('card-admin');
+        var logoutBtn = document.getElementById('logout-btn');
+
+        // Public menu — Fichar always visible, requires PIN on tap
+        greetingEl.textContent = 'Panel publico';
+        statusEl.textContent = '';
+        ficharCard.classList.remove('hidden');
+        paymentCard.classList.add('hidden');
+        adminCard.classList.remove('hidden');
+        logoutBtn.classList.add('hidden');
+
+        // Menu clock
+        updateMenuClock();
+        menuClockTimer = setInterval(updateMenuClock, 1000);
+    }
+
+    function updateMenuClock() {
+        var el = document.getElementById('menu-clock');
+        if (el) el.textContent = Utils.formatTime(new Date());
+    }
+
+    // ---- MODAL ----
+
+    function confirm(title, body, onOk) {
+        var modal = document.getElementById('modal-confirm');
+        document.getElementById('modal-title').textContent = title;
+        document.getElementById('modal-body').textContent = body;
+        modalCallback = onOk;
+
+        // Hide cancel button if no callback (info-only modal)
+        var cancelBtn = document.getElementById('modal-cancel');
+        if (onOk) {
+            cancelBtn.classList.remove('hidden');
+        } else {
+            cancelBtn.classList.add('hidden');
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+        document.getElementById('modal-confirm').classList.add('hidden');
+        modalCallback = null;
+    }
+
+    function hasAdminAccess() {
+        return !!(session && (session.role === 'admin' || session.role === 'org_admin'));
+    }
+
+    // ---- BOOTSTRAP ----
+
+    document.addEventListener('DOMContentLoaded', function () {
+        init();
     });
-});
 
-if (infoToggle) {
-    infoToggle.addEventListener('click', toggleInfo);
-}
-
-if (backToHomeBtn) {
-    backToHomeBtn.addEventListener('click', goToHome);
-}
-
-if (backToHomeFinalBtn) {
-    backToHomeFinalBtn.addEventListener('click', goToHome);
-}
-
-if (finishBtn) {
-    finishBtn.addEventListener('click', goToHome);
-}
-
-if (prevBtn) {
-    prevBtn.addEventListener('click', prevStep);
-}
-
-if (nextBtn) {
-    nextBtn.addEventListener('click', nextStep);
-}
-
-// Soporte para gestos en movil (swipe)
-let touchStartX = 0;
-let touchEndX = 0;
-
-function handleSwipe() {
-    const swipeThreshold = 50;
-    const diff = touchStartX - touchEndX;
-
-    if (Math.abs(diff) > swipeThreshold) {
-        if (diff > 0) {
-            nextStep();
-        } else {
-            if (currentStep > 0) {
-                prevStep();
-            }
-        }
-    }
-}
-
-if (processScreen) {
-    processScreen.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-
-    processScreen.addEventListener('touchend', (e) => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipe();
-    }, { passive: true });
-}
-
-// Soporte para teclado
-document.addEventListener('keydown', (e) => {
-    if (!processScreen || !processScreen.classList.contains('active')) return;
-
-    if (e.key === 'ArrowRight' || e.key === ' ') {
-        e.preventDefault();
-        nextStep();
-    } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        if (currentStep > 0) {
-            prevStep();
-        }
-    } else if (e.key === 'Escape') {
-        goToHome();
-    }
-});
-
-// Inicializacion
-console.log('Guia Pickup cargada correctamente');
+    return {
+        navigate: navigate,
+        isScreen: isScreen,
+        setSession: setSession,
+        getSession: getSession,
+        hasAdminAccess: hasAdminAccess,
+        confirm: confirm
+    };
+})();

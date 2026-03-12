@@ -2,277 +2,588 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#E31E24">
-    <meta name="description" content="Guia interactiva paso a paso para gestionar paquetes SEUR/TIPSA en tu tienda.">
+    <meta name="description" content="Fichaje y horarios para el punto pickup SEUR">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Guia Pickup">
-    <meta name="application-name" content="Guia Pickup">
+    <meta name="apple-mobile-web-app-title" content="Pickup TMG">
+    <meta name="application-name" content="Pickup TMG">
     <meta name="msapplication-TileColor" content="#E31E24">
     <meta name="msapplication-tap-highlight" content="no">
 
-    <title>Guia Pickup</title>
+    <title>Pickup TMG</title>
 
-    <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
-
-    <!-- Icons -->
     <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
 
-    <!-- Estilos -->
+    <link rel="stylesheet" href="vendor/webawesome/dist-cdn/styles/webawesome.css">
     <link rel="stylesheet" href="css/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
-        <!-- PANTALLA DE INICIO -->
-        <div id="home-screen" class="screen active">
-            <header class="header">
-                <div class="logo">
-                    <span class="logo-icon">📦</span>
-                    <h1>Guia Pickup</h1>
+
+        <!-- Update Button (shown when new version available) -->
+        <button id="update-btn" class="update-btn hidden" type="button" aria-label="Actualizar aplicacion">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+            Actualizar
+        </button>
+
+        <!-- ============================================ -->
+        <!-- SCREEN: PIN ENTRY                            -->
+        <!-- ============================================ -->
+        <div id="screen-pin" class="screen">
+            <div class="pin-container">
+                <div class="pin-header">
+                    <div class="pin-logo">Pickup TMG</div>
+                    <div class="pin-clock" id="pin-clock">--:--</div>
+                    <div class="pin-date" id="pin-date"></div>
                 </div>
-                <p class="subtitle">Ayuda paso a paso</p>
-            </header>
 
-            <main class="main-content">
-                <section class="processes-section">
-                    <h2>¿Que quieres hacer?</h2>
-                    <div class="process-grid">
-                        <button class="process-card card-repartidor" data-process="recepcion-repartidor-seur">
-                            <span class="process-icon">🚚</span>
-                            <span class="process-title">Recibir paquetes SEUR</span>
-                            <span class="process-desc">Llega el repartidor de SEUR</span>
-                        </button>
+                <p class="pin-prompt" id="pin-prompt">Introduce el PIN de ajustes</p>
 
-                        <button class="process-card card-repartidor" data-process="recepcion-repartidor-tipsa">
-                            <span class="process-icon">🚚</span>
-                            <span class="process-title">Recibir paquetes TIPSA</span>
-                            <span class="process-desc">Llega el repartidor de TIPSA</span>
-                        </button>
+                <div class="pin-dots" id="pin-dots" aria-label="PIN introducido">
+                    <span class="pin-dot" data-index="0"></span>
+                    <span class="pin-dot" data-index="1"></span>
+                    <span class="pin-dot" data-index="2"></span>
+                    <span class="pin-dot" data-index="3"></span>
+                    <span class="pin-dot" data-index="4"></span>
+                    <span class="pin-dot" data-index="5"></span>
+                    <span class="pin-dot" data-index="6"></span>
+                    <span class="pin-dot" data-index="7"></span>
+                </div>
 
-                        <button class="process-card card-repartidor" data-process="recogida-repartidor">
-                            <span class="process-icon">📦</span>
-                            <span class="process-title">Repartidor recoge paquetes</span>
-                            <span class="process-desc">Se lleva los paquetes depositados</span>
-                        </button>
+                <div class="pin-error hidden" id="pin-error" aria-live="polite"></div>
 
-                        <button class="process-card card-cliente" data-process="deposito-etiqueta">
-                            <span class="process-icon">🏷️</span>
-                            <span class="process-title">Cliente deja paquete</span>
-                            <span class="process-desc">Tiene etiqueta impresa</span>
-                        </button>
-
-                        <button class="process-card card-cliente" data-process="deposito-qr">
-                            <span class="process-icon">📱</span>
-                            <span class="process-title">Devolucion con QR</span>
-                            <span class="process-desc">Cliente tiene QR en el movil</span>
-                        </button>
-
-                        <button class="process-card card-cliente" data-process="entrega-cliente">
-                            <span class="process-icon">🎁</span>
-                            <span class="process-title">Cliente recoge paquete</span>
-                            <span class="process-desc">Viene a buscar su paquete</span>
-                        </button>
-                    </div>
-                </section>
-
-                <section class="info-section">
-                    <button class="info-toggle" id="info-toggle">
-                        <span>Datos de la tienda</span>
-                        <span class="toggle-icon">▼</span>
+                <div class="pin-keypad" id="pin-keypad">
+                    <button class="key-btn" data-key="1">1</button>
+                    <button class="key-btn" data-key="2">2</button>
+                    <button class="key-btn" data-key="3">3</button>
+                    <button class="key-btn" data-key="4">4</button>
+                    <button class="key-btn" data-key="5">5</button>
+                    <button class="key-btn" data-key="6">6</button>
+                    <button class="key-btn" data-key="7">7</button>
+                    <button class="key-btn" data-key="8">8</button>
+                    <button class="key-btn" data-key="9">9</button>
+                    <button class="key-btn key-empty" disabled></button>
+                    <button class="key-btn" data-key="0">0</button>
+                    <button class="key-btn key-clear" data-key="clear" aria-label="Borrar">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
                     </button>
-                    <div class="info-content" id="info-content">
-                        <div class="info-grid">
-                            <div class="info-item">
-                                <span class="info-label">Codigo tienda</span>
-                                <span class="info-value">ES26626</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">PIN</span>
-                                <span class="info-value">5500</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Horario</span>
-                                <span class="info-value">9-14 y 17-20</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Tamano maximo</span>
-                                <span class="info-value">50x50x50 cm</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Dias guardado</span>
-                                <span class="info-value">10 dias</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Version app</span>
-                                <span class="info-value" id="app-version">v9</span>
-                            </div>
-                            <div class="info-item highlight-warning">
-                                <span class="info-label">Cobrar</span>
-                                <span class="info-value">SOLO tarjeta. Nunca dinero.</span>
-                            </div>
-                        </div>
+                </div>
 
-                        <div class="other-functions">
-                            <h3>Otros botones de la app</h3>
-                            <ul>
-                                <li><strong>Acciones Pendientes:</strong> Ver tareas sin hacer</li>
-                                <li><strong>Buscar:</strong> Encontrar un paquete</li>
-                                <li><strong>Almacenamiento:</strong> Ver todos los paquetes</li>
-                            </ul>
-                        </div>
-                    </div>
-                </section>
-            </main>
-        </div>
+                <div class="pin-loading hidden" id="pin-loading">
+                    <div class="spinner"></div>
+                    <span>Verificando...</span>
+                </div>
 
-        <!-- PANTALLA DE PROCESO (PASOS) -->
-        <div id="process-screen" class="screen">
-            <header class="process-header">
-                <button class="back-btn" id="back-to-home">
-                    <span>←</span> Inicio
+                <button class="btn-primary pin-submit-btn" id="pin-submit-btn" type="button">
+                    Acceder
                 </button>
-                <h2 id="process-title">Proceso</h2>
-            </header>
 
-            <div class="progress-bar">
-                <span class="progress-text" id="progress-text">Paso <span class="current-step">1</span> de 5</span>
-            </div>
-
-            <main class="step-content">
-                <div class="image-container" id="image-container">
-                    <img id="step-image" src="" alt="Pantalla de la app">
-                    <div class="highlight-circle" id="highlight"></div>
-                </div>
-
-                <div class="no-image-placeholder" id="no-image-placeholder">
-                    <span class="placeholder-icon">📝</span>
-                    <span class="placeholder-text">Sigue las instrucciones</span>
-                </div>
-
-                <div class="step-text" id="step-text">
-                    <!-- Instruccion del paso -->
-                </div>
-            </main>
-
-            <footer class="step-navigation">
-                <button class="nav-btn prev-btn" id="prev-btn">
-                    <span>←</span> Atras
-                </button>
-                <button class="nav-btn next-btn" id="next-btn">
-                    Siguiente <span>→</span>
-                </button>
-            </footer>
-        </div>
-
-        <!-- PANTALLA COMPLETADO -->
-        <div id="complete-screen" class="screen">
-            <header class="process-header">
-                <button class="back-btn" id="back-to-home-final">
-                    <span>←</span> Inicio
-                </button>
-                <h2 id="complete-title">Completado</h2>
-            </header>
-
-            <main class="complete-content">
-                <div class="complete-icon">✅</div>
-                <h3>¡Bien hecho!</h3>
-
-                <div class="success-message" id="success-message">
-                    <!-- Mensaje de exito -->
-                </div>
-
-                <div class="special-warning" id="special-warning" style="display: none;">
-                    <!-- Aviso especial (cobro) -->
-                </div>
-
-                <div class="notes-section">
-                    <h4>Recuerda</h4>
-                    <ul id="notes-list">
-                        <!-- Notas del proceso -->
-                    </ul>
-                </div>
-
-                <button class="home-btn" id="finish-btn">
+                <button class="pin-public-btn" id="pin-public-schedule" type="button">
                     Volver al inicio
                 </button>
-            </main>
+            </div>
         </div>
+
+        <!-- ============================================ -->
+        <!-- SCREEN: MAIN MENU                            -->
+        <!-- ============================================ -->
+        <div id="screen-menu" class="screen active">
+            <div class="menu-container">
+                <header class="menu-header">
+                    <h1 class="greeting" id="greeting">Panel publico</h1>
+                    <div class="menu-clock" id="menu-clock">--:--</div>
+                </header>
+
+                <nav class="menu-grid" id="menu-grid">
+                    <button class="menu-card card-blue" data-screen="screen-schedule" aria-label="Mi Horario">
+                        <span class="card-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></svg>
+                        </span>
+                        <span class="card-title">Mi Horario</span>
+                    </button>
+
+                    <button class="menu-card card-green" id="card-fichar" data-screen="screen-clock" aria-label="Fichar">
+                        <span class="card-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        </span>
+                        <span class="card-title">Fichar</span>
+                        <span class="card-status" id="fichar-status"></span>
+                    </button>
+
+                    <button class="menu-card card-orange" data-screen="screen-guia" aria-label="Guia Pickup">
+                        <span class="card-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                        </span>
+                        <span class="card-title">Guia Pickup</span>
+                    </button>
+
+                    <button class="menu-card card-yellow hidden" id="card-payment" data-screen="screen-payment" aria-label="Mi Pago">
+                        <span class="card-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        </span>
+                        <span class="card-title">Mi Pago</span>
+                    </button>
+
+                    <button class="menu-card card-admin" id="card-admin" data-screen="screen-admin" aria-label="Ajustes">
+                        <span class="card-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </span>
+                        <span class="card-title">Ajustes</span>
+                    </button>
+                </nav>
+
+                <button class="logout-btn hidden" id="logout-btn" aria-label="Salir">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Salir
+                </button>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- SCREEN: MI HORARIO (Schedule)                -->
+        <!-- ============================================ -->
+        <div id="screen-schedule" class="screen">
+            <header class="screen-header">
+                <button class="back-btn" id="schedule-back-btn" data-back="screen-menu" aria-label="Volver">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                </button>
+                <h2>Mi Horario</h2>
+            </header>
+
+            <div class="schedule-shell">
+                <section class="schedule-hero">
+                    <div class="schedule-eyebrow">Panel tactil de asignacion</div>
+                    <div class="schedule-headline">
+                        <div>
+                            <div class="week-label" id="week-label">Semana --</div>
+                            <div class="schedule-range" id="week-range">--</div>
+                        </div>
+                        <div class="schedule-chip">PIN por celda</div>
+                    </div>
+                    <p class="schedule-context" id="schedule-context">
+                        Pulsa una franja libre, escribe tu PIN y tu nombre aparecera automaticamente.
+                    </p>
+                </section>
+
+                <div class="week-nav schedule-week-nav">
+                    <button class="week-arrow" id="week-prev" aria-label="Semana anterior">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <div class="schedule-nav-copy">Desliza por la semana y toca la casilla que quieras gestionar.</div>
+                    <button class="week-arrow" id="week-next" aria-label="Semana siguiente">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                    </button>
+                </div>
+
+                <div class="schedule-board">
+                    <div class="schedule-grid" id="schedule-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <div class="schedule-legend">
+                    <span class="legend-item"><span class="legend-dot legend-free"></span> Libre</span>
+                    <span class="legend-item"><span class="legend-dot legend-mine"></span> Tu turno</span>
+                    <span class="legend-item"><span class="legend-dot legend-taken"></span> Ocupada</span>
+                    <span class="legend-item"><span class="legend-dot legend-empty"></span> Sin franja</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- SCREEN: FICHAR (Clock In/Out)                -->
+        <!-- ============================================ -->
+        <div id="screen-clock" class="screen">
+            <header class="screen-header">
+                <button class="back-btn" data-back="screen-menu" aria-label="Volver">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                </button>
+                <h2>Fichar</h2>
+            </header>
+
+            <div class="clock-container">
+                <div class="clock-time" id="clock-time">--:--:--</div>
+                <div class="clock-today-slot" id="clock-today-slot"></div>
+
+                <div class="clock-status" id="clock-status">
+                    <!-- Filled by JS -->
+                </div>
+
+                <button class="clock-btn clock-btn-in hidden" id="btn-check-in" aria-label="Fichar entrada">
+                    ENTRADA
+                </button>
+
+                <div class="clock-feedback hidden" id="clock-feedback" aria-live="polite">
+                    <div class="feedback-msg" id="feedback-msg"></div>
+                    <button class="feedback-schedule-btn hidden" id="feedback-schedule-btn">Ir a Mi Horario</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- SCREEN: GUIA PICKUP                          -->
+        <!-- ============================================ -->
+        <div id="screen-guia" class="screen">
+            <header class="screen-header">
+                <button class="back-btn" data-back="screen-menu" aria-label="Volver">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                </button>
+                <h2>Guia Pickup</h2>
+            </header>
+
+            <div class="guia-home" id="guia-home">
+                <p class="guia-subtitle">Que quieres hacer?</p>
+                <div class="guia-grid" id="guia-grid">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+
+            <div class="guia-steps hidden" id="guia-steps">
+                <div class="guia-progress">
+                    <span id="guia-progress-text">Paso 1 de 5</span>
+                </div>
+
+                <div class="guia-image-wrap" id="guia-image-wrap">
+                    <img id="guia-step-image" src="" alt="Pantalla de la app">
+                </div>
+
+                <div class="guia-no-image hidden" id="guia-no-image">
+                    <div class="guia-no-image-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    </div>
+                    <div class="guia-no-image-text" id="guia-no-image-text"></div>
+                </div>
+
+                <div class="guia-instruction" id="guia-instruction"></div>
+
+                <div class="guia-nav">
+                    <button class="guia-nav-btn" id="guia-prev" aria-label="Paso anterior">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                        Atras
+                    </button>
+                    <button class="guia-nav-btn guia-nav-next" id="guia-next" aria-label="Paso siguiente">
+                        Siguiente
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="guia-complete hidden" id="guia-complete">
+                <div class="complete-check">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                </div>
+                <h3>Bien hecho!</h3>
+                <p class="complete-msg" id="guia-complete-msg"></p>
+                <div class="complete-warning hidden" id="guia-complete-warning"></div>
+                <ul class="complete-notes" id="guia-complete-notes"></ul>
+                <button class="btn-primary" id="guia-finish">Volver a la guia</button>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- SCREEN: MI PAGO                              -->
+        <!-- ============================================ -->
+        <div id="screen-payment" class="screen">
+            <header class="screen-header">
+                <button class="back-btn" data-back="screen-menu" aria-label="Volver">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                </button>
+                <h2>Mi Pago</h2>
+            </header>
+
+            <div class="payment-container">
+                <div class="payment-month-nav">
+                    <button class="week-arrow" id="pay-month-prev" aria-label="Mes anterior">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <div class="week-label" id="pay-month-label">Marzo 2026</div>
+                    <button class="week-arrow" id="pay-month-next" aria-label="Mes siguiente">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                    </button>
+                </div>
+
+                <div class="payment-cards" id="payment-cards">
+                    <div class="pay-card">
+                        <span class="pay-label">Horas trabajadas</span>
+                        <span class="pay-value" id="pay-hours">--</span>
+                    </div>
+                    <div class="pay-card">
+                        <span class="pay-label">Precio por hora</span>
+                        <span class="pay-value" id="pay-rate">--</span>
+                    </div>
+                    <div class="pay-card pay-card-total">
+                        <span class="pay-label">Total ganado</span>
+                        <span class="pay-value pay-value-big" id="pay-total">--</span>
+                    </div>
+                </div>
+
+                <p class="payment-note" id="payment-note">Los pagos se calculan a final de mes.</p>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- SCREEN: ADMIN PANEL                          -->
+        <!-- ============================================ -->
+        <div id="screen-admin" class="screen">
+            <header class="screen-header">
+                <button class="back-btn" data-back="screen-menu" aria-label="Volver">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                </button>
+                <h2>Admin</h2>
+            </header>
+
+            <div class="admin-container">
+                <nav class="admin-tabs" id="admin-tabs">
+                    <button class="admin-tab active" data-tab="admin-payments">Pagos</button>
+                    <button class="admin-tab" data-tab="admin-employees">Empleados</button>
+                </nav>
+
+                <!-- Admin: Payments -->
+                <div class="admin-section active" id="admin-payments">
+                    <div class="admin-pay-form">
+                        <div class="form-row">
+                            <label for="admin-pay-year">Ano</label>
+                            <input type="number" id="admin-pay-year" min="2020" max="2100" value="2026">
+                        </div>
+                        <div class="form-row">
+                            <label for="admin-pay-month">Mes</label>
+                            <select id="admin-pay-month">
+                                <option value="1">Enero</option><option value="2">Febrero</option>
+                                <option value="3" selected>Marzo</option><option value="4">Abril</option>
+                                <option value="5">Mayo</option><option value="6">Junio</option>
+                                <option value="7">Julio</option><option value="8">Agosto</option>
+                                <option value="9">Septiembre</option><option value="10">Octubre</option>
+                                <option value="11">Noviembre</option><option value="12">Diciembre</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label for="admin-pay-amount">Importe total SEUR</label>
+                            <div class="input-euro">
+                                <input type="number" id="admin-pay-amount" min="0" step="0.01" placeholder="0.00">
+                                <span class="euro-sign">&euro;</span>
+                            </div>
+                        </div>
+                        <button class="btn-primary" id="admin-pay-save">Guardar importe</button>
+                        <button class="btn-secondary" id="admin-pay-calculate">Calcular pagos</button>
+                        <div class="employee-form-feedback hidden" id="admin-pay-feedback"></div>
+                    </div>
+
+                    <div class="admin-pay-results hidden" id="admin-pay-results">
+                        <h3>Distribucion</h3>
+                        <table class="pay-table" id="admin-pay-table">
+                            <thead>
+                                <tr>
+                                    <th>Empleado</th>
+                                    <th>Horas</th>
+                                    <th>Importe</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-pay-tbody"></tbody>
+                            <tfoot id="admin-pay-tfoot"></tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Admin: Employees -->
+                <div class="admin-section hidden" id="admin-employees">
+                    <div class="employee-form" id="employee-form">
+                        <h3>Nuevo empleado</h3>
+                        <div class="form-row">
+                            <label for="emp-name">Nombre</label>
+                            <input type="text" id="emp-name" placeholder="Nombre">
+                        </div>
+                        <div class="form-row">
+                            <label for="emp-surname">Apellido</label>
+                            <input type="text" id="emp-surname" placeholder="Apellido">
+                        </div>
+                        <div class="form-row">
+                            <label for="emp-pin">PIN (4 cifras)</label>
+                            <input type="text" id="emp-pin" maxlength="4" inputmode="numeric" placeholder="1234" pattern="[0-9]{4}">
+                        </div>
+                        <button class="btn-primary" id="admin-emp-create">Crear empleado</button>
+                        <div class="employee-form-feedback hidden" id="emp-feedback"></div>
+                    </div>
+
+                    <div class="employee-list" id="admin-employee-list">
+                        <p class="loading-text">Cargando empleados...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- MODAL: Confirmation Dialog                   -->
+        <!-- ============================================ -->
+        <div id="modal-confirm" class="modal hidden" role="dialog" aria-modal="true">
+            <div class="modal-card">
+                <h3 class="modal-title" id="modal-title">Confirmar</h3>
+                <p class="modal-body" id="modal-body"></p>
+                <div class="modal-actions">
+                    <button class="btn-secondary" id="modal-cancel">Cancelar</button>
+                    <button class="btn-primary" id="modal-ok">Aceptar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- MODAL: Edit Employee                         -->
+        <!-- ============================================ -->
+        <div id="modal-edit-emp" class="modal hidden" role="dialog" aria-modal="true">
+            <div class="modal-card">
+                <h3 class="modal-title">Editar empleado</h3>
+                <div class="form-row">
+                    <label for="edit-emp-name">Nombre</label>
+                    <input type="text" id="edit-emp-name" placeholder="Nombre">
+                </div>
+                <div class="form-row">
+                    <label for="edit-emp-surname">Apellido</label>
+                    <input type="text" id="edit-emp-surname" placeholder="Apellido">
+                </div>
+                <div class="form-row">
+                    <label for="edit-emp-pin">Nuevo PIN (4 cifras, dejar vacío para no cambiar)</label>
+                    <input type="text" id="edit-emp-pin" maxlength="4" inputmode="numeric" placeholder="••••" pattern="[0-9]{4}">
+                </div>
+                <div class="employee-form-feedback hidden" id="edit-emp-feedback"></div>
+                <div class="modal-actions">
+                    <button class="btn-secondary" id="edit-emp-cancel">Cancelar</button>
+                    <button class="btn-primary" id="edit-emp-save">Guardar</button>
+                </div>
+            </div>
+        </div>
+
+        <wa-dialog label="Gestionar turno" id="schedule-slot-dialog" class="schedule-slot-dialog" style="--width:min(92vw, 32rem);">
+            <div class="slot-dialog-stack">
+                <div class="slot-dialog-badge" id="schedule-slot-mode">Turno</div>
+                <h3 class="slot-dialog-title" id="schedule-slot-title">Gestionar franja</h3>
+                <p class="slot-dialog-summary" id="schedule-slot-summary">--</p>
+                <p class="slot-dialog-body" id="schedule-slot-body">Introduce tu PIN para continuar.</p>
+                <wa-callout id="schedule-slot-feedback" variant="neutral" appearance="filled-outlined" class="hidden"></wa-callout>
+                <wa-input
+                    id="schedule-slot-pin"
+                    label="PIN"
+                    hint="Introduce tu PIN personal para asignarte o liberar la franja."
+                    placeholder="4 cifras"
+                    type="password"
+                    inputmode="numeric"
+                    maxlength="8"
+                    size="large"
+                    appearance="filled-outlined"
+                    password-toggle
+                ></wa-input>
+            </div>
+            <wa-button slot="footer" variant="neutral" appearance="outlined" data-dialog="close">Cancelar</wa-button>
+            <wa-button slot="footer" id="schedule-slot-submit" variant="brand" appearance="accent">Continuar</wa-button>
+        </wa-dialog>
+
+        <!-- Install Banners -->
+        <div id="install-banner-android" class="install-banner hidden" role="alert">
+            <div class="install-banner-content">
+                <img src="icons/icon-192.png" alt="" class="install-banner-icon" width="48" height="48">
+                <div class="install-banner-text">
+                    <strong>Instalar Pickup TMG</strong>
+                    <span>Accede mas rapido desde tu pantalla de inicio</span>
+                </div>
+            </div>
+            <div class="install-banner-actions">
+                <button class="install-dismiss" type="button">Ahora no</button>
+                <button class="install-btn-primary" id="install-btn-android" type="button">Instalar</button>
+            </div>
+        </div>
+
+        <div id="install-banner-ios" class="install-banner hidden" role="alert">
+            <div class="install-banner-content">
+                <img src="icons/icon-192.png" alt="" class="install-banner-icon" width="48" height="48">
+                <div class="install-banner-text">
+                    <strong>Instalar Pickup TMG</strong>
+                    <span>Anade la app a tu pantalla de inicio</span>
+                </div>
+            </div>
+            <div class="install-banner-instructions">
+                <p>1. Pulsa el icono <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;color:var(--blue)"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> de compartir</p>
+                <p>2. Selecciona <strong>"Anadir a pantalla de inicio"</strong></p>
+                <p>3. Pulsa <strong>"Anadir"</strong></p>
+            </div>
+            <button class="install-dismiss install-dismiss-ios" type="button">Entendido</button>
+        </div>
+
     </div>
 
+    <!-- JS Modules (loaded in order, no ES modules for max compat) -->
+    <script type="module" src="js/webawesome-init.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/pin.js"></script>
+    <script src="js/schedule.js"></script>
+    <script src="js/clock.js"></script>
+    <script src="js/guia.js"></script>
+    <script src="js/payment.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/install.js"></script>
     <script src="js/app.js"></script>
 
-    <!-- PWA Service Worker Registration con Auto-Update -->
+    <!-- PWA Service Worker -->
     <script>
-        // Registrar Service Worker para funcionamiento offline
         if ('serviceWorker' in navigator) {
-            // Recargar automaticamente cuando hay nueva version
-            let refreshing = false;
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
+            var refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', function () {
                 if (refreshing) return;
                 refreshing = true;
-                console.log('Nueva version detectada, recargando...');
                 window.location.reload();
             });
 
-            window.addEventListener('load', () => {
+            window.addEventListener('load', function () {
                 navigator.serviceWorker.register('./sw.js')
-                    .then((registration) => {
-                        console.log('Service Worker registrado:', registration.scope);
-
-                        // Verificar actualizaciones cada 60 segundos
-                        setInterval(() => {
-                            registration.update();
-                            console.log('Verificando actualizaciones...');
-                        }, 60000);
-
-                        // Verificar actualizaciones al volver a la app (visibilitychange)
-                        document.addEventListener('visibilitychange', () => {
-                            if (document.visibilityState === 'visible') {
-                                registration.update();
-                            }
+                    .then(function (reg) {
+                        // Check for updates every 60s and on visibility change
+                        setInterval(function () { reg.update(); }, 60000);
+                        document.addEventListener('visibilitychange', function () {
+                            if (document.visibilityState === 'visible') reg.update();
                         });
 
-                        // Detectar cuando hay nueva version instalada
-                        registration.addEventListener('updatefound', () => {
-                            const newWorker = registration.installing;
-                            console.log('Nueva version del Service Worker encontrada');
+                        // Show update button when new SW is waiting
+                        function onNewSW(sw) {
+                            if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                                showUpdateButton(sw);
+                            }
+                        }
 
-                            newWorker.addEventListener('statechange', () => {
-                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('Nueva version lista, activando...');
-                                    // El skipWaiting en sw.js activara el nuevo SW
-                                    // y el controllerchange de arriba recargara la pagina
-                                }
+                        // Check if there's already a waiting worker
+                        if (reg.waiting) {
+                            showUpdateButton(reg.waiting);
+                        }
+
+                        reg.addEventListener('updatefound', function () {
+                            var nw = reg.installing;
+                            nw.addEventListener('statechange', function () {
+                                onNewSW(nw);
                             });
                         });
                     })
-                    .catch((error) => {
-                        console.warn('Error al registrar Service Worker:', error);
-                    });
+                    .catch(function (err) { console.warn('SW error:', err); });
             });
         }
 
-        // Detectar si la app fue instalada
-        window.addEventListener('appinstalled', () => {
-            console.log('Guia Pickup instalada correctamente');
-        });
-
-        // Manejar el prompt de instalacion
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            deferredPrompt = e;
-            console.log('App lista para instalar');
-        });
+        function showUpdateButton(waitingSW) {
+            var btn = document.getElementById('update-btn');
+            if (!btn) return;
+            btn.classList.remove('hidden');
+            btn.onclick = function () {
+                btn.textContent = 'Actualizando...';
+                btn.disabled = true;
+                waitingSW.postMessage({ type: 'SKIP_WAITING' });
+            };
+        }
     </script>
 </body>
 </html>

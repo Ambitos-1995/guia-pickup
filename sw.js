@@ -1,18 +1,30 @@
-/* =====================================================
-   GUIA PICKUP - SERVICE WORKER
-   PWA con estrategia Cache-First para uso offline
-   ===================================================== */
-
-const CACHE_NAME = 'guia-pickup-v9';
-const CACHE_VERSION = 9;
-
-// Archivos a cachear durante la instalacion
-const PRECACHE_URLS = [
+var CACHE_NAME = 'pickup-tmg-v19';
+var FILES_TO_CACHE = [
     './',
     './index.html',
-    './css/styles.css',
-    './js/app.js',
     './manifest.json',
+    './css/styles.css',
+    './js/webawesome-init.js',
+    './js/utils.js',
+    './js/api.js',
+    './js/pin.js',
+    './js/schedule.js',
+    './js/clock.js',
+    './js/guia.js',
+    './js/payment.js',
+    './js/admin.js',
+    './js/install.js',
+    './js/app.js',
+    './vendor/webawesome/dist-cdn/styles/webawesome.css',
+    './vendor/webawesome/dist-cdn/styles/layers.css',
+    './vendor/webawesome/dist-cdn/styles/native.css',
+    './vendor/webawesome/dist-cdn/styles/utilities.css',
+    './vendor/webawesome/dist-cdn/styles/themes/default.css',
+    './vendor/webawesome/dist-cdn/styles/color/palettes/default.css',
+    './vendor/webawesome/dist-cdn/webawesome.loader.js',
+    './vendor/webawesome/dist-cdn/translations/es.js',
+    './icons/icon-192.png',
+    './icons/icon-512.png',
     './icons/icon.svg',
     './img/fotos con circulos/1.png',
     './img/fotos con circulos/2.png',
@@ -27,128 +39,67 @@ const PRECACHE_URLS = [
     './img/fotos con circulos/11.png'
 ];
 
-// =====================================================
-// EVENTO: INSTALL - Cachear archivos esenciales
-// =====================================================
-self.addEventListener('install', (event) => {
-    console.log('[SW] Instalando Service Worker...');
-
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => {
-                console.log('[SW] Cacheando archivos esenciales');
-                return cache.addAll(PRECACHE_URLS);
-            })
-            .then(() => {
-                console.log('[SW] Instalacion completada');
-                // Activar inmediatamente sin esperar
-                return self.skipWaiting();
-            })
-            .catch((error) => {
-                console.error('[SW] Error en instalacion:', error);
-            })
+// Install: cache all static assets (do NOT skipWaiting — user controls update)
+self.addEventListener('install', function (e) {
+    e.waitUntil(
+        caches.open(CACHE_NAME).then(function (cache) {
+            return cache.addAll(FILES_TO_CACHE);
+        })
     );
 });
 
-// =====================================================
-// EVENTO: ACTIVATE - Limpiar caches antiguos
-// =====================================================
-self.addEventListener('activate', (event) => {
-    console.log('[SW] Activando Service Worker...');
-
-    event.waitUntil(
-        caches.keys()
-            .then((cacheNames) => {
-                return Promise.all(
-                    cacheNames
-                        .filter((name) => name !== CACHE_NAME)
-                        .map((name) => {
-                            console.log('[SW] Eliminando cache antiguo:', name);
-                            return caches.delete(name);
-                        })
-                );
-            })
-            .then(() => {
-                console.log('[SW] Activacion completada');
-                // Tomar control de todas las paginas inmediatamente
-                return self.clients.claim();
-            })
-    );
-});
-
-// =====================================================
-// EVENTO: FETCH - Estrategia Cache-First
-// =====================================================
-self.addEventListener('fetch', (event) => {
-    // Solo manejar peticiones GET
-    if (event.request.method !== 'GET') {
-        return;
+// Listen for SKIP_WAITING message from the app
+self.addEventListener('message', function (e) {
+    if (e.data && e.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
     }
+});
 
-    // Ignorar peticiones a otros dominios (Google Fonts, etc.)
-    const requestUrl = new URL(event.request.url);
-    if (requestUrl.origin !== location.origin) {
-        // Para recursos externos, intentar red primero
-        event.respondWith(
-            fetch(event.request)
-                .catch(() => {
-                    // Si falla, intentar cache
-                    return caches.match(event.request);
-                })
+// Activate: clean old caches
+self.addEventListener('activate', function (e) {
+    e.waitUntil(
+        caches.keys().then(function (names) {
+            return Promise.all(
+                names.filter(function (n) { return n !== CACHE_NAME; })
+                     .map(function (n) { return caches.delete(n); })
+            );
+        }).then(function () {
+            return self.clients.claim();
+        })
+    );
+});
+
+// Fetch: cache-first for static, network-first for API/external
+self.addEventListener('fetch', function (e) {
+    var url = e.request.url;
+
+    // Skip non-GET, API calls, and external requests (Supabase, etc.)
+    if (e.request.method !== 'GET' ||
+        url.indexOf('/api/') !== -1 ||
+        url.indexOf('supabase.co') !== -1) {
+        e.respondWith(
+            fetch(e.request).catch(function () {
+                return new Response(JSON.stringify({ success: false, message: 'Sin conexion' }), {
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            })
         );
         return;
     }
 
-    // Estrategia Cache-First para recursos locales
-    event.respondWith(
-        caches.match(event.request)
-            .then((cachedResponse) => {
-                if (cachedResponse) {
-                    // Respuesta encontrada en cache
-                    console.log('[SW] Sirviendo desde cache:', event.request.url);
-                    return cachedResponse;
-                }
-
-                // No esta en cache, buscar en red
-                console.log('[SW] Buscando en red:', event.request.url);
-                return fetch(event.request)
-                    .then((networkResponse) => {
-                        // Si es exitoso, guardar en cache para futuro uso
-                        if (networkResponse && networkResponse.status === 200) {
-                            const responseClone = networkResponse.clone();
-                            caches.open(CACHE_NAME)
-                                .then((cache) => {
-                                    cache.put(event.request, responseClone);
-                                });
-                        }
-                        return networkResponse;
-                    })
-                    .catch((error) => {
-                        console.error('[SW] Error de red:', error);
-                        // Mostrar pagina offline si es navegacion
-                        if (event.request.mode === 'navigate') {
-                            return caches.match('/index.html');
-                        }
-                        return new Response('Offline', {
-                            status: 503,
-                            statusText: 'Servicio no disponible'
-                        });
+    // Static assets: cache-first
+    e.respondWith(
+        caches.match(e.request).then(function (cached) {
+            return cached || fetch(e.request).then(function (response) {
+                // Cache new static resources on the fly
+                if (response.status === 200) {
+                    var clone = response.clone();
+                    caches.open(CACHE_NAME).then(function (cache) {
+                        cache.put(e.request, clone);
                     });
-            })
+                }
+                return response;
+            });
+        })
     );
 });
-
-// =====================================================
-// EVENTO: MESSAGE - Comunicacion con la app
-// =====================================================
-self.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'SKIP_WAITING') {
-        self.skipWaiting();
-    }
-
-    if (event.data && event.data.type === 'GET_VERSION') {
-        event.ports[0].postMessage({ version: CACHE_VERSION });
-    }
-});
-
-console.log('[SW] Service Worker cargado');
