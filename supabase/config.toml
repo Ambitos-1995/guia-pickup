@@ -1,0 +1,8 @@
+[functions.kiosk-admin-verify]
+verify_jwt = false
+
+[functions.kiosk-employees]
+verify_jwt = false
+
+[functions.kiosk-clock]
+verify_jwt = false

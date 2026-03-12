@@ -23,11 +23,13 @@ No compilation, transpilation, or install step required.
 ## Backend: Supabase
 
 ### Edge Functions (Deno/TypeScript)
-Located in `supabase/functions/`. Deploy with:
+Located in `supabase/functions/`. Five functions, deploy individually:
 ```bash
 supabase functions deploy kiosk-admin-verify
 supabase functions deploy kiosk-employees
 supabase functions deploy kiosk-clock
+supabase functions deploy kiosk-schedule
+supabase functions deploy kiosk-payment
 ```
 
 Local development:
@@ -42,10 +44,10 @@ supabase db push        # Apply migrations to remote
 supabase migration new <name>  # Create new migration
 ```
 
-Migrations live in `supabase/migrations/`. Current schema: `kiosk_employees` and `kiosk_attendance` tables, both with RLS enabled (service role bypasses policies).
+Migrations live in `supabase/migrations/`. Current tables: `kiosk_employees`, `kiosk_attendance`, `kiosk_schedule_slots`, `kiosk_payment_months` — all with RLS enabled (service role bypasses policies).
 
 ### JWT Disabled
-All three Edge Functions have `verify_jwt = false` — the kiosk uses PIN-based auth, not tokens.
+All Edge Functions have `verify_jwt = false` — the kiosk uses PIN-based auth, not tokens.
 
 ## Architecture
 
@@ -53,39 +55,46 @@ All three Edge Functions have `verify_jwt = false` — the kiosk uses PIN-based 
 All JS files use **IIFE module pattern** (no ES modules, no bundler). Load order in `index.html` matters — dependencies must load before dependents:
 
 ```
-utils.js → api.js → pin.js, clock.js, schedule.js, payment.js, admin.js → app.js
+utils.js → api.js → pin.js, clock.js, schedule.js, guia.js, payment.js, admin.js, install.js → app.js
 ```
 
 `app.js` is loaded last and bootstraps everything via `App.init()`.
 
 ### Screen Navigation
-`index.html` contains all 6 screens as overlapping `<div>` containers. Navigation works by toggling CSS classes for visibility/opacity transitions. `App` module manages routing.
+`index.html` contains all screens as overlapping `<div>` containers. Navigation works by toggling CSS classes for visibility/opacity transitions. `App` module manages routing.
 
 ### Session State
 `App.session` holds: `{ pin, employeeProfileId, userId, employeeCode, employeeName, photoUrl, currentStatus, role }`. It's set after PIN verification and cleared on logout.
 
 ### API Layer (`js/api.js`)
-Two backend targets:
-- **Supabase Edge Functions** (`https://mzuvkinwebqgmnutchsv.supabase.co/functions/v1`): admin verify, employee verify/create/list, check-in/out
-- **Legacy REST API** (`/api/v1`, dev: `http://localhost:3006/api/v1`): schedule slots and payment management — this server is external and not in this repo
+All API calls go through **Supabase Edge Functions** at `https://mzuvkinwebqgmnutchsv.supabase.co/functions/v1`. Every request is a `POST` with JSON body including `orgSlug`. Functions: `kiosk-admin-verify`, `kiosk-employees`, `kiosk-clock`, `kiosk-schedule`, `kiosk-payment`.
 
 ### Service Worker (`sw.js`)
-Cache version is hardcoded (currently v12). **Increment the cache version** whenever static assets change to force cache invalidation on existing clients. The SW auto-checks for updates every 60 seconds from the app.
+Cache version is hardcoded (currently `pickup-tmg-v19`). **Increment the cache version number** whenever static assets change to force cache invalidation on existing clients. The SW uses cache-first for static assets and network-first for API/Supabase calls. The app auto-checks for SW updates every 60 seconds and on visibility change.
 
 ### Web Awesome Components
 UI components (dialogs, buttons, inputs, selects) come from Web Awesome, loaded from `vendor/webawesome/dist-cdn/`. Import declarations are in `js/webawesome-init.js`.
 
-## Organization Slug
-The org identifier `'ambitos'` is hardcoded in `js/api.js`. All API calls route through this slug.
+## Deployment
+
+Hosted on **Vercel** as a static site (no build command). Configuration in `vercel.json` sets cache headers and security headers. The `sw.js` and `manifest.json` are served with `no-cache`; vendor/icons/images are immutable-cached.
+
+## Key Conventions
+
+- **Organization slug**: `'ambitos'` is hardcoded in `js/api.js`. All API calls include it.
+- **Language**: All UI text is in Spanish. Keep all user-facing strings in Spanish.
+- **Cognitive accessibility**: The UI targets low-tech-literacy users — use Lexend font, large tap targets (min 48px), high contrast, simple language. Avoid jargon.
+- **No ES modules in app code**: `webawesome-init.js` is the only `type="module"` script (for Web Awesome imports). All other JS uses IIFE pattern with `var`.
+- **New static assets**: When adding files that should work offline, add them to `FILES_TO_CACHE` in `sw.js` and increment the cache version.
 
 ## Screens / Modules Reference
 
 | Screen | Module | Purpose |
 |--------|--------|---------|
 | PIN entry | `js/pin.js` | Dual-mode: employee login or admin verification |
-| Menu | `js/app.js` | Navigation hub after PIN auth |
+| Menu | `js/app.js` | Navigation hub, public by default |
 | Clock | `js/clock.js` | Check-in / check-out with shift display |
 | Schedule | `js/schedule.js` | Weekly grid, PIN-based slot assign/release |
-| Guía | `js/guia.js` | 11 step-by-step operational flows with images |
+| Guía | `js/guia.js` | Step-by-step operational flows with images |
 | Payment | `js/payment.js` | Read-only monthly payment summary |
 | Admin | `js/admin.js` | Employee management + monthly payment calculation |

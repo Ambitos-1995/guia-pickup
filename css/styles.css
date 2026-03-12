@@ -759,7 +759,12 @@ button:focus-visible {
 .guia-card-cliente { border-left: 4px solid var(--blue); }
 
 /* Guia Steps */
-.guia-steps { padding: 16px 20px; }
+.guia-steps {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 60px);
+}
 
 .guia-progress {
     text-align: center;
@@ -778,9 +783,13 @@ button:focus-visible {
 }
 
 .guia-image-wrap img {
-    width: 100%;
+    width: auto;
+    max-width: 100%;
     height: auto;
+    max-height: 45vh;
     display: block;
+    margin: 0 auto;
+    object-fit: contain;
 }
 
 .guia-no-image {
@@ -794,7 +803,7 @@ button:focus-visible {
     border-radius: var(--radius);
     margin-bottom: 16px;
     text-align: center;
-    min-height: 180px;
+    min-height: 120px;
 }
 
 .guia-no-image-icon { color: var(--blue); }
@@ -824,6 +833,7 @@ button:focus-visible {
 .guia-nav {
     display: flex;
     gap: 12px;
+    margin-top: auto;
 }
 
 .guia-nav-btn {
@@ -1313,55 +1323,12 @@ body {
         linear-gradient(180deg, rgba(255,255,255,0.76) 0%, rgba(245,247,245,0.94) 100%);
 }
 
-.schedule-hero {
-    padding: 22px 22px 18px;
-    border-radius: 28px;
-    background:
-        linear-gradient(145deg, rgba(255,255,255,0.96), rgba(255,248,245,0.9)),
-        var(--white);
-    border: 1px solid rgba(17,24,39,0.08);
-    box-shadow: 0 24px 50px rgba(83, 54, 40, 0.10);
-}
-
-.schedule-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 7px 12px;
-    border-radius: 999px;
-    background: rgba(227,30,36,0.08);
-    color: var(--red-dark);
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-}
-
-.schedule-headline {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    align-items: flex-start;
-    margin-top: 18px;
-}
-
-.schedule-chip {
-    flex-shrink: 0;
-    padding: 8px 12px;
-    border-radius: 16px;
-    background: var(--gray-900);
-    color: var(--white);
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
 
 .week-label {
     font-family: var(--font-display);
     font-size: 1.35rem;
     font-weight: 800;
-    text-align: left;
+    text-align: center;
     letter-spacing: -0.05em;
 }
 
@@ -1375,13 +1342,6 @@ body {
     text-transform: uppercase;
 }
 
-.schedule-context {
-    margin-top: 14px;
-    max-width: 36ch;
-    color: var(--gray-600);
-    font-size: 0.9rem;
-    line-height: 1.45;
-}
 
 .week-nav {
     display: flex;
@@ -1396,13 +1356,9 @@ body {
     padding-inline: 4px;
 }
 
-.schedule-nav-copy {
+.week-nav-center {
     flex: 1;
-    color: var(--gray-600);
-    font-size: 0.78rem;
-    font-weight: 600;
     text-align: center;
-    line-height: 1.35;
 }
 
 .week-arrow {
@@ -1418,7 +1374,7 @@ body {
 .week-arrow:active { background: #f8fafc; }
 
 .schedule-board {
-    padding: 14px;
+    padding: 10px;
     border-radius: 30px;
     background: rgba(250,251,250,0.92);
     border: 1px solid rgba(17,24,39,0.08);
@@ -1428,16 +1384,15 @@ body {
 
 .schedule-grid {
     display: grid;
-    grid-template-columns: 72px repeat(5, minmax(112px, 1fr));
-    gap: 8px;
+    grid-template-columns: 52px repeat(5, minmax(0, 1fr));
+    gap: 6px;
     padding: 0;
     flex: 1;
-    min-width: 640px;
 }
 
 .sched-header,
 .sched-time {
-    min-height: 72px;
+    min-height: 52px;
     border-radius: 22px;
     background: rgba(255,255,255,0.82);
     border: 1px solid rgba(17,24,39,0.06);
@@ -1462,14 +1417,14 @@ body {
 }
 
 .sched-day-letter {
-    font-size: 0.74rem;
+    font-size: 0.65rem;
     font-weight: 800;
     letter-spacing: 0.12em;
     text-transform: uppercase;
 }
 
 .sched-day-date {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-weight: 700;
 }
 
@@ -1484,7 +1439,7 @@ body {
     justify-content: center;
     padding: 8px;
     color: var(--gray-600);
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     font-weight: 800;
 }
 
@@ -1493,8 +1448,8 @@ body {
     flex-direction: column;
     align-items: flex-start;
     justify-content: space-between;
-    min-height: 110px;
-    padding: 14px 14px 13px;
+    min-height: 80px;
+    padding: 10px 8px 9px;
     border-radius: 24px;
     border: 1px solid transparent;
     text-align: left;
@@ -1517,7 +1472,7 @@ body {
 }
 
 .sched-status {
-    font-size: 0.92rem;
+    font-size: 0.82rem;
     font-weight: 750;
     letter-spacing: -0.03em;
 }
@@ -1525,7 +1480,7 @@ body {
 .sched-meta {
     color: inherit;
     opacity: 0.76;
-    font-size: 0.68rem;
+    font-size: 0.6rem;
     font-weight: 650;
     letter-spacing: 0.01em;
 }
@@ -1660,12 +1615,12 @@ body {
 @media (min-width: 600px) {
     .pin-keypad { max-width: 360px; }
     .key-btn { font-size: 1.8rem; min-height: 72px; }
-    .menu-container { max-width: 680px; margin: 0 auto; padding: 24px 32px; }
-    .clock-container { max-width: 680px; margin: 0 auto; }
-    .payment-container { max-width: 680px; margin: 0 auto; }
-    .guia-home, .guia-steps, .guia-complete { max-width: 680px; margin: 0 auto; }
-    .schedule-shell { max-width: 900px; margin: 0 auto; }
-    .admin-container { max-width: 680px; margin: 0 auto; }
+    .menu-container { max-width: 92%; margin: 0 auto; padding: 24px 32px; }
+    .clock-container { max-width: 92%; margin: 0 auto; }
+    .payment-container { max-width: 92%; margin: 0 auto; }
+    .guia-home, .guia-steps, .guia-complete { max-width: 92%; margin: 0 auto; }
+    .schedule-shell { max-width: 96%; margin: 0 auto; }
+    .admin-container { max-width: 92%; margin: 0 auto; }
 }
 
 /* Tablet portrait (768px+) */
@@ -1693,28 +1648,14 @@ body {
 
 /* Large tablets and desktop (900px+) */
 @media (min-width: 900px) {
-    .schedule-grid { min-width: 0; }
     .sched-cell { min-height: 118px; }
-    .menu-container { max-width: 800px; }
-    .clock-container { max-width: 800px; }
-    .payment-container { max-width: 800px; }
-    .guia-home, .guia-steps, .guia-complete { max-width: 800px; }
-    .admin-container { max-width: 800px; margin: 0 auto; }
+    .menu-container { max-width: 900px; }
+    .clock-container { max-width: 900px; }
+    .payment-container { max-width: 900px; }
+    .guia-home, .guia-steps, .guia-complete { max-width: 900px; }
+    .admin-container { max-width: 900px; margin: 0 auto; }
 }
 
-@media (max-width: 640px) {
-    .schedule-headline {
-        flex-direction: column;
-    }
-
-    .schedule-chip {
-        align-self: flex-start;
-    }
-
-    .schedule-nav-copy {
-        display: none;
-    }
-}
 
 /* =====================================================
    UPDATE BUTTON

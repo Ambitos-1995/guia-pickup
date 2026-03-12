@@ -143,6 +143,39 @@ var Guia = (function () {
         prevBtn.addEventListener('click', prevStep);
         nextBtn.addEventListener('click', nextStep);
         finishBtn.addEventListener('click', backToGuiaHome);
+
+        // Smart back button: steps/complete → guia-home, guia-home → screen-menu
+        var backBtn = document.getElementById('guia-back-btn');
+        if (backBtn) {
+            backBtn.addEventListener('click', function (e) {
+                if (!guiaHome.classList.contains('hidden')) {
+                    // Already on guia-home, let App.navigate handle it
+                    return;
+                }
+                // In steps or complete, go back to guia-home instead of main menu
+                e.stopPropagation();
+                backToGuiaHome();
+            });
+        }
+
+        // Swipe gestures for step navigation
+        var stepsEl = document.getElementById('guia-steps');
+        var touchStartX = 0;
+        var touchStartY = 0;
+
+        stepsEl.addEventListener('touchstart', function (e) {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        stepsEl.addEventListener('touchend', function (e) {
+            var dx = e.changedTouches[0].screenX - touchStartX;
+            var dy = e.changedTouches[0].screenY - touchStartY;
+            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+                if (dx < 0) nextStep();
+                else prevStep();
+            }
+        }, { passive: true });
     }
 
     function show() {
