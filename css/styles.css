@@ -1615,12 +1615,12 @@ body {
 @media (min-width: 600px) {
     .pin-keypad { max-width: 360px; }
     .key-btn { font-size: 1.8rem; min-height: 72px; }
-    .menu-container { max-width: 92%; margin: 0 auto; padding: 24px 32px; }
-    .clock-container { max-width: 92%; margin: 0 auto; }
-    .payment-container { max-width: 92%; margin: 0 auto; }
-    .guia-home, .guia-steps, .guia-complete { max-width: 92%; margin: 0 auto; }
-    .schedule-shell { max-width: 96%; margin: 0 auto; }
-    .admin-container { max-width: 92%; margin: 0 auto; }
+    .menu-container { padding: 24px 32px; }
+    .clock-container { padding: 0 32px; }
+    .payment-container { padding: 0 32px; }
+    .guia-home, .guia-steps, .guia-complete { padding-left: 32px; padding-right: 32px; }
+    .schedule-shell { padding: 18px 24px 24px; }
+    .admin-container { padding: 0 32px; }
 }
 
 /* Tablet portrait (768px+) */
@@ -1649,10 +1649,11 @@ body {
 /* Large tablets and desktop (900px+) */
 @media (min-width: 900px) {
     .sched-cell { min-height: 118px; }
-    .menu-container { max-width: 900px; }
-    .clock-container { max-width: 900px; }
-    .payment-container { max-width: 900px; }
-    .guia-home, .guia-steps, .guia-complete { max-width: 900px; }
+    .menu-container { max-width: 900px; margin: 0 auto; }
+    .clock-container { max-width: 900px; margin: 0 auto; }
+    .payment-container { max-width: 900px; margin: 0 auto; }
+    .guia-home, .guia-steps, .guia-complete { max-width: 900px; margin: 0 auto; }
+    .schedule-shell { max-width: 960px; margin: 0 auto; }
     .admin-container { max-width: 900px; margin: 0 auto; }
 }
 
