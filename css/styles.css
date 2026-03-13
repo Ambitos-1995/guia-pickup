@@ -1844,6 +1844,9 @@ body {
         grid-template-rows: minmax(150px, auto) 1fr;
         align-content: stretch;
     }
+    .menu-card {
+        height: 100%;
+    }
 }
 
 /* iPad / tablets grandes (834px+) */
