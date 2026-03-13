@@ -242,11 +242,9 @@ button:focus-visible {
 
 .pin-dots {
     display: flex;
-    flex-wrap: wrap;
     justify-content: center;
     gap: 16px;
     margin-bottom: 16px;
-    max-width: 240px;
 }
 
 .pin-dot {
@@ -735,22 +733,14 @@ button:focus-visible {
     padding-right: 20px;
 }
 
-.guia-subtitle {
-    font-size: 1.3rem;
-    font-weight: 800;
-    margin-bottom: 6px;
-    color: var(--text);
-    line-height: 1.2;
-    letter-spacing: -0.02em;
-}
-
 .guia-grid {
     display: grid;
     width: 100%;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
     flex: 1;
-    align-content: center;
+    align-content: start;
+    grid-auto-rows: minmax(150px, auto);
     margin-inline: auto;
 }
 
@@ -765,7 +755,7 @@ button:focus-visible {
     border-radius: var(--radius-lg);
     text-align: center;
     transition: transform 0.12s ease, box-shadow 0.12s ease;
-    min-height: 170px;
+    min-height: 150px;
     justify-content: center;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
     cursor: pointer;
@@ -1825,6 +1815,17 @@ body {
         align-content: stretch;
     }
     .menu-card {
+        height: 100%;
+    }
+}
+
+/* Guia grid: stretch 3 rows on mobile (2-column layout) */
+@media (max-width: 767px) {
+    .guia-grid {
+        grid-template-rows: 1fr 1fr 1fr;
+        align-content: stretch;
+    }
+    .guia-card {
         height: 100%;
     }
 }

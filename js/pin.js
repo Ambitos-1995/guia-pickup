@@ -4,7 +4,8 @@
 var Pin = (function () {
     'use strict';
 
-    var MAX_PIN_LENGTH = 8;
+    var MAX_PIN_LENGTH = 6;
+    var currentMaxLength = 6;
     var pin = '';
     var isVerifying = false;
     var mode = 'admin';
@@ -26,7 +27,7 @@ var Pin = (function () {
 
             var key = btn.dataset.key;
             if (key === 'clear') clearPin();
-            else if (key && pin.length < MAX_PIN_LENGTH) addDigit(key);
+            else if (key && pin.length < currentMaxLength) addDigit(key);
         });
 
         submitBtn.addEventListener('click', verify);
@@ -47,7 +48,7 @@ var Pin = (function () {
     }
 
     function addDigit(digit) {
-        if (pin.length >= MAX_PIN_LENGTH) return;
+        if (pin.length >= currentMaxLength) return;
         pin += digit;
         updateDots();
         hideError();
@@ -57,6 +58,13 @@ var Pin = (function () {
         pin = '';
         updateDots();
         hideError();
+    }
+
+    function setDotCount(count) {
+        currentMaxLength = count;
+        dots.forEach(function (dot, index) {
+            dot.style.display = index < count ? '' : 'none';
+        });
     }
 
     function updateDots() {
@@ -130,6 +138,7 @@ var Pin = (function () {
 
     function openForAdmin() {
         mode = 'admin';
+        setDotCount(6);
         clearPin();
         if (promptEl) promptEl.textContent = 'Introduce el PIN de ajustes';
         if (submitBtn) submitBtn.textContent = 'Acceder';
@@ -138,6 +147,7 @@ var Pin = (function () {
     function openForEmployee(targetScreen) {
         mode = 'employee';
         employeeTarget = targetScreen || 'screen-clock';
+        setDotCount(4);
         clearPin();
         if (promptEl) promptEl.textContent = 'Introduce tu PIN de empleado';
         if (submitBtn) submitBtn.textContent = 'Entrar';

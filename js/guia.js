@@ -116,7 +116,7 @@ var Guia = (function () {
     var guiaHome, guiaSteps, guiaComplete;
     var guiaGrid, progressText;
     var imageWrap, stepImage, noImage, noImageText, instruction;
-    var prevBtn, nextBtn, finishBtn;
+    var finishBtn;
     var completeMsgEl, completeWarningEl, completeNotesEl;
 
     function init() {
@@ -130,8 +130,6 @@ var Guia = (function () {
         noImage = document.getElementById('guia-no-image');
         noImageText = document.getElementById('guia-no-image-text');
         instruction = document.getElementById('guia-instruction');
-        prevBtn = document.getElementById('guia-prev');
-        nextBtn = document.getElementById('guia-next');
         finishBtn = document.getElementById('guia-finish');
         completeMsgEl = document.getElementById('guia-complete-msg');
         completeWarningEl = document.getElementById('guia-complete-warning');
@@ -140,8 +138,6 @@ var Guia = (function () {
         // Render process cards
         renderProcessCards();
 
-        prevBtn.addEventListener('click', prevStep);
-        nextBtn.addEventListener('click', nextStep);
         finishBtn.addEventListener('click', backToGuiaHome);
 
         // Smart back button: steps/complete → guia-home, guia-home → screen-menu
@@ -158,12 +154,14 @@ var Guia = (function () {
             });
         }
 
-        // Swipe gestures for step navigation
+        // Swipe gestures + tap-to-advance for step navigation
         var stepsEl = document.getElementById('guia-steps');
         var touchStartX = 0;
         var touchStartY = 0;
+        var swipeHandled = false;
 
         stepsEl.addEventListener('touchstart', function (e) {
+            swipeHandled = false;
             touchStartX = e.changedTouches[0].screenX;
             touchStartY = e.changedTouches[0].screenY;
         }, { passive: true });
@@ -172,10 +170,17 @@ var Guia = (function () {
             var dx = e.changedTouches[0].screenX - touchStartX;
             var dy = e.changedTouches[0].screenY - touchStartY;
             if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+                swipeHandled = true;
                 if (dx < 0) nextStep();
                 else prevStep();
             }
         }, { passive: true });
+
+        // Tap anywhere on steps to advance
+        stepsEl.addEventListener('click', function () {
+            if (swipeHandled) { swipeHandled = false; return; }
+            nextStep();
+        });
     }
 
     function show() {
@@ -255,10 +260,6 @@ var Guia = (function () {
             instruction.classList.add('hidden');
         }
 
-        prevBtn.disabled = currentStep === 0;
-        prevBtn.style.visibility = currentStep === 0 ? 'hidden' : 'visible';
-
-        setNextButton(currentStep === total - 1);
     }
 
     function nextStep() {
@@ -330,39 +331,6 @@ var Guia = (function () {
                 target.appendChild(document.createElement('br'));
             }
         }
-    }
-
-    function setNextButton(isLastStep) {
-        nextBtn.textContent = '';
-
-        var label = document.createElement('span');
-        label.textContent = isLastStep ? 'Terminar' : 'Siguiente';
-
-        var icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        icon.setAttribute('width', '20');
-        icon.setAttribute('height', '20');
-        icon.setAttribute('viewBox', '0 0 24 24');
-        icon.setAttribute('fill', 'none');
-        icon.setAttribute('stroke', 'currentColor');
-        icon.setAttribute('stroke-width', '2.5');
-        icon.setAttribute('stroke-linecap', 'round');
-        icon.setAttribute('stroke-linejoin', 'round');
-
-        if (isLastStep) {
-            var check = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-            check.setAttribute('points', '20 6 9 17 4 12');
-            icon.appendChild(check);
-        } else {
-            var line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            line.setAttribute('d', 'M5 12h14');
-            var arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            arrow.setAttribute('d', 'm12 5 7 7-7 7');
-            icon.appendChild(line);
-            icon.appendChild(arrow);
-        }
-
-        nextBtn.appendChild(label);
-        nextBtn.appendChild(icon);
     }
 
     return { init: init, show: show };
