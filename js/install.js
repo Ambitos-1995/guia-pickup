@@ -41,13 +41,13 @@ var Install = (function () {
         // Dismiss buttons
         var dismissBtns = document.querySelectorAll('.install-dismiss');
         for (var i = 0; i < dismissBtns.length; i++) {
-            Utils.addPressListener(dismissBtns[i], dismissAll);
+            dismissBtns[i].addEventListener('click', dismissAll);
         }
 
         // Android install button
         var installBtn = document.getElementById('install-btn-android');
         if (installBtn) {
-            Utils.addPressListener(installBtn, triggerInstall);
+            installBtn.addEventListener('click', triggerInstall);
         }
 
         // Hide banner if app gets installed

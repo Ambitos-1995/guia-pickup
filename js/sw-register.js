@@ -49,11 +49,11 @@ if ("serviceWorker" in navigator) {
             if (!btn) return;
 
             btn.classList.remove('hidden');
-            Utils.addPressListener(btn, function () {
+            btn.onclick = function () {
                 btn.textContent = 'Actualizando...';
                 btn.disabled = true;
                 waitingSW.postMessage({ type: 'SKIP_WAITING' });
-            });
+            };
         }
     })();
 }

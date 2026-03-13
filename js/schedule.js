@@ -45,21 +45,16 @@ var Schedule = (function () {
         dialogEmployeeEl = document.getElementById('schedule-slot-employee');
         dialogHelperEl = document.getElementById('schedule-slot-helper');
 
-        Utils.addPressListener(document.getElementById('week-prev'), function () {
+        document.getElementById('week-prev').addEventListener('click', function () {
             changeWeek(-1);
         });
-        Utils.addPressListener(document.getElementById('week-next'), function () {
+        document.getElementById('week-next').addEventListener('click', function () {
             changeWeek(1);
         });
 
-        Utils.delegatePress(gridEl, '.sched-cell', function (e, cell) {
-            if (e.type === 'pointerup') {
-                e.preventDefault();
-            }
-            handleCellClick(cell);
-        });
-        Utils.addPressListener(dialogSubmitEl, submitDialog);
-        Utils.addPressListener(dialogSecondaryEl, submitSecondaryDialog);
+        gridEl.addEventListener('click', handleCellClick);
+        dialogSubmitEl.addEventListener('click', submitDialog);
+        dialogSecondaryEl.addEventListener('click', submitSecondaryDialog);
         dialogEmployeeEl.addEventListener('change', updateActionAvailability);
         dialogEl.addEventListener('wa-after-hide', function () {
             resetDialog();
@@ -209,7 +204,8 @@ var Schedule = (function () {
             '</button>';
     }
 
-    function handleCellClick(cell) {
+    function handleCellClick(e) {
+        var cell = e.target.closest('.sched-cell');
         if (!cell) return;
 
         var session = App.getSession();
