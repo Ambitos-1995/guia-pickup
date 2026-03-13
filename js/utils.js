@@ -10,8 +10,6 @@ var Utils = (function () {
         'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
-    var lastTouchLikePressTime = 0;
-
     /** Get ISO week number for a date */
     function getISOWeek(date) {
         var d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -147,58 +145,23 @@ var Utils = (function () {
         return !!(element && (element.disabled || element.getAttribute('aria-disabled') === 'true'));
     }
 
-    function getPressEventName() {
-        return (typeof window !== 'undefined' && 'PointerEvent' in window) ? 'pointerup' : 'touchend';
-    }
-
-    function isRecentTouchLikePress(thresholdMs) {
-        var threshold = typeof thresholdMs === 'number' ? thresholdMs : 700;
-        return Date.now() - lastTouchLikePressTime < threshold;
-    }
-
-    function isTouchLikePress(event) {
-        if (!event) return false;
-
-        if (event.type === 'touchend') {
-            return true;
-        }
-
-        if (event.type !== 'pointerup') {
-            return false;
-        }
-
-        if (event.isPrimary === false) {
-            return false;
-        }
-
-        if (typeof event.button === 'number' && event.button !== 0 && event.button !== -1) {
-            return false;
-        }
-
-        return event.pointerType !== 'mouse';
+    // click-only mode: touch-action:manipulation in CSS removes the 300ms delay,
+    // so plain click events work reliably on all kiosk touchscreens and browsers.
+    function isRecentTouchLikePress() {
+        return false;
     }
 
     function bindPress(target, handler) {
         if (!target || typeof handler !== 'function') return function () {};
 
-        var pressEventName = getPressEventName();
-
-        function handleTouchLike(event) {
-            if (!isTouchLikePress(event) || isDisabled(target)) return;
-            lastTouchLikePressTime = Date.now();
-            handler.call(target, event);
-        }
-
         function handleClick(event) {
-            if (Date.now() - lastTouchLikePressTime < 700 || isDisabled(target)) return;
+            if (isDisabled(target)) return;
             handler.call(target, event);
         }
 
-        target.addEventListener(pressEventName, handleTouchLike);
         target.addEventListener('click', handleClick);
 
         return function () {
-            target.removeEventListener(pressEventName, handleTouchLike);
             target.removeEventListener('click', handleClick);
         };
     }
@@ -206,32 +169,15 @@ var Utils = (function () {
     function delegatePress(container, selector, handler) {
         if (!container || !selector || typeof handler !== 'function') return function () {};
 
-        var pressEventName = getPressEventName();
-
-        function resolveTarget(event) {
-            var matched = closest(event.target, selector, container);
-            if (!matched || isDisabled(matched)) return null;
-            return matched;
-        }
-
-        function handleTouchLike(event) {
-            var matched = resolveTarget(event);
-            if (!matched || !isTouchLikePress(event)) return;
-            lastTouchLikePressTime = Date.now();
-            handler.call(matched, event, matched);
-        }
-
         function handleClick(event) {
-            var matched = resolveTarget(event);
-            if (!matched || Date.now() - lastTouchLikePressTime < 700) return;
+            var matched = closest(event.target, selector, container);
+            if (!matched || isDisabled(matched)) return;
             handler.call(matched, event, matched);
         }
 
-        container.addEventListener(pressEventName, handleTouchLike);
         container.addEventListener('click', handleClick);
 
         return function () {
-            container.removeEventListener(pressEventName, handleTouchLike);
             container.removeEventListener('click', handleClick);
         };
     }
