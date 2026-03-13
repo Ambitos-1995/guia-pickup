@@ -8,8 +8,10 @@ var App = (function () {
     var currentScreen = 'screen-menu';
     var menuClockTimer = null;
     var modalCallback = null;
+    var viewportRaf = 0;
 
     function init() {
+        bindViewportState();
         Pin.init();
         Schedule.init();
         Clock.init();
@@ -90,6 +92,7 @@ var App = (function () {
         var target = document.getElementById(screenId);
         if (target) target.classList.add('active');
         currentScreen = screenId;
+        requestViewportUpdate();
 
         if (screenId === 'screen-menu') showMenu();
         if (screenId === 'screen-schedule') Schedule.show();
@@ -173,8 +176,10 @@ var App = (function () {
         }
 
         // Toggle odd-cards class for full-width Ajustes on mobile
+        var menuGrid = document.getElementById('menu-grid');
         var visibleCards = document.querySelectorAll('#menu-grid > .menu-card:not(.hidden)');
-        document.getElementById('menu-grid').classList.toggle('odd-cards', visibleCards.length % 2 === 1);
+        menuGrid.classList.toggle('odd-cards', visibleCards.length % 2 === 1);
+        menuGrid.setAttribute('data-card-count', String(visibleCards.length));
 
         if (currentScreen !== 'screen-menu') {
             if (menuClockTimer) {
@@ -192,6 +197,45 @@ var App = (function () {
     function updateMenuClock() {
         var el = document.getElementById('menu-clock');
         if (el) el.textContent = Utils.formatTime(new Date());
+    }
+
+    function bindViewportState() {
+        updateViewportState();
+
+        window.addEventListener('resize', requestViewportUpdate, { passive: true });
+        window.addEventListener('orientationchange', requestViewportUpdate, { passive: true });
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', requestViewportUpdate, { passive: true });
+            window.visualViewport.addEventListener('scroll', requestViewportUpdate, { passive: true });
+        }
+    }
+
+    function requestViewportUpdate() {
+        if (viewportRaf) {
+            cancelAnimationFrame(viewportRaf);
+        }
+
+        viewportRaf = requestAnimationFrame(function () {
+            viewportRaf = 0;
+            updateViewportState();
+        });
+    }
+
+    function updateViewportState() {
+        var root = document.documentElement;
+        var layoutHeight = Math.round(window.innerHeight || root.clientHeight || 0);
+        var vv = window.visualViewport;
+        var viewportHeight = vv ? Math.round(vv.height) : layoutHeight;
+        var viewportOffsetTop = vv ? Math.round(vv.offsetTop) : 0;
+        var viewportOffsetBottom = vv ? Math.max(0, Math.round(layoutHeight - (vv.height + vv.offsetTop))) : 0;
+        var keyboardGap = vv ? layoutHeight - (vv.height + vv.offsetTop) : 0;
+
+        root.style.setProperty('--app-height', layoutHeight + 'px');
+        root.style.setProperty('--visual-viewport-height', viewportHeight + 'px');
+        root.style.setProperty('--visual-viewport-offset-top', viewportOffsetTop + 'px');
+        root.style.setProperty('--visual-viewport-offset-bottom', viewportOffsetBottom + 'px');
+        root.classList.toggle('keyboard-open', keyboardGap > 120);
     }
 
     function confirm(title, body, onOk) {
@@ -237,6 +281,7 @@ var App = (function () {
         hasEmployeeAccess: hasEmployeeAccess,
         handleAuthFailure: handleAuthFailure,
         confirm: confirm,
-        showMenu: showMenu
+        showMenu: showMenu,
+        requestViewportUpdate: requestViewportUpdate
     };
 })();

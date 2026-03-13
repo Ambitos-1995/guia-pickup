@@ -51,10 +51,15 @@ var Schedule = (function () {
         dialogPinEl.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') submitDialog();
         });
+        dialogPinEl.addEventListener('focus', handleDialogViewportChange);
+        dialogPinEl.addEventListener('blur', handleDialogViewportChange);
         dialogPinDotsEl.addEventListener('click', function () {
             dialogPinEl.focus();
         });
-        dialogEl.addEventListener('wa-after-hide', resetDialog);
+        dialogEl.addEventListener('wa-after-hide', function () {
+            resetDialog();
+            handleDialogViewportChange();
+        });
 
         var info = Utils.currentWeekInfo();
         fetchAndCache(info.year, info.week);
@@ -142,6 +147,8 @@ var Schedule = (function () {
         var todayIso = Utils.today();
         var hours = getHoursToRender(slotsData);
         var html = '';
+
+        gridEl.style.setProperty('--schedule-grid-rows-mobile', '42px repeat(' + hours.length + ', minmax(0, 1fr))');
 
         html += '<div class="sched-header sched-corner">Hora</div>';
         for (var d = 1; d <= 5; d++) {
@@ -283,8 +290,12 @@ var Schedule = (function () {
         }
 
         dialogEl.open = true;
+        handleDialogViewportChange();
         if (needsPin) {
-            setTimeout(function () { dialogPinEl.focus(); }, 100);
+            setTimeout(function () {
+                dialogPinEl.focus();
+                handleDialogViewportChange();
+            }, 100);
         }
     }
 
@@ -418,6 +429,15 @@ var Schedule = (function () {
         dialogModeEl.classList.remove('hidden');
         dialogBodyEl.classList.remove('hidden');
         clearDialogFeedback();
+    }
+
+    function handleDialogViewportChange() {
+        if (!App.requestViewportUpdate) return;
+
+        App.requestViewportUpdate();
+        setTimeout(function () {
+            App.requestViewportUpdate();
+        }, 120);
     }
 
     function showDialogFeedback(variant, message) {

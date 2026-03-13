@@ -56,30 +56,38 @@
     --space-md: 16px;
     --space-lg: 24px;
     --space-xl: 32px;
+    --app-height: 100dvh;
+    --visual-viewport-height: 100dvh;
+    --visual-viewport-offset-top: 0px;
+    --visual-viewport-offset-bottom: 0px;
 }
 
 html {
+    height: 100%;
     font-size: clamp(16px, 2.5vw, 22px);
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
 }
 
 body {
+    height: var(--app-height);
     font-family: var(--font);
     background: var(--bg);
     color: var(--text);
     line-height: 1.5;
-    min-height: 100dvh;
+    min-height: var(--app-height);
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     touch-action: manipulation;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    overflow: hidden;
 }
 
 #app {
     position: relative;
-    min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    min-height: 100%;
+    height: 100%;
 }
 
 @media (display-mode: standalone) {
@@ -97,13 +105,19 @@ body {
     transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    min-height: 100%;
+    min-height: 0;
 }
 
 .screen.active {
     opacity: 1;
     pointer-events: auto;
     z-index: 1;
+}
+
+#screen-menu,
+#screen-schedule,
+#screen-guia {
+    overflow: hidden;
 }
 
 /* --- Utility --- */
@@ -201,7 +215,7 @@ button:focus-visible {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 100dvh;
+    min-height: 100%;
     padding: 24px;
     background: linear-gradient(170deg, var(--gray-900) 0%, #2d1b1c 100%);
     color: var(--white);
@@ -367,15 +381,17 @@ button:focus-visible {
     display: flex;
     flex-direction: column;
     flex: 1;
+    min-height: 0;
     padding: 24px 20px;
     background: var(--bg);
+    gap: 18px;
 }
 
 .menu-header {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 28px;
+    flex-shrink: 0;
 }
 
 .greeting {
@@ -396,7 +412,8 @@ button:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
     flex: 1;
-    align-content: start;
+    min-height: 0;
+    align-content: stretch;
     grid-auto-rows: minmax(150px, auto);
 }
 
@@ -493,7 +510,7 @@ button:focus-visible {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    margin-top: 20px;
+    margin-top: 0;
     padding: 14px;
     font-weight: 600;
     color: var(--gray-500);
@@ -501,6 +518,7 @@ button:focus-visible {
     background: var(--gray-100);
     transition: all var(--transition);
     width: 100%;
+    flex-shrink: 0;
 }
 .logout-btn:hover { background: var(--gray-200); color: var(--text); }
 
@@ -753,6 +771,7 @@ button:focus-visible {
     display: flex;
     flex-direction: column;
     flex: 1;
+    min-height: 0;
     width: min(100%, 1100px);
     margin-inline: auto;
     gap: 14px;
@@ -760,6 +779,8 @@ button:focus-visible {
 
 .guia-steps,
 .guia-complete {
+    flex: 1;
+    min-height: 0;
     width: min(100%, 1100px);
     margin-inline: auto;
     padding-left: 20px;
@@ -772,7 +793,8 @@ button:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
     flex: 1;
-    align-content: start;
+    min-height: 0;
+    align-content: stretch;
     grid-auto-rows: minmax(150px, auto);
     margin-inline: auto;
 }
@@ -863,6 +885,7 @@ button:focus-visible {
     display: flex;
     flex-direction: column;
     flex: 1;
+    min-height: 0;
 }
 
 .guia-content {
@@ -872,6 +895,7 @@ button:focus-visible {
     margin-inline: auto;
     gap: 12px;
     flex: 1;
+    min-height: 0;
     cursor: pointer;
 }
 .guia-content:active { opacity: 0.92; }
@@ -881,7 +905,7 @@ button:focus-visible {
     padding: 16px 20px;
     display: flex;
     flex-direction: column;
-    min-height: calc(100dvh - 60px);
+    min-height: 0;
 }
 
 .guia-progress {
@@ -904,6 +928,7 @@ button:focus-visible {
     padding: 10px;
     box-shadow: var(--shadow-card);
     flex: 1;
+    min-height: 0;
 }
 
 .guia-image-wrap img {
@@ -929,6 +954,7 @@ button:focus-visible {
     min-height: 180px;
     box-shadow: var(--shadow-card);
     flex: 1;
+    min-height: 0;
 }
 
 .guia-no-image-icon { color: var(--blue); }
@@ -1427,6 +1453,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-height: 0;
     padding: 16px 12px 22px;
     background:
         radial-gradient(circle at top right, rgba(227, 30, 36, 0.12), transparent 26%),
@@ -1491,6 +1518,9 @@ body {
 .week-arrow:active { background: #f8fafc; }
 
 .schedule-board {
+    display: flex;
+    flex: 1;
+    min-height: 0;
     padding: 8px;
     border-radius: 30px;
     background: rgba(250,251,250,0.92);
@@ -1505,6 +1535,9 @@ body {
     gap: 5px;
     padding: 0;
     flex: 1;
+    min-height: 0;
+    width: 100%;
+    align-content: stretch;
 }
 
 .sched-header,
@@ -1897,12 +1930,20 @@ body {
 /* Mobile 2-column: cards fill viewport equally */
 @media (max-width: 833px) {
     .menu-grid {
-        grid-auto-rows: 1fr;
-        align-content: stretch;
-    }
-    .menu-card {
         height: 100%;
         min-height: 0;
+        align-content: stretch;
+        grid-auto-rows: minmax(0, 1fr);
+    }
+    .menu-grid[data-card-count="4"] {
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+    }
+    .menu-grid[data-card-count="5"] {
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+    }
+    .menu-card {
+        min-height: 0;
+        height: auto;
     }
     .menu-grid.odd-cards > .card-admin {
         grid-column: 1 / -1;
@@ -1916,37 +1957,88 @@ body {
 /* Small phones: compact spacing */
 @media (max-width: 599px) {
     .menu-container {
-        padding: 20px 16px;
+        padding: 16px 14px 14px;
+        gap: 12px;
     }
     .menu-header {
-        margin-bottom: 16px;
+        align-items: center;
+        gap: 10px;
+    }
+    .greeting {
+        font-size: 1.42rem;
+    }
+    .menu-clock {
+        font-size: 0.96rem;
+    }
+    .menu-grid {
+        gap: 12px;
+    }
+    .menu-card {
+        padding: 16px 12px 14px;
+        gap: 8px;
+        border-radius: 22px;
+    }
+    .card-icon svg {
+        width: 38px;
+        height: 38px;
+    }
+    .card-title {
+        font-size: 0.94rem;
+    }
+    .menu-grid.odd-cards > .card-admin {
+        padding: 14px 18px;
+        gap: 14px;
     }
     .logout-btn {
-        margin-top: 12px;
-        padding: 10px;
+        padding: 11px 12px;
     }
 
-    /* Schedule compact */
     .schedule-shell {
-        gap: 10px;
-        padding: 10px 8px 16px;
+        gap: 12px;
+        padding: 12px 10px 14px;
+    }
+    .schedule-week-nav {
+        padding-inline: 0;
     }
     .schedule-board {
-        padding: 5px;
-        border-radius: 20px;
+        padding: 6px;
+        border-radius: 22px;
+        overflow: hidden;
+    }
+    .schedule-grid {
+        grid-template-columns: 38px repeat(5, minmax(0, 1fr));
+        gap: 4px;
     }
     .sched-header,
     .sched-time {
-        min-height: 42px;
+        min-height: 0;
+        border-radius: 18px;
     }
     .sched-header {
-        padding: 6px 4px;
-        font-size: 0.65rem;
+        padding: 6px 2px;
+        font-size: 0.62rem;
+        gap: 3px;
+    }
+    .sched-day-letter {
+        font-size: 0.56rem;
+    }
+    .sched-day-date {
+        font-size: 0.74rem;
+    }
+    .sched-time {
+        padding: 4px;
+        font-size: 0.58rem;
     }
     .sched-cell {
-        min-height: 56px;
-        padding: 8px 6px;
-        border-radius: 16px;
+        min-height: 0;
+        padding: 8px 4px 7px;
+        border-radius: 18px;
+    }
+    .sched-status {
+        font-size: clamp(0.76rem, 1.8vh, 0.86rem);
+    }
+    .sched-meta {
+        font-size: 0.52rem;
     }
     .week-arrow {
         width: 44px;
@@ -1954,48 +2046,107 @@ body {
         border-radius: 14px;
     }
     .week-label {
-        font-size: 1.15rem;
+        font-size: 1.1rem;
     }
     .schedule-range {
-        font-size: 0.72rem;
+        font-size: 0.68rem;
     }
     .schedule-context {
-        font-size: 0.82rem;
-        line-height: 1.35;
+        padding: 0 2px;
+        font-size: 0.78rem;
+        line-height: 1.3;
+    }
+    .schedule-legend {
+        gap: 6px;
     }
     .legend-item {
-        padding: 6px 10px;
-        font-size: 0.62rem;
+        padding: 6px 8px;
+        font-size: 0.6rem;
     }
     .legend-dot {
-        width: 12px;
-        height: 12px;
+        width: 10px;
+        height: 10px;
+        border-radius: 4px;
     }
 
-    /* Guia compact */
+    .guia-home {
+        padding: 12px 12px 14px;
+    }
+    .guia-grid {
+        gap: 10px;
+    }
     .guia-card {
-        padding: 20px 12px 16px;
-        gap: 8px;
+        padding: 16px 10px 12px;
+        gap: 6px;
+        min-height: 0;
+        overflow: visible;
     }
     .guia-card-icon {
-        font-size: 3rem;
+        font-size: clamp(2.2rem, 4.8vh, 3rem);
     }
     .guia-card-title {
-        font-size: 0.95rem;
+        font-size: clamp(0.82rem, 1.8vh, 0.95rem);
     }
     .guia-card-desc {
-        font-size: 0.75rem;
+        font-size: clamp(0.66rem, 1.55vh, 0.76rem);
+        line-height: 1.25;
+    }
+    .guia-steps,
+    .guia-complete {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+    .guia-steps {
+        padding-top: 12px;
+        padding-bottom: 14px;
+    }
+    .guia-progress {
+        margin-bottom: 10px;
+        font-size: 0.74rem;
+    }
+    .guia-content {
+        gap: 10px;
+    }
+    .guia-image-wrap,
+    .guia-no-image {
+        padding: 12px;
+    }
+    .guia-image-wrap img {
+        width: auto;
+        max-height: 100%;
+    }
+    .guia-no-image {
+        gap: 10px;
+    }
+    .guia-no-image-icon svg {
+        width: 34px;
+        height: 34px;
+    }
+    .guia-no-image-text {
+        font-size: clamp(0.88rem, 2vh, 0.98rem);
+        line-height: 1.3;
+    }
+    .guia-instruction {
+        min-height: 0;
+        padding: 14px;
+        font-size: clamp(0.88rem, 1.95vh, 1rem);
+        line-height: 1.35;
     }
 }
 
 /* Schedule dialog: position above keyboard on phones */
 @media (max-width: 767px) {
+    .schedule-grid {
+        height: 100%;
+        grid-template-rows: var(--schedule-grid-rows-mobile, auto);
+    }
     .schedule-slot-dialog::part(panel) {
-        width: min(95vw, 28rem);
+        width: min(94vw, 28rem);
         border-radius: 20px;
-        margin-top: 10vh;
-        margin-bottom: auto;
-        max-height: 80dvh;
+        align-self: flex-start;
+        margin-top: calc(max(12px, env(safe-area-inset-top)) + var(--visual-viewport-offset-top));
+        margin-bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--visual-viewport-offset-bottom));
+        max-height: calc(var(--visual-viewport-height) - 24px);
         overflow-y: auto;
     }
     .slot-dialog-stack {
@@ -2013,12 +2164,106 @@ body {
 /* Guia grid: auto-size rows on mobile so text is not clipped */
 @media (max-width: 767px) {
     .guia-grid {
-        grid-auto-rows: auto;
-        align-content: start;
+        height: 100%;
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+        grid-auto-rows: minmax(0, 1fr);
+        align-content: stretch;
     }
     .guia-card {
         overflow: visible;
-        min-height: auto;
+        min-height: 0;
+    }
+    .guia-steps {
+        padding-top: 14px;
+        padding-bottom: 16px;
+    }
+    .guia-content,
+    .guia-media-area {
+        min-height: 0;
+    }
+    .guia-image-wrap,
+    .guia-no-image {
+        min-height: 0;
+    }
+    .guia-image-wrap img {
+        max-height: 100%;
+    }
+    .guia-instruction {
+        min-height: 0;
+    }
+}
+
+@media (max-width: 599px) and (max-height: 740px) {
+    .menu-container {
+        padding: 14px 12px 12px;
+        gap: 10px;
+    }
+    .menu-grid {
+        gap: 10px;
+    }
+    .menu-card {
+        padding: 12px 10px;
+        gap: 6px;
+    }
+    .card-icon svg {
+        width: 34px;
+        height: 34px;
+    }
+    .card-title {
+        font-size: 0.88rem;
+    }
+    .menu-grid.odd-cards > .card-admin {
+        padding: 12px 16px;
+        gap: 12px;
+    }
+
+    .schedule-shell {
+        gap: 10px;
+        padding: 10px 8px 12px;
+    }
+    .week-arrow {
+        width: 42px;
+        height: 42px;
+    }
+    .legend-item {
+        padding: 5px 7px;
+        font-size: 0.56rem;
+    }
+
+    .guia-home {
+        padding: 10px 10px 12px;
+    }
+    .guia-grid {
+        gap: 8px;
+    }
+    .guia-card {
+        padding: 12px 8px 10px;
+    }
+    .guia-card-icon {
+        font-size: clamp(1.9rem, 4.2vh, 2.5rem);
+    }
+    .guia-card-title {
+        font-size: 0.78rem;
+    }
+    .guia-card-desc {
+        font-size: 0.62rem;
+    }
+    .guia-steps {
+        padding-top: 10px;
+        padding-bottom: 12px;
+    }
+    .guia-progress {
+        margin-bottom: 8px;
+    }
+    .guia-content {
+        gap: 8px;
+    }
+    .guia-instruction {
+        padding: 12px;
+        font-size: 0.84rem;
+    }
+    .guia-no-image-text {
+        font-size: 0.84rem;
     }
 }
 
