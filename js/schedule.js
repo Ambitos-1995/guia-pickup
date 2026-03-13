@@ -148,7 +148,11 @@ var Schedule = (function () {
         var hours = getHoursToRender(slotsData);
         var html = '';
 
-        gridEl.style.setProperty('--schedule-grid-rows-mobile', '42px repeat(' + hours.length + ', minmax(0, 1fr))');
+        if (window.matchMedia('(max-width: 767px)').matches) {
+            gridEl.style.setProperty('--schedule-grid-rows-mobile', '46px repeat(' + hours.length + ', minmax(0, 1fr))');
+        } else {
+            gridEl.style.removeProperty('--schedule-grid-rows-mobile');
+        }
 
         html += '<div class="sched-header sched-corner">Hora</div>';
         for (var d = 1; d <= 5; d++) {

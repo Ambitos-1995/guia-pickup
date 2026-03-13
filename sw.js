@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pickup-tmg-v36';
+var CACHE_NAME = 'pickup-tmg-v38';
 var FILES_TO_CACHE = [
     './',
     './index.html',
@@ -24,8 +24,13 @@ var FILES_TO_CACHE = [
     './vendor/webawesome/dist-cdn/styles/color/palettes/default.css',
     './vendor/webawesome/dist-cdn/webawesome.loader.js',
     './vendor/webawesome/dist-cdn/translations/es.js',
+    './icons/favicon-16.png',
+    './icons/favicon-32.png',
+    './icons/apple-touch-icon.png',
     './icons/icon-192.png',
+    './icons/icon-192-maskable.png',
     './icons/icon-512.png',
+    './icons/icon-512-maskable.png',
     './icons/icon.svg',
     './fonts/Lexend-Variable.ttf',
     './img/fotos con circulos/1.png',

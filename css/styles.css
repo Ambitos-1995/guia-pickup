@@ -803,6 +803,8 @@ button:focus-visible {
     display: flex;
     flex-direction: column;
     align-items: center;
+    align-self: stretch;
+    justify-self: stretch;
     gap: 10px;
     padding: 28px 16px 22px;
     background: var(--white);
@@ -817,6 +819,8 @@ button:focus-visible {
     -webkit-tap-highlight-color: transparent;
     position: relative;
     overflow: hidden;
+    width: 100%;
+    height: 100%;
 }
 
 .guia-card::after {
@@ -1538,6 +1542,7 @@ body {
     min-height: 0;
     width: 100%;
     align-content: stretch;
+    align-items: stretch;
 }
 
 .sched-header,
@@ -1598,7 +1603,11 @@ body {
     flex-direction: column;
     align-items: flex-start;
     justify-content: space-between;
+    align-self: stretch;
+    justify-self: stretch;
     min-height: 80px;
+    width: 100%;
+    height: 100%;
     padding: 10px 8px 9px;
     border-radius: 24px;
     border: 1px solid transparent;
@@ -1640,6 +1649,7 @@ body {
     border-color: rgba(203,213,225,0.34);
     color: transparent;
     box-shadow: none;
+    padding: 0;
 }
 
 .sched-mine {
@@ -1664,6 +1674,7 @@ body {
     border-color: rgba(203,213,225,0.34);
     color: transparent;
     box-shadow: none;
+    padding: 0;
 }
 
 .sched-empty:active {
@@ -1881,7 +1892,12 @@ body {
     }
     .schedule-grid {
         grid-template-columns: 46px repeat(5, minmax(0, 1fr));
-        gap: 6px;
+        column-gap: 6px;
+        row-gap: 10px;
+    }
+    .sched-header,
+    .sched-time {
+        min-height: 56px;
     }
     .sched-cell {
         min-height: 94px;
@@ -2031,8 +2047,12 @@ body {
     }
     .sched-cell {
         min-height: 0;
-        padding: 8px 4px 7px;
+        padding: 0;
         border-radius: 18px;
+    }
+    .sched-mine,
+    .sched-taken {
+        padding: 8px 6px;
     }
     .sched-status {
         font-size: clamp(0.76rem, 1.8vh, 0.86rem);
@@ -2071,25 +2091,27 @@ body {
 
     .guia-home {
         padding: 12px 12px 14px;
+        gap: 10px;
     }
     .guia-grid {
         gap: 10px;
     }
-    .guia-card {
-        padding: 16px 10px 12px;
-        gap: 6px;
+    .guia-home .guia-card {
+        justify-content: center;
+        padding: 18px 10px 16px;
+        gap: 10px;
         min-height: 0;
-        overflow: visible;
+        overflow: hidden;
     }
-    .guia-card-icon {
-        font-size: clamp(2.2rem, 4.8vh, 3rem);
+    .guia-home .guia-card-icon {
+        font-size: clamp(2.45rem, 5vh, 3.15rem);
     }
-    .guia-card-title {
-        font-size: clamp(0.82rem, 1.8vh, 0.95rem);
+    .guia-home .guia-card-title {
+        font-size: clamp(0.9rem, 1.95vh, 1rem);
     }
-    .guia-card-desc {
-        font-size: clamp(0.66rem, 1.55vh, 0.76rem);
-        line-height: 1.25;
+    .guia-home .guia-card-desc {
+        font-size: clamp(0.72rem, 1.65vh, 0.8rem);
+        line-height: 1.3;
     }
     .guia-steps,
     .guia-complete {
@@ -2161,16 +2183,16 @@ body {
     }
 }
 
-/* Guia grid: auto-size rows on mobile so text is not clipped */
+/* Guia home grid: 2x3 cards fill the viewport on mobile */
 @media (max-width: 767px) {
-    .guia-grid {
+    .guia-home .guia-grid {
         height: 100%;
         grid-template-rows: repeat(3, minmax(0, 1fr));
         grid-auto-rows: minmax(0, 1fr);
         align-content: stretch;
     }
-    .guia-card {
-        overflow: visible;
+    .guia-home .guia-card {
+        overflow: hidden;
         min-height: 0;
     }
     .guia-steps {
@@ -2232,21 +2254,24 @@ body {
 
     .guia-home {
         padding: 10px 10px 12px;
-    }
-    .guia-grid {
         gap: 8px;
     }
-    .guia-card {
-        padding: 12px 8px 10px;
+    .guia-home .guia-grid {
+        gap: 8px;
     }
-    .guia-card-icon {
-        font-size: clamp(1.9rem, 4.2vh, 2.5rem);
+    .guia-home .guia-card {
+        padding: 14px 8px 12px;
+        gap: 8px;
     }
-    .guia-card-title {
-        font-size: 0.78rem;
+    .guia-home .guia-card-icon {
+        font-size: clamp(2.05rem, 4.35vh, 2.65rem);
     }
-    .guia-card-desc {
-        font-size: 0.62rem;
+    .guia-home .guia-card-title {
+        font-size: 0.82rem;
+    }
+    .guia-home .guia-card-desc {
+        font-size: 0.66rem;
+        line-height: 1.2;
     }
     .guia-steps {
         padding-top: 10px;
