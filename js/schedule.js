@@ -9,6 +9,7 @@ var Schedule = (function () {
     var currentYear, currentWeek;
     var gridEl, labelEl, rangeEl, contextEl, dialogEl;
     var dialogModeEl, dialogTitleEl, dialogSummaryEl, dialogBodyEl, dialogFeedbackEl, dialogPinEl, dialogSubmitEl;
+    var dialogPinEntryEl, dialogPinDotsEl, dialogPinDots;
 
     var slotsData = [];
     var selectedSlot = null;
@@ -33,6 +34,9 @@ var Schedule = (function () {
         dialogFeedbackEl = document.getElementById('schedule-slot-feedback');
         dialogPinEl = document.getElementById('schedule-slot-pin');
         dialogSubmitEl = document.getElementById('schedule-slot-submit');
+        dialogPinEntryEl = document.getElementById('schedule-slot-pin-entry');
+        dialogPinDotsEl = document.getElementById('schedule-slot-dots');
+        dialogPinDots = dialogPinDotsEl.querySelectorAll('.slot-pin-dot');
 
         document.getElementById('week-prev').addEventListener('click', function () {
             changeWeek(-1);
@@ -43,8 +47,12 @@ var Schedule = (function () {
 
         gridEl.addEventListener('click', handleCellClick);
         dialogSubmitEl.addEventListener('click', submitDialog);
+        dialogPinEl.addEventListener('input', handlePinInput);
         dialogPinEl.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') submitDialog();
+        });
+        dialogPinDotsEl.addEventListener('click', function () {
+            dialogPinEl.focus();
         });
         dialogEl.addEventListener('wa-after-hide', resetDialog);
 
@@ -218,9 +226,12 @@ var Schedule = (function () {
 
         var needsPin = (mode === 'assign' || mode === 'release' || mode === 'assign-empty') && !App.getSession();
         dialogPinEl.value = '';
-        dialogPinEl.classList.toggle('hidden', !needsPin);
+        updateSlotPinDots();
+        dialogPinEntryEl.classList.toggle('hidden', !needsPin);
 
         if (mode === 'create') {
+            dialogModeEl.classList.remove('hidden');
+            dialogBodyEl.classList.remove('hidden');
             dialogEl.label = 'Crear franja';
             dialogModeEl.textContent = 'Modo ajustes';
             dialogTitleEl.textContent = 'Crear nueva franja';
@@ -228,6 +239,8 @@ var Schedule = (function () {
             dialogSubmitEl.textContent = 'Crear franja';
             dialogSubmitEl.setAttribute('variant', 'brand');
         } else if (mode === 'delete') {
+            dialogModeEl.classList.remove('hidden');
+            dialogBodyEl.classList.remove('hidden');
             dialogEl.label = 'Borrar franja';
             dialogModeEl.textContent = 'Modo ajustes';
             dialogTitleEl.textContent = 'Borrar franja libre';
@@ -236,14 +249,21 @@ var Schedule = (function () {
             dialogSubmitEl.setAttribute('variant', 'danger');
         } else if (mode === 'assign' || mode === 'assign-empty') {
             dialogEl.label = 'Reservar franja';
-            dialogModeEl.textContent = 'Franja disponible';
             dialogTitleEl.textContent = 'Reservar tu turno';
-            dialogBodyEl.textContent = needsPin
-                ? 'Introduce tu PIN de empleado para abrir sesion y reservar esta franja.'
-                : 'Tu sesion de empleado esta activa. Confirma para reservar esta franja.';
+            if (needsPin) {
+                dialogModeEl.classList.add('hidden');
+                dialogBodyEl.classList.add('hidden');
+            } else {
+                dialogModeEl.classList.remove('hidden');
+                dialogModeEl.textContent = 'Franja disponible';
+                dialogBodyEl.classList.remove('hidden');
+                dialogBodyEl.textContent = 'Tu sesion de empleado esta activa. Confirma para reservar esta franja.';
+            }
             dialogSubmitEl.textContent = needsPin ? 'Entrar y reservar' : 'Reservar franja';
             dialogSubmitEl.setAttribute('variant', 'brand');
         } else {
+            dialogModeEl.classList.remove('hidden');
+            dialogBodyEl.classList.remove('hidden');
             dialogEl.label = 'Liberar franja';
             dialogModeEl.textContent = App.hasAdminAccess() ? 'Modo ajustes' : 'Tu franja';
             dialogTitleEl.textContent = 'Liberar franja';
@@ -263,6 +283,9 @@ var Schedule = (function () {
         }
 
         dialogEl.open = true;
+        if (needsPin) {
+            setTimeout(function () { dialogPinEl.focus(); }, 100);
+        }
     }
 
     function submitDialog() {
@@ -319,6 +342,7 @@ var Schedule = (function () {
         var pin = String(dialogPinEl.value || '').trim();
         if (!/^\d{4}$/.test(pin)) {
             showDialogFeedback('warning', 'Introduce tu PIN de 4 cifras para continuar.');
+            shakeSlotPinDots();
             return false;
         }
 
@@ -337,7 +361,8 @@ var Schedule = (function () {
                     currentStatus: res.data.currentStatus || 'not_checked_in'
                 });
                 dialogPinEl.value = '';
-                dialogPinEl.classList.add('hidden');
+                updateSlotPinDots();
+                dialogPinEntryEl.classList.add('hidden');
                 isSubmitting = false;
                 dialogSubmitEl.disabled = false;
                 submitDialog();
@@ -345,10 +370,39 @@ var Schedule = (function () {
                 isSubmitting = false;
                 dialogSubmitEl.disabled = false;
                 showDialogFeedback('danger', (res && res.message) || 'PIN incorrecto.');
+                shakeSlotPinDots();
             }
         });
 
         return false;
+    }
+
+    function handlePinInput() {
+        var raw = dialogPinEl.value.replace(/[^0-9]/g, '');
+        if (raw.length > 4) raw = raw.substring(0, 4);
+        dialogPinEl.value = raw;
+        updateSlotPinDots();
+        if (raw.length === 4) {
+            setTimeout(submitDialog, 150);
+        }
+    }
+
+    function updateSlotPinDots() {
+        var len = dialogPinEl.value.length;
+        for (var i = 0; i < dialogPinDots.length; i++) {
+            dialogPinDots[i].classList.toggle('filled', i < len);
+            dialogPinDots[i].classList.remove('error');
+        }
+    }
+
+    function shakeSlotPinDots() {
+        for (var i = 0; i < dialogPinDots.length; i++) {
+            dialogPinDots[i].classList.add('error');
+        }
+        setTimeout(function () {
+            dialogPinEl.value = '';
+            updateSlotPinDots();
+        }, 500);
     }
 
     function resetDialog() {
@@ -359,7 +413,10 @@ var Schedule = (function () {
         isSubmitting = false;
         dialogSubmitEl.disabled = false;
         dialogPinEl.value = '';
-        dialogPinEl.classList.remove('hidden');
+        updateSlotPinDots();
+        dialogPinEntryEl.classList.remove('hidden');
+        dialogModeEl.classList.remove('hidden');
+        dialogBodyEl.classList.remove('hidden');
         clearDialogFeedback();
     }
 

@@ -39,6 +39,10 @@
         <!-- ============================================ -->
         <div id="screen-pin" class="screen">
             <div class="pin-container">
+                <button class="pin-back-btn" id="pin-public-schedule" type="button" aria-label="Volver al inicio">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+
                 <div class="pin-header">
                     <div class="pin-logo">Pickup TMG</div>
                     <div class="pin-clock" id="pin-clock">--:--</div>
@@ -55,8 +59,6 @@
                     <span class="pin-dot" data-index="4"></span>
                     <span class="pin-dot" data-index="5"></span>
                 </div>
-
-                <div class="pin-error hidden" id="pin-error" aria-live="polite"></div>
 
                 <div class="pin-keypad" id="pin-keypad">
                     <button class="key-btn" data-key="1">1</button>
@@ -79,15 +81,8 @@
                     <div class="spinner"></div>
                     <span>Verificando...</span>
                 </div>
-
-                <button class="btn-primary pin-submit-btn" id="pin-submit-btn" type="button">
-                    Acceder
-                </button>
-
-                <button class="pin-public-btn" id="pin-public-schedule" type="button">
-                    Volver al inicio
-                </button>
             </div>
+            <div class="pin-toast" id="pin-toast" role="alert" aria-live="polite"></div>
         </div>
 
         <!-- ============================================ -->
@@ -451,18 +446,18 @@
                 <p class="slot-dialog-summary" id="schedule-slot-summary">--</p>
                 <p class="slot-dialog-body" id="schedule-slot-body">Inicia sesion para continuar.</p>
                 <wa-callout id="schedule-slot-feedback" variant="neutral" appearance="filled-outlined" class="hidden"></wa-callout>
-                <wa-input
-                    id="schedule-slot-pin"
-                    label="PIN"
-                    hint="Solo hace falta si tu sesion de empleado no esta activa."
-                    placeholder="4 cifras"
-                    type="password"
-                    inputmode="numeric"
-                    maxlength="4"
-                    size="large"
-                    appearance="filled-outlined"
-                    password-toggle
-                ></wa-input>
+                <div class="slot-pin-entry hidden" id="schedule-slot-pin-entry">
+                    <label class="slot-pin-label">Introduce tu PIN</label>
+                    <div class="slot-pin-dots" id="schedule-slot-dots">
+                        <span class="slot-pin-dot"></span>
+                        <span class="slot-pin-dot"></span>
+                        <span class="slot-pin-dot"></span>
+                        <span class="slot-pin-dot"></span>
+                    </div>
+                    <input id="schedule-slot-pin" class="slot-pin-hidden-input"
+                           type="password" inputmode="numeric" maxlength="4"
+                           autocomplete="off" aria-label="PIN de empleado">
+                </div>
             </div>
             <wa-button slot="footer" variant="neutral" appearance="outlined" data-dialog="close">Cancelar</wa-button>
             <wa-button slot="footer" id="schedule-slot-submit" variant="brand" appearance="accent">Continuar</wa-button>

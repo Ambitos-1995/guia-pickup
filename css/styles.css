@@ -196,6 +196,7 @@ button:focus-visible {
    PIN SCREEN
    ===================================================== */
 .pin-container {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -261,13 +262,29 @@ button:focus-visible {
     transform: scale(1.15);
 }
 
-.pin-error {
-    color: #ff6b6b;
+.pin-toast {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #ff4444;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 12px;
     font-weight: 600;
     font-size: 0.95rem;
-    min-height: 28px;
-    margin-bottom: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 1000;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
     text-align: center;
+}
+
+.pin-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
 }
 
 .pin-keypad {
@@ -322,9 +339,25 @@ button:focus-visible {
     color: var(--gray-300);
 }
 
-.pin-submit-btn {
-    margin-top: 18px;
-    max-width: 320px;
+.pin-back-btn {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--gray-300);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+    z-index: 10;
+}
+
+.pin-back-btn:hover {
+    background: rgba(255,255,255,0.18);
 }
 
 /* =====================================================
@@ -1388,22 +1421,6 @@ body {
     letter-spacing: -0.04em;
 }
 
-.pin-public-btn {
-    margin-top: 18px;
-    width: 100%;
-    padding: 15px 18px;
-    border-radius: 999px;
-    background: rgba(255,255,255,0.12);
-    color: var(--white);
-    border: 1px solid rgba(255,255,255,0.18);
-    font-size: 0.92rem;
-    font-weight: 650;
-    letter-spacing: 0.01em;
-}
-
-.pin-public-btn:hover {
-    background: rgba(255,255,255,0.16);
-}
 
 .schedule-shell {
     flex: 1;
@@ -1706,6 +1723,75 @@ body {
     color: var(--gray-600);
     font-size: 0.92rem;
     line-height: 1.45;
+}
+
+/* --- Slot dialog: dot-based PIN entry --- */
+.slot-pin-entry {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0 4px;
+}
+
+.slot-pin-label {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--gray-500);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.slot-pin-dots {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    padding: 14px 28px;
+    border-radius: 16px;
+    background: var(--gray-100);
+    cursor: text;
+    transition: box-shadow 0.15s ease;
+}
+
+.slot-pin-dots:focus-within {
+    box-shadow: 0 0 0 3px rgba(227, 30, 36, 0.18);
+}
+
+.slot-pin-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2.5px solid var(--gray-400);
+    background: transparent;
+    transition: all 0.15s ease;
+}
+
+.slot-pin-dot.filled {
+    background: var(--red);
+    border-color: var(--red);
+    transform: scale(1.15);
+}
+
+.slot-pin-dot.error {
+    border-color: #ff4444;
+    animation: slot-pin-shake 0.4s ease;
+}
+
+.slot-pin-hidden-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+@keyframes slot-pin-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
 }
 
 

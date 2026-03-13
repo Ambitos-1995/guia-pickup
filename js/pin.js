@@ -10,15 +10,15 @@ var Pin = (function () {
     var isVerifying = false;
     var mode = 'admin';
     var employeeTarget = 'screen-clock';
+    var toastTimer = null;
 
-    var dots, errorEl, loadingEl, keypad, submitBtn, promptEl;
+    var dots, toastEl, loadingEl, keypad, promptEl;
 
     function init() {
         dots = document.querySelectorAll('.pin-dot');
-        errorEl = document.getElementById('pin-error');
+        toastEl = document.getElementById('pin-toast');
         loadingEl = document.getElementById('pin-loading');
         keypad = document.getElementById('pin-keypad');
-        submitBtn = document.getElementById('pin-submit-btn');
         promptEl = document.getElementById('pin-prompt');
 
         keypad.addEventListener('click', function (e) {
@@ -29,8 +29,6 @@ var Pin = (function () {
             if (key === 'clear') clearPin();
             else if (key && pin.length < currentMaxLength) addDigit(key);
         });
-
-        submitBtn.addEventListener('click', verify);
 
         document.addEventListener('keydown', function (e) {
             if (!App.isScreen('screen-pin') || isVerifying) return;
@@ -52,6 +50,9 @@ var Pin = (function () {
         pin += digit;
         updateDots();
         hideError();
+        if (pin.length === currentMaxLength) {
+            setTimeout(verify, 150);
+        }
     }
 
     function clearPin() {
@@ -74,13 +75,17 @@ var Pin = (function () {
     }
 
     function showError(message) {
-        errorEl.textContent = message;
-        errorEl.classList.remove('hidden');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastEl.textContent = message;
+        toastEl.classList.add('show');
+        toastTimer = setTimeout(function () {
+            toastEl.classList.remove('show');
+        }, 2500);
     }
 
     function hideError() {
-        errorEl.textContent = '';
-        errorEl.classList.add('hidden');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastEl.classList.remove('show');
     }
 
     function verify() {
@@ -94,8 +99,6 @@ var Pin = (function () {
         loadingEl.classList.remove('hidden');
         keypad.style.opacity = '0.5';
         keypad.style.pointerEvents = 'none';
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Verificando...';
 
         var request = mode === 'admin' ? Api.verifyAdminPin(pin) : Api.verifyPin(pin);
         request.then(function (res) {
@@ -103,8 +106,6 @@ var Pin = (function () {
             loadingEl.classList.add('hidden');
             keypad.style.opacity = '1';
             keypad.style.pointerEvents = 'auto';
-            submitBtn.disabled = false;
-            submitBtn.textContent = mode === 'employee' ? 'Entrar' : 'Acceder';
 
             if (!(res && res.success && res.data)) {
                 showError((res && res.message) || 'PIN incorrecto');
@@ -141,7 +142,6 @@ var Pin = (function () {
         setDotCount(6);
         clearPin();
         if (promptEl) promptEl.textContent = 'Introduce el PIN de ajustes';
-        if (submitBtn) submitBtn.textContent = 'Acceder';
     }
 
     function openForEmployee(targetScreen) {
@@ -150,7 +150,6 @@ var Pin = (function () {
         setDotCount(4);
         clearPin();
         if (promptEl) promptEl.textContent = 'Introduce tu PIN de empleado';
-        if (submitBtn) submitBtn.textContent = 'Entrar';
     }
 
     return {
