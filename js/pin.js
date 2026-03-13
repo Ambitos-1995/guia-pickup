@@ -22,8 +22,10 @@ var Pin = (function () {
         keypad = document.getElementById('pin-keypad');
         promptEl = document.getElementById('pin-prompt');
 
-        keypad.addEventListener('click', function (e) {
-            var btn = e.target.closest('.key-btn');
+        Utils.delegatePress(keypad, '.key-btn', function (e, btn) {
+            if (e.type === 'pointerup') {
+                e.preventDefault();
+            }
             if (!btn || isVerifying) return;
 
             var key = btn.dataset.key;

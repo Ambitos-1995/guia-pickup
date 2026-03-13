@@ -105,6 +105,35 @@ var Utils = (function () {
         return count;
     }
 
+    function addPressListener(element, handler) {
+        if (!element || typeof handler !== 'function') return;
+
+        var lastTouchActivation = 0;
+
+        if (window.PointerEvent) {
+            element.addEventListener('pointerup', function (e) {
+                if (e.pointerType === 'mouse') return;
+                if (e.isPrimary === false) return;
+                if (typeof e.button === 'number' && e.button !== 0) return;
+                lastTouchActivation = Date.now();
+                handler(e);
+            });
+        }
+
+        element.addEventListener('click', function (e) {
+            if (Date.now() - lastTouchActivation < 700) return;
+            handler(e);
+        });
+    }
+
+    function delegatePress(element, selector, handler) {
+        addPressListener(element, function (e) {
+            var target = e.target && e.target.closest ? e.target.closest(selector) : null;
+            if (!target || !element.contains(target)) return;
+            handler(e, target);
+        });
+    }
+
     return {
         DAY_NAMES: DAY_NAMES,
         DAY_SHORT: DAY_SHORT,
@@ -121,6 +150,8 @@ var Utils = (function () {
         currentWeekInfo: currentWeekInfo,
         getISOWeeksInYear: getISOWeeksInYear,
         dayOfWeekShort: dayOfWeekShort,
-        countWeekdays: countWeekdays
+        countWeekdays: countWeekdays,
+        addPressListener: addPressListener,
+        delegatePress: delegatePress
     };
 })();

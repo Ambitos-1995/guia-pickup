@@ -138,12 +138,12 @@ var Guia = (function () {
         // Render process cards
         renderProcessCards();
 
-        finishBtn.addEventListener('click', backToGuiaHome);
+        Utils.addPressListener(finishBtn, backToGuiaHome);
 
         // Smart back button: steps/complete → guia-home, guia-home → screen-menu
         var backBtn = document.getElementById('guia-back-btn');
         if (backBtn) {
-            backBtn.addEventListener('click', function (e) {
+            Utils.addPressListener(backBtn, function (e) {
                 if (!guiaHome.classList.contains('hidden')) {
                     // Already on guia-home, let App.navigate handle it
                     return;
@@ -177,7 +177,7 @@ var Guia = (function () {
         }, { passive: true });
 
         // Tap anywhere on steps to advance
-        stepsEl.addEventListener('click', function () {
+        Utils.addPressListener(stepsEl, function () {
             if (swipeHandled) { swipeHandled = false; return; }
             nextStep();
         });
@@ -216,9 +216,10 @@ var Guia = (function () {
             guiaGrid.appendChild(button);
         }
 
-        guiaGrid.addEventListener('click', function (e) {
-            var card = e.target.closest('.guia-card');
-            if (!card) return;
+        Utils.delegatePress(guiaGrid, '.guia-card', function (e, card) {
+            if (e.type === 'pointerup') {
+                e.preventDefault();
+            }
             startProcess(card.dataset.process);
         });
     }

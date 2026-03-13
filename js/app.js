@@ -21,9 +21,10 @@ var App = (function () {
         Install.init();
         Realtime.init();
 
-        document.getElementById('menu-grid').addEventListener('click', function (e) {
-            var card = e.target.closest('.menu-card');
-            if (!card) return;
+        Utils.delegatePress(document.getElementById('menu-grid'), '.menu-card', function (e, card) {
+            if (e.type === 'pointerup') {
+                e.preventDefault();
+            }
 
             if (card.id === 'card-admin') {
                 if (hasAdminAccess()) {
@@ -55,24 +56,24 @@ var App = (function () {
             if (target) navigate(target);
         });
 
-        document.getElementById('pin-public-schedule').addEventListener('click', function () {
+        Utils.addPressListener(document.getElementById('pin-public-schedule'), function () {
             navigate('screen-menu');
         });
 
         document.querySelectorAll('.back-btn[data-back]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
+            Utils.addPressListener(btn, function () {
                 navigate(btn.dataset.back);
             });
         });
 
-        document.getElementById('logout-btn').addEventListener('click', logout);
-        document.getElementById('menu-login-btn').addEventListener('click', function () {
+        Utils.addPressListener(document.getElementById('logout-btn'), logout);
+        Utils.addPressListener(document.getElementById('menu-login-btn'), function () {
             Pin.openForEmployee('screen-menu');
             navigate('screen-pin');
         });
 
-        document.getElementById('modal-cancel').addEventListener('click', closeModal);
-        document.getElementById('modal-ok').addEventListener('click', function () {
+        Utils.addPressListener(document.getElementById('modal-cancel'), closeModal);
+        Utils.addPressListener(document.getElementById('modal-ok'), function () {
             var cb = modalCallback;
             closeModal();
             if (cb) cb();
