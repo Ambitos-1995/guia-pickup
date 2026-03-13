@@ -19,6 +19,7 @@ var App = (function () {
         Payment.init();
         Admin.init();
         Install.init();
+        Realtime.init();
 
         document.getElementById('menu-grid').addEventListener('click', function (e) {
             var card = e.target.closest('.menu-card');
@@ -65,6 +66,10 @@ var App = (function () {
         });
 
         document.getElementById('logout-btn').addEventListener('click', logout);
+        document.getElementById('menu-login-btn').addEventListener('click', function () {
+            Pin.openForEmployee('screen-menu');
+            navigate('screen-pin');
+        });
 
         document.getElementById('modal-cancel').addEventListener('click', closeModal);
         document.getElementById('modal-ok').addEventListener('click', function () {
@@ -150,6 +155,7 @@ var App = (function () {
         var ficharCard = document.getElementById('card-fichar');
         var paymentCard = document.getElementById('card-payment');
         var adminCard = document.getElementById('card-admin');
+        var loginBtn = document.getElementById('menu-login-btn');
         var logoutBtn = document.getElementById('logout-btn');
 
         if (activeSession && activeSession.role === 'respondent') {
@@ -158,6 +164,7 @@ var App = (function () {
             ficharCard.classList.remove('hidden');
             paymentCard.classList.remove('hidden');
             adminCard.classList.remove('hidden');
+            loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
         } else if (activeSession && activeSession.role === 'org_admin') {
             greetingEl.textContent = 'Ajustes';
@@ -165,6 +172,7 @@ var App = (function () {
             ficharCard.classList.remove('hidden');
             paymentCard.classList.add('hidden');
             adminCard.classList.remove('hidden');
+            loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
         } else {
             greetingEl.textContent = 'Panel publico';
@@ -172,6 +180,7 @@ var App = (function () {
             ficharCard.classList.remove('hidden');
             paymentCard.classList.add('hidden');
             adminCard.classList.remove('hidden');
+            loginBtn.classList.remove('hidden');
             logoutBtn.classList.add('hidden');
         }
 

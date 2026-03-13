@@ -389,19 +389,44 @@ button:focus-visible {
 
 .menu-header {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
+    gap: 12px;
     flex-shrink: 0;
 }
 
 .greeting {
+    flex: 1;
+    min-width: 0;
     font-size: 1.6rem;
     font-weight: 800;
     letter-spacing: -0.03em;
     color: var(--text);
 }
 
+.menu-login-btn {
+    flex-shrink: 0;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.92);
+    border: 1px solid rgba(17,24,39,0.08);
+    color: var(--gray-700);
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    box-shadow: 0 10px 20px rgba(15,23,42,0.06);
+    white-space: nowrap;
+}
+
+.menu-login-btn:hover {
+    background: var(--white);
+}
+
+.menu-login-btn:active {
+    transform: scale(0.97);
+}
+
 .menu-clock {
+    flex-shrink: 0;
     font-size: 1.1rem;
     font-weight: 600;
     color: var(--gray-500);
@@ -1977,11 +2002,14 @@ body {
         gap: 12px;
     }
     .menu-header {
-        align-items: center;
         gap: 10px;
     }
     .greeting {
         font-size: 1.42rem;
+    }
+    .menu-login-btn {
+        padding: 9px 12px;
+        font-size: 0.74rem;
     }
     .menu-clock {
         font-size: 0.96rem;

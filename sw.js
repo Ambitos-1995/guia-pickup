@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pickup-tmg-v38';
+var CACHE_NAME = 'pickup-tmg-v40';
 var FILES_TO_CACHE = [
     './',
     './index.html',
@@ -14,6 +14,8 @@ var FILES_TO_CACHE = [
     './js/payment.js',
     './js/admin.js',
     './js/install.js',
+    './vendor/supabase/supabase.min.js',
+    './js/realtime.js',
     './js/sw-register.js',
     './js/app.js',
     './vendor/webawesome/dist-cdn/styles/webawesome.css',

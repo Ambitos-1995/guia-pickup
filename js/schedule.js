@@ -537,8 +537,16 @@ var Schedule = (function () {
             .replace(/'/g, '&#39;');
     }
 
+    function refreshIfVisible() {
+        if (typeof App !== 'undefined' && App.isScreen('screen-schedule')) {
+            fetchAndCache(currentYear, currentWeek);
+        }
+    }
+
     return {
         init: init,
-        show: show
+        show: show,
+        invalidateCache: invalidateCache,
+        refreshIfVisible: refreshIfVisible
     };
 })();
