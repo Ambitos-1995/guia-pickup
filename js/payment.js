@@ -15,10 +15,10 @@ var Payment = (function () {
         noteEl = document.getElementById('payment-note');
         statusEl = document.getElementById('payment-status');
 
-        document.getElementById('pay-month-prev').addEventListener('click', function () {
+        Utils.bindPress(document.getElementById('pay-month-prev'), function () {
             changeMonth(-1);
         });
-        document.getElementById('pay-month-next').addEventListener('click', function () {
+        Utils.bindPress(document.getElementById('pay-month-next'), function () {
             changeMonth(1);
         });
     }

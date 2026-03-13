@@ -21,10 +21,7 @@ var App = (function () {
         Install.init();
         Realtime.init();
 
-        document.getElementById('menu-grid').addEventListener('click', function (e) {
-            var card = Utils.closest(e.target, '.menu-card', this);
-            if (!card) return;
-
+        Utils.delegatePress(document.getElementById('menu-grid'), '.menu-card', function (e, card) {
             if (card.id === 'card-admin') {
                 if (hasAdminAccess()) {
                     navigate('screen-admin');
@@ -55,24 +52,24 @@ var App = (function () {
             if (target) navigate(target);
         });
 
-        document.getElementById('pin-public-schedule').addEventListener('click', function () {
+        Utils.bindPress(document.getElementById('pin-public-schedule'), function () {
             navigate('screen-menu');
         });
 
         Utils.each(document.querySelectorAll('.back-btn[data-back]'), function (btn) {
-            btn.addEventListener('click', function () {
+            Utils.bindPress(btn, function () {
                 navigate(btn.dataset.back);
             });
         });
 
-        document.getElementById('logout-btn').addEventListener('click', logout);
-        document.getElementById('menu-login-btn').addEventListener('click', function () {
+        Utils.bindPress(document.getElementById('logout-btn'), logout);
+        Utils.bindPress(document.getElementById('menu-login-btn'), function () {
             Pin.openForEmployee('screen-menu');
             navigate('screen-pin');
         });
 
-        document.getElementById('modal-cancel').addEventListener('click', closeModal);
-        document.getElementById('modal-ok').addEventListener('click', function () {
+        Utils.bindPress(document.getElementById('modal-cancel'), closeModal);
+        Utils.bindPress(document.getElementById('modal-ok'), function () {
             var cb = modalCallback;
             closeModal();
             if (cb) cb();

@@ -9,7 +9,7 @@ var Admin = (function () {
     function init() {
         var tabs = document.querySelectorAll('.admin-tab');
         Utils.each(tabs, function (tab) {
-            tab.addEventListener('click', function () {
+            Utils.bindPress(tab, function () {
                 Utils.each(tabs, function (item) { item.classList.remove('active'); });
                 tab.classList.add('active');
 
@@ -26,11 +26,11 @@ var Admin = (function () {
             });
         });
 
-        document.getElementById('admin-pay-save').addEventListener('click', savePayment);
-        document.getElementById('admin-pay-calculate').addEventListener('click', calculatePayments);
-        document.getElementById('admin-emp-create').addEventListener('click', createEmployee);
-        document.getElementById('edit-emp-cancel').addEventListener('click', closeEditModal);
-        document.getElementById('edit-emp-save').addEventListener('click', saveEditEmployee);
+        Utils.bindPress(document.getElementById('admin-pay-save'), savePayment);
+        Utils.bindPress(document.getElementById('admin-pay-calculate'), calculatePayments);
+        Utils.bindPress(document.getElementById('admin-emp-create'), createEmployee);
+        Utils.bindPress(document.getElementById('edit-emp-cancel'), closeEditModal);
+        Utils.bindPress(document.getElementById('edit-emp-save'), saveEditEmployee);
 
         var now = new Date();
         document.getElementById('admin-pay-year').value = now.getFullYear();
@@ -321,7 +321,7 @@ var Admin = (function () {
         button.className = 'btn-edit-emp';
         button.type = 'button';
         button.textContent = 'Editar';
-        button.addEventListener('click', function () {
+        Utils.bindPress(button, function () {
             openEditModal(employee);
         });
 

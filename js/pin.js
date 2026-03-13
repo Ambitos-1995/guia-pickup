@@ -22,10 +22,8 @@ var Pin = (function () {
         keypad = document.getElementById('pin-keypad');
         promptEl = document.getElementById('pin-prompt');
 
-        keypad.addEventListener('click', function (e) {
-            var btn = Utils.closest(e.target, '.key-btn', keypad);
-            if (!btn || isVerifying) return;
-
+        Utils.delegatePress(keypad, '.key-btn', function (e, btn) {
+            if (isVerifying) return;
             var key = btn.dataset.key;
             if (key === 'clear') clearPin();
             else if (key && pin.length < currentMaxLength) addDigit(key);

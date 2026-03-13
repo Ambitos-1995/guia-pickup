@@ -17,8 +17,8 @@ var Clock = (function () {
         feedbackMsg = document.getElementById('feedback-msg');
         feedbackScheduleBtn = document.getElementById('feedback-schedule-btn');
 
-        btnIn.addEventListener('click', doCheckIn);
-        feedbackScheduleBtn.addEventListener('click', function () {
+        Utils.bindPress(btnIn, doCheckIn);
+        Utils.bindPress(feedbackScheduleBtn, function () {
             App.navigate('screen-schedule');
         });
     }

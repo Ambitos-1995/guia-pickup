@@ -138,18 +138,20 @@ var Guia = (function () {
         // Render process cards
         renderProcessCards();
 
-        finishBtn.addEventListener('click', backToGuiaHome);
+        Utils.bindPress(finishBtn, backToGuiaHome);
 
         // Smart back button: steps/complete → guia-home, guia-home → screen-menu
         var backBtn = document.getElementById('guia-back-btn');
         if (backBtn) {
-            backBtn.addEventListener('click', function (e) {
+            Utils.bindPress(backBtn, function (e) {
                 if (!guiaHome.classList.contains('hidden')) {
                     // Already on guia-home, let App.navigate handle it
                     return;
                 }
                 // In steps or complete, go back to guia-home instead of main menu
-                e.stopPropagation();
+                if (e.preventDefault) e.preventDefault();
+                if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+                else if (e.stopPropagation) e.stopPropagation();
                 backToGuiaHome();
             });
         }
@@ -173,11 +175,21 @@ var Guia = (function () {
                 swipeHandled = true;
                 if (dx < 0) nextStep();
                 else prevStep();
+                return;
+            }
+
+            if (Math.abs(dx) < 12 && Math.abs(dy) < 12) {
+                swipeHandled = true;
+                nextStep();
             }
         }, { passive: true });
 
         // Tap anywhere on steps to advance
         stepsEl.addEventListener('click', function () {
+            if (Utils.isRecentTouchLikePress(700)) {
+                swipeHandled = false;
+                return;
+            }
             if (swipeHandled) { swipeHandled = false; return; }
             nextStep();
         });
@@ -216,9 +228,7 @@ var Guia = (function () {
             guiaGrid.appendChild(button);
         }
 
-        guiaGrid.addEventListener('click', function (e) {
-            var card = Utils.closest(e.target, '.guia-card', guiaGrid);
-            if (!card) return;
+        Utils.delegatePress(guiaGrid, '.guia-card', function (e, card) {
             startProcess(card.dataset.process);
         });
     }

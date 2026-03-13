@@ -48,12 +48,21 @@ if ("serviceWorker" in navigator) {
             var btn = document.getElementById('update-btn');
             if (!btn) return;
 
+            btn._waitingSW = waitingSW;
             btn.classList.remove('hidden');
-            btn.onclick = function () {
+
+            if (btn.dataset.pressBound === 'true') {
+                return;
+            }
+
+            btn.dataset.pressBound = 'true';
+            Utils.bindPress(btn, function () {
                 btn.textContent = 'Actualizando...';
                 btn.disabled = true;
-                waitingSW.postMessage({ type: 'SKIP_WAITING' });
-            };
+                if (btn._waitingSW) {
+                    btn._waitingSW.postMessage({ type: 'SKIP_WAITING' });
+                }
+            });
         }
     })();
 }
