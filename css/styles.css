@@ -747,10 +747,10 @@ button:focus-visible {
 .guia-grid {
     display: grid;
     width: 100%;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
     flex: 1;
-    align-content: stretch;
+    align-content: center;
     margin-inline: auto;
 }
 
@@ -759,23 +759,23 @@ button:focus-visible {
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    padding: 20px 12px;
+    padding: 24px 14px;
     background: var(--white);
     border: 2px solid var(--gray-200);
     border-radius: var(--radius);
     text-align: center;
     transition: all var(--transition);
-    min-height: 140px;
+    min-height: 160px;
     justify-content: center;
     box-shadow: var(--shadow-card);
 }
 
 .guia-card:active { transform: scale(0.96); border-color: var(--red); }
 
-.guia-card-icon { font-size: 2.8rem; }
+.guia-card-icon { font-size: 3rem; }
 
 .guia-card-title {
-    font-size: 0.88rem;
+    font-size: 0.95rem;
     font-weight: 700;
     line-height: 1.2;
     max-width: 100%;
@@ -783,7 +783,7 @@ button:focus-visible {
 }
 
 .guia-card-desc {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--gray-500);
     line-height: 1.3;
     max-width: 100%;
@@ -1778,12 +1778,12 @@ body {
         align-items: center;
     }
     .guia-card {
-        min-height: 180px;
-        padding: 24px 16px;
+        min-height: 200px;
+        padding: 28px 18px;
     }
-    .guia-card-icon { font-size: 3.2rem; }
-    .guia-card-title { font-size: 1rem; }
-    .guia-card-desc { font-size: 0.78rem; }
+    .guia-card-icon { font-size: 3.5rem; }
+    .guia-card-title { font-size: 1.05rem; }
+    .guia-card-desc { font-size: 0.82rem; }
     .payment-cards {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -1798,10 +1798,6 @@ body {
 @media (min-width: 834px) {
     .menu-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .guia-grid {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     .payment-cards {
@@ -1841,6 +1837,10 @@ body {
     .guia-grid {
         gap: 18px;
     }
+    .guia-card {
+        min-height: 220px;
+    }
+    .guia-card-icon { font-size: 3.8rem; }
 
     .sched-cell {
         min-height: 108px;
