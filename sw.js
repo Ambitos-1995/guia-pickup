@@ -35,17 +35,17 @@ var FILES_TO_CACHE = [
     './icons/icon-512-maskable.png',
     './icons/icon.svg',
     './fonts/Lexend-Variable.ttf',
-    './img/fotos con circulos/1.png',
-    './img/fotos con circulos/2.png',
-    './img/fotos con circulos/3.png',
-    './img/fotos con circulos/4.png',
-    './img/fotos con circulos/5.png',
-    './img/fotos con circulos/6.png',
-    './img/fotos con circulos/7.png',
-    './img/fotos con circulos/8.png',
-    './img/fotos con circulos/9.png',
-    './img/fotos con circulos/10.png',
-    './img/fotos con circulos/11.png'
+    './img/fotos-con-circulos/1.png',
+    './img/fotos-con-circulos/2.png',
+    './img/fotos-con-circulos/3.png',
+    './img/fotos-con-circulos/4.png',
+    './img/fotos-con-circulos/5.png',
+    './img/fotos-con-circulos/6.png',
+    './img/fotos-con-circulos/7.png',
+    './img/fotos-con-circulos/8.png',
+    './img/fotos-con-circulos/9.png',
+    './img/fotos-con-circulos/10.png',
+    './img/fotos-con-circulos/11.png'
 ];
 
 // Install: cache all static assets (do NOT skipWaiting — user controls update)

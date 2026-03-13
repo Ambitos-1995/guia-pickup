@@ -13,10 +13,10 @@ var Guia = (function () {
             icono: "\uD83D\uDE9A",
             tipo: "repartidor",
             pasos: [
-                { imagen: "img/fotos con circulos/1.png", texto: "Pulsa <strong>REPARTIDOR</strong>" },
-                { imagen: "img/fotos con circulos/5.png", texto: "Pulsa <strong>RECEPCION DE PAQUETES</strong>" },
-                { imagen: "img/fotos con circulos/7.png", texto: "Pulsa <strong>SEUR</strong>" },
-                { imagen: "img/fotos con circulos/9.png", texto: "Pulsa el <strong>boton grande</strong>.<br>Escanea cada paquete." },
+                { imagen: "img/fotos-con-circulos/1.png", texto: "Pulsa <strong>REPARTIDOR</strong>" },
+                { imagen: "img/fotos-con-circulos/5.png", texto: "Pulsa <strong>RECEPCION DE PAQUETES</strong>" },
+                { imagen: "img/fotos-con-circulos/7.png", texto: "Pulsa <strong>SEUR</strong>" },
+                { imagen: "img/fotos-con-circulos/9.png", texto: "Pulsa el <strong>boton grande</strong>.<br>Escanea cada paquete." },
                 { imagen: null, texto: "Pulsa <strong>CONTINUAR</strong>" }
             ],
             mensajeExito: "Los paquetes estan guardados.",
@@ -30,10 +30,10 @@ var Guia = (function () {
             icono: "\uD83D\uDE9A",
             tipo: "repartidor",
             pasos: [
-                { imagen: "img/fotos con circulos/1.png", texto: "Pulsa <strong>REPARTIDOR</strong>" },
-                { imagen: "img/fotos con circulos/5.png", texto: "Pulsa <strong>RECEPCION DE PAQUETES</strong>" },
-                { imagen: "img/fotos con circulos/8.png", texto: "Pulsa <strong>TIPSA</strong>" },
-                { imagen: "img/fotos con circulos/9.png", texto: "Pulsa el <strong>boton grande</strong>.<br>Escanea cada paquete." },
+                { imagen: "img/fotos-con-circulos/1.png", texto: "Pulsa <strong>REPARTIDOR</strong>" },
+                { imagen: "img/fotos-con-circulos/5.png", texto: "Pulsa <strong>RECEPCION DE PAQUETES</strong>" },
+                { imagen: "img/fotos-con-circulos/8.png", texto: "Pulsa <strong>TIPSA</strong>" },
+                { imagen: "img/fotos-con-circulos/9.png", texto: "Pulsa el <strong>boton grande</strong>.<br>Escanea cada paquete." },
                 { imagen: null, texto: "Pulsa <strong>CONTINUAR</strong>" }
             ],
             mensajeExito: "Los paquetes estan guardados.",
@@ -47,10 +47,10 @@ var Guia = (function () {
             icono: "\uD83D\uDCE6",
             tipo: "repartidor",
             pasos: [
-                { imagen: "img/fotos con circulos/1.png", texto: "Pulsa <strong>REPARTIDOR</strong>" },
-                { imagen: "img/fotos con circulos/6.png", texto: "Pulsa <strong>RECOGIDA DE PAQUETES</strong>" },
-                { imagen: "img/fotos con circulos/7.png", texto: "Pulsa <strong>SEUR</strong> o <strong>TIPSA</strong>" },
-                { imagen: "img/fotos con circulos/9.png", texto: "Escanea cada paquete que se lleva." },
+                { imagen: "img/fotos-con-circulos/1.png", texto: "Pulsa <strong>REPARTIDOR</strong>" },
+                { imagen: "img/fotos-con-circulos/6.png", texto: "Pulsa <strong>RECOGIDA DE PAQUETES</strong>" },
+                { imagen: "img/fotos-con-circulos/7.png", texto: "Pulsa <strong>SEUR</strong> o <strong>TIPSA</strong>" },
+                { imagen: "img/fotos-con-circulos/9.png", texto: "Escanea cada paquete que se lleva." },
                 { imagen: null, texto: "Pulsa <strong>CONTINUAR</strong>" }
             ],
             mensajeExito: "Los paquetes estan registrados.",
@@ -64,9 +64,9 @@ var Guia = (function () {
             icono: "\uD83C\uDFF7\uFE0F",
             tipo: "cliente",
             pasos: [
-                { imagen: "img/fotos con circulos/2.png", texto: "Pulsa <strong>CLIENTE</strong>" },
-                { imagen: "img/fotos con circulos/4.png", texto: "Pulsa <strong>DEPOSITO DE PAQUETES</strong>" },
-                { imagen: "img/fotos con circulos/10.png", texto: "Pulsa <strong>Una etiqueta de envio</strong>" },
+                { imagen: "img/fotos-con-circulos/2.png", texto: "Pulsa <strong>CLIENTE</strong>" },
+                { imagen: "img/fotos-con-circulos/4.png", texto: "Pulsa <strong>DEPOSITO DE PAQUETES</strong>" },
+                { imagen: "img/fotos-con-circulos/10.png", texto: "Pulsa <strong>Una etiqueta de envio</strong>" },
                 { imagen: null, texto: "Escanea la etiqueta.<br>Pide el <strong>telefono</strong> al cliente.<br>Pulsa <strong>CONTINUAR</strong>." }
             ],
             mensajeExito: "Guarda el paquete en la estanteria.",
@@ -80,9 +80,9 @@ var Guia = (function () {
             icono: "\uD83D\uDCF1",
             tipo: "cliente",
             pasos: [
-                { imagen: "img/fotos con circulos/2.png", texto: "Pulsa <strong>CLIENTE</strong>" },
-                { imagen: "img/fotos con circulos/4.png", texto: "Pulsa <strong>DEPOSITO DE PAQUETES</strong>" },
-                { imagen: "img/fotos con circulos/11.png", texto: "Pulsa <strong>Un codigo QR</strong>" },
+                { imagen: "img/fotos-con-circulos/2.png", texto: "Pulsa <strong>CLIENTE</strong>" },
+                { imagen: "img/fotos-con-circulos/4.png", texto: "Pulsa <strong>DEPOSITO DE PAQUETES</strong>" },
+                { imagen: "img/fotos-con-circulos/11.png", texto: "Pulsa <strong>Un codigo QR</strong>" },
                 { imagen: null, texto: "Escanea el <strong>QR del movil</strong> del cliente." },
                 { imagen: null, texto: "Escribe en una etiqueta:<br><strong>El codigo + ES26626</strong><br>Pegala en el paquete." }
             ],
@@ -97,8 +97,8 @@ var Guia = (function () {
             icono: "\uD83C\uDF81",
             tipo: "cliente",
             pasos: [
-                { imagen: "img/fotos con circulos/2.png", texto: "Pulsa <strong>CLIENTE</strong>" },
-                { imagen: "img/fotos con circulos/3.png", texto: "Pulsa <strong>RECOGIDA DE PAQUETES</strong>" },
+                { imagen: "img/fotos-con-circulos/2.png", texto: "Pulsa <strong>CLIENTE</strong>" },
+                { imagen: "img/fotos-con-circulos/3.png", texto: "Pulsa <strong>RECOGIDA DE PAQUETES</strong>" },
                 { imagen: null, texto: "Pregunta: <strong>Tienes QR o DNI?</strong><br>Pulsa la opcion." },
                 { imagen: null, texto: "Busca el paquete.<br>Escanea la <strong>etiqueta</strong>." },
                 { imagen: null, texto: "El cliente <strong>firma en la pantalla</strong>.<br>Dale su paquete." }
