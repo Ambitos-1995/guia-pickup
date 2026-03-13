@@ -737,18 +737,19 @@ button:focus-visible {
 }
 
 .guia-subtitle {
-    font-size: 1.15rem;
-    font-weight: 700;
-    margin-bottom: 4px;
+    font-size: 1.3rem;
+    font-weight: 800;
+    margin-bottom: 6px;
     color: var(--text);
     line-height: 1.2;
+    letter-spacing: -0.02em;
 }
 
 .guia-grid {
     display: grid;
     width: 100%;
     grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
+    gap: 16px;
     flex: 1;
     align-content: center;
     margin-inline: auto;
@@ -758,34 +759,80 @@ button:focus-visible {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    padding: 24px 14px;
+    gap: 10px;
+    padding: 28px 16px 22px;
     background: var(--white);
-    border: 2px solid var(--gray-200);
-    border-radius: var(--radius);
+    border: .5px solid var(--gray-200);
+    border-radius: var(--radius-lg);
     text-align: center;
-    transition: all var(--transition);
-    min-height: 160px;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    min-height: 170px;
     justify-content: center;
-    box-shadow: var(--shadow-card);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    overflow: hidden;
 }
 
-.guia-card:active { transform: scale(0.96); border-color: var(--red); }
+.guia-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+}
 
-.guia-card-icon { font-size: 3rem; }
+.guia-card:active {
+    transform: scale(0.95);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.guia-card:active::after {
+    opacity: 1;
+}
+
+/* Repartidor cards — warm orange tint */
+.guia-card-repartidor {
+    background: linear-gradient(160deg, #fff8f0 0%, #fff1e0 100%);
+    border-color: rgba(249, 115, 22, 0.15);
+}
+.guia-card-repartidor::after {
+    background: rgba(249, 115, 22, 0.08);
+}
+
+/* Cliente cards — cool blue tint */
+.guia-card-cliente {
+    background: linear-gradient(160deg, #f0f7ff 0%, #e0eeff 100%);
+    border-color: rgba(59, 130, 246, 0.15);
+}
+.guia-card-cliente::after {
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.guia-card-icon {
+    font-size: 4rem;
+    line-height: 1;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
 
 .guia-card-title {
-    font-size: 0.95rem;
-    font-weight: 700;
+    font-size: 1.05rem;
+    font-weight: 800;
     line-height: 1.2;
+    color: var(--text);
+    letter-spacing: -0.01em;
     max-width: 100%;
     overflow-wrap: anywhere;
 }
 
 .guia-card-desc {
-    font-size: 0.75rem;
-    color: var(--gray-500);
-    line-height: 1.3;
+    font-size: 0.8rem;
+    color: var(--gray-600);
+    line-height: 1.35;
+    font-weight: 500;
     max-width: 100%;
     overflow-wrap: anywhere;
 }
@@ -797,9 +844,6 @@ button:focus-visible {
     margin-inline: auto;
     gap: 12px;
 }
-
-.guia-card-repartidor { border-left: 4px solid var(--orange); }
-.guia-card-cliente { border-left: 4px solid var(--blue); }
 
 /* Guia Steps */
 .guia-steps {
@@ -1757,7 +1801,7 @@ body {
     }
     .guia-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 16px;
+        gap: 20px;
     }
 
     .guia-content {
@@ -1778,12 +1822,13 @@ body {
         align-items: center;
     }
     .guia-card {
-        min-height: 200px;
-        padding: 28px 18px;
+        min-height: 210px;
+        padding: 32px 20px 26px;
+        gap: 12px;
     }
-    .guia-card-icon { font-size: 3.5rem; }
-    .guia-card-title { font-size: 1.05rem; }
-    .guia-card-desc { font-size: 0.82rem; }
+    .guia-card-icon { font-size: 4.8rem; }
+    .guia-card-title { font-size: 1.15rem; }
+    .guia-card-desc { font-size: 0.88rem; }
     .payment-cards {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -1835,12 +1880,15 @@ body {
     }
 
     .guia-grid {
-        gap: 18px;
+        gap: 22px;
     }
     .guia-card {
-        min-height: 220px;
+        min-height: 240px;
+        padding: 36px 24px 28px;
     }
-    .guia-card-icon { font-size: 3.8rem; }
+    .guia-card-icon { font-size: 5.2rem; }
+    .guia-card-title { font-size: 1.2rem; }
+    .guia-card-desc { font-size: 0.92rem; }
 
     .sched-cell {
         min-height: 108px;
