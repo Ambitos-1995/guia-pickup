@@ -60,6 +60,7 @@
     --visual-viewport-height: 100dvh;
     --visual-viewport-offset-top: 0px;
     --visual-viewport-offset-bottom: 0px;
+    --install-banner-offset: 0px;
 }
 
 html {
@@ -106,6 +107,7 @@ body {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     min-height: 0;
+    padding-bottom: var(--install-banner-offset);
 }
 
 .screen.active {
@@ -118,6 +120,13 @@ body {
 #screen-schedule,
 #screen-guia {
     overflow: hidden;
+}
+
+html.install-banner-active #screen-menu,
+html.install-banner-active #screen-schedule,
+html.install-banner-active #screen-guia {
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* --- Utility --- */
@@ -278,7 +287,7 @@ button:focus-visible {
 
 .pin-toast {
     position: fixed;
-    bottom: 40px;
+    bottom: calc(40px + var(--install-banner-offset));
     left: 50%;
     transform: translateX(-50%) translateY(20px);
     background: #ff4444;

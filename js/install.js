@@ -7,6 +7,7 @@ var Install = (function () {
     var STORAGE_KEY = 'pickup_install_dismissed';
     var RESHOW_DAYS = 7;
     var deferredPrompt = null;
+    var layoutSyncRaf = 0;
 
     var androidBanner, iosBanner;
 
@@ -24,6 +25,12 @@ var Install = (function () {
 
         // Check if previously dismissed within RESHOW_DAYS
         if (wasDismissedRecently()) return;
+
+        window.addEventListener('resize', scheduleLayoutSync, { passive: true });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', scheduleLayoutSync, { passive: true });
+            window.visualViewport.addEventListener('scroll', scheduleLayoutSync, { passive: true });
+        }
 
         // Android / Chrome: intercept beforeinstallprompt
         window.addEventListener('beforeinstallprompt', function (e) {
@@ -85,11 +92,13 @@ var Install = (function () {
         if (!deferredPrompt) return;
         androidBanner.classList.remove('hidden');
         androidBanner.classList.add('install-banner-visible');
+        scheduleLayoutSync();
     }
 
     function showIOSBanner() {
         iosBanner.classList.remove('hidden');
         iosBanner.classList.add('install-banner-visible');
+        scheduleLayoutSync();
     }
 
     function dismissAll() {
@@ -98,6 +107,7 @@ var Install = (function () {
         androidBanner.classList.remove('install-banner-visible');
         iosBanner.classList.add('hidden');
         iosBanner.classList.remove('install-banner-visible');
+        scheduleLayoutSync();
     }
 
     function triggerInstall() {
@@ -107,6 +117,42 @@ var Install = (function () {
             deferredPrompt = null;
             dismissAll();
         });
+    }
+
+    function scheduleLayoutSync() {
+        if (layoutSyncRaf) cancelAnimationFrame(layoutSyncRaf);
+        layoutSyncRaf = requestAnimationFrame(function () {
+            layoutSyncRaf = 0;
+            syncBannerLayout();
+        });
+    }
+
+    function syncBannerLayout() {
+        var banner = getVisibleBanner();
+        var offset = 0;
+
+        if (banner) {
+            offset = Math.ceil(banner.getBoundingClientRect().height) + 12;
+        }
+
+        document.documentElement.style.setProperty('--install-banner-offset', offset + 'px');
+        document.documentElement.classList.toggle('install-banner-active', offset > 0);
+
+        if (window.App && typeof window.App.requestViewportUpdate === 'function') {
+            window.App.requestViewportUpdate();
+        }
+    }
+
+    function getVisibleBanner() {
+        if (androidBanner && !androidBanner.classList.contains('hidden') && androidBanner.classList.contains('install-banner-visible')) {
+            return androidBanner;
+        }
+
+        if (iosBanner && !iosBanner.classList.contains('hidden') && iosBanner.classList.contains('install-banner-visible')) {
+            return iosBanner;
+        }
+
+        return null;
     }
 
     return { init: init };
