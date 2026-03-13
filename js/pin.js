@@ -11,6 +11,7 @@ var Pin = (function () {
     var mode = 'admin';
     var employeeTarget = 'screen-clock';
     var toastTimer = null;
+    var loginTimer = null;
 
     var dots, toastEl, loadingEl, keypad, promptEl;
 
@@ -47,15 +48,19 @@ var Pin = (function () {
 
     function addDigit(digit) {
         if (pin.length >= currentMaxLength) return;
+        if (loginTimer) { clearTimeout(loginTimer); loginTimer = null; }
         pin += digit;
         updateDots();
         hideError();
-        if (pin.length === currentMaxLength) {
+        if (mode === 'login' && pin.length === 4) {
+            loginTimer = setTimeout(function () { loginTimer = null; verify(); }, 500);
+        } else if (pin.length === currentMaxLength) {
             setTimeout(verify, 150);
         }
     }
 
     function clearPin() {
+        if (loginTimer) { clearTimeout(loginTimer); loginTimer = null; }
         pin = '';
         updateDots();
         hideError();
@@ -100,7 +105,12 @@ var Pin = (function () {
         keypad.style.opacity = '0.5';
         keypad.style.pointerEvents = 'none';
 
-        var request = mode === 'admin' ? Api.verifyAdminPin(pin) : Api.verifyPin(pin);
+        var request;
+        if (mode === 'login') {
+            request = pin.length <= 4 ? Api.verifyPin(pin) : Api.verifyAdminPin(pin);
+        } else {
+            request = mode === 'admin' ? Api.verifyAdminPin(pin) : Api.verifyPin(pin);
+        }
         request.then(function (res) {
             isVerifying = false;
             loadingEl.classList.add('hidden');
@@ -124,7 +134,8 @@ var Pin = (function () {
             });
 
             clearPin();
-            if (mode === 'admin') App.navigate('screen-admin');
+            if (mode === 'login') App.navigate(employeeTarget || 'screen-menu');
+            else if (mode === 'admin') App.navigate('screen-admin');
             else App.navigate(employeeTarget || 'screen-clock');
         });
     }
@@ -152,10 +163,19 @@ var Pin = (function () {
         if (promptEl) promptEl.textContent = 'Introduce tu PIN de empleado';
     }
 
+    function openForLogin(targetScreen) {
+        mode = 'login';
+        employeeTarget = targetScreen || 'screen-menu';
+        setDotCount(6);
+        clearPin();
+        if (promptEl) promptEl.textContent = 'Introduce tu PIN (4 o 6 digitos)';
+    }
+
     return {
         init: init,
         clearPin: clearPin,
         openForAdmin: openForAdmin,
-        openForEmployee: openForEmployee
+        openForEmployee: openForEmployee,
+        openForLogin: openForLogin
     };
 })();

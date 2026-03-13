@@ -186,7 +186,7 @@ async function handleList(
     attendance_enabled: boolean;
     created_at: string;
   }>>(
-    `${supabaseUrl}/rest/v1/kiosk_employees?select=id,nombre,apellido,attendance_enabled,created_at&organization_id=eq.${orgId}&order=created_at.desc`,
+    `${supabaseUrl}/rest/v1/kiosk_employees?select=id,nombre,apellido,attendance_enabled,created_at&organization_id=eq.${orgId}&order=nombre.asc,apellido.asc`,
     { headers: { ...getHeaders(key) } },
   );
 

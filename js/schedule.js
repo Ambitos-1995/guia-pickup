@@ -5,21 +5,27 @@ var Schedule = (function () {
     'use strict';
 
     var DEFAULT_HOURS = [15, 16, 17, 18, 19, 20];
+    var AUTH_REDIRECT_MS = 3000;
+    var CACHE_TTL = 60000;
 
     var currentYear, currentWeek;
     var gridEl, labelEl, rangeEl, contextEl, dialogEl;
-    var dialogModeEl, dialogTitleEl, dialogSummaryEl, dialogBodyEl, dialogFeedbackEl, dialogPinEl, dialogSubmitEl;
-    var dialogPinEntryEl, dialogPinDotsEl, dialogPinDots;
+    var dialogModeEl, dialogTitleEl, dialogSummaryEl, dialogBodyEl, dialogNoteEl;
+    var dialogFeedbackEl, dialogSubmitEl, dialogSecondaryEl;
+    var dialogAdminPanelEl, dialogEmployeeEl, dialogHelperEl;
 
     var slotsData = [];
     var selectedSlot = null;
-    var dialogMode = 'assign';
+    var dialogState = null;
     var pendingDay = null;
     var pendingHour = null;
     var isSubmitting = false;
+    var authRedirectTimer = 0;
+    var dialogToken = 0;
 
     var cache = {};
-    var CACHE_TTL = 60000;
+    var employeesCache = null;
+    var employeesPromise = null;
 
     function init() {
         gridEl = document.getElementById('schedule-grid');
@@ -31,12 +37,13 @@ var Schedule = (function () {
         dialogTitleEl = document.getElementById('schedule-slot-title');
         dialogSummaryEl = document.getElementById('schedule-slot-summary');
         dialogBodyEl = document.getElementById('schedule-slot-body');
+        dialogNoteEl = document.getElementById('schedule-slot-note');
         dialogFeedbackEl = document.getElementById('schedule-slot-feedback');
-        dialogPinEl = document.getElementById('schedule-slot-pin');
         dialogSubmitEl = document.getElementById('schedule-slot-submit');
-        dialogPinEntryEl = document.getElementById('schedule-slot-pin-entry');
-        dialogPinDotsEl = document.getElementById('schedule-slot-dots');
-        dialogPinDots = dialogPinDotsEl.querySelectorAll('.slot-pin-dot');
+        dialogSecondaryEl = document.getElementById('schedule-slot-secondary');
+        dialogAdminPanelEl = document.getElementById('schedule-slot-admin-panel');
+        dialogEmployeeEl = document.getElementById('schedule-slot-employee');
+        dialogHelperEl = document.getElementById('schedule-slot-helper');
 
         document.getElementById('week-prev').addEventListener('click', function () {
             changeWeek(-1);
@@ -47,15 +54,8 @@ var Schedule = (function () {
 
         gridEl.addEventListener('click', handleCellClick);
         dialogSubmitEl.addEventListener('click', submitDialog);
-        dialogPinEl.addEventListener('input', handlePinInput);
-        dialogPinEl.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') submitDialog();
-        });
-        dialogPinEl.addEventListener('focus', handleDialogViewportChange);
-        dialogPinEl.addEventListener('blur', handleDialogViewportChange);
-        dialogPinDotsEl.addEventListener('click', function () {
-            dialogPinEl.focus();
-        });
+        dialogSecondaryEl.addEventListener('click', submitSecondaryDialog);
+        dialogEmployeeEl.addEventListener('change', updateActionAvailability);
         dialogEl.addEventListener('wa-after-hide', function () {
             resetDialog();
             handleDialogViewportChange();
@@ -70,6 +70,9 @@ var Schedule = (function () {
         currentYear = info.year;
         currentWeek = info.week;
         updateAccessMode();
+        if (App.hasAdminAccess()) {
+            loadAdminEmployees(true).catch(function () {});
+        }
         loadWeek();
     }
 
@@ -77,16 +80,16 @@ var Schedule = (function () {
         if (!contextEl) return;
 
         if (App.hasAdminAccess()) {
-            contextEl.textContent = 'Modo ajustes: crea franjas en huecos vacios y libera o borra franjas existentes.';
+            contextEl.textContent = 'Modo ajustes: asigna, reasigna, libera o borra franjas usando la lista real de empleados.';
             return;
         }
 
         if (App.hasEmployeeAccess()) {
-            contextEl.textContent = 'Sesion activa: puedes reservar una franja libre o liberar solo tus turnos.';
+            contextEl.textContent = 'Sesion activa: puedes reservar franjas libres, crear la tuya en un hueco vacio y liberar solo tus turnos.';
             return;
         }
 
-        contextEl.textContent = 'Consulta el horario. Para reservar o liberar una franja te pediremos el PIN de empleado.';
+        contextEl.textContent = 'Consulta el horario. Para reservar o gestionar una franja debes iniciar sesion desde el panel publico.';
     }
 
     function changeWeek(delta) {
@@ -184,12 +187,11 @@ var Schedule = (function () {
         var session = App.getSession();
 
         if (!slot) {
-            var emptyAttrs = ' data-day="' + day + '" data-hour="' + hour + '"';
-            return '<button type="button" class="' + baseClass + ' sched-empty" ' + emptyAttrs + '></button>';
+            return '<button type="button" class="' + baseClass + ' sched-empty" data-day="' + day + '" data-hour="' + hour + '"></button>';
         }
 
         if (!slot.assignedEmployeeProfileId) {
-            return '<button type="button" class="' + baseClass + ' sched-free" data-slot-id="' + slot.id + '" data-mode="assign"></button>';
+            return '<button type="button" class="' + baseClass + ' sched-free" data-slot-id="' + slot.id + '"></button>';
         }
 
         var isMine = session && slot.assignedEmployeeProfileId === session.employeeId;
@@ -197,7 +199,7 @@ var Schedule = (function () {
         var className = isMine ? 'sched-mine' : 'sched-taken';
 
         return '' +
-            '<button type="button" class="' + baseClass + ' ' + className + '" data-slot-id="' + slot.id + '" data-mode="release">' +
+            '<button type="button" class="' + baseClass + ' ' + className + '" data-slot-id="' + slot.id + '">' +
                 '<span class="sched-status">' + escapeHtml(shortName) + '</span>' +
             '</button>';
     }
@@ -206,13 +208,22 @@ var Schedule = (function () {
         var cell = e.target.closest('.sched-cell');
         if (!cell) return;
 
+        var session = App.getSession();
+        if (!App.isScreen('screen-schedule')) return;
+
         if (cell.classList.contains('sched-empty')) {
             var day = parseInt(cell.dataset.day, 10);
             var hour = parseInt(cell.dataset.hour, 10);
+
+            if (!session) {
+                openAuthRequiredDialog('reserve', null, day, hour);
+                return;
+            }
+
             if (App.hasAdminAccess()) {
-                openDialog('create', null, day, hour);
+                openAdminCreateDialog(day, hour);
             } else {
-                openDialog('assign-empty', null, day, hour);
+                openEmployeeCreateDialog(day, hour);
             }
             return;
         }
@@ -220,117 +231,336 @@ var Schedule = (function () {
         var slot = findSlotById(cell.dataset.slotId);
         if (!slot) return;
 
-        if (cell.classList.contains('sched-free')) {
-            openDialog(App.hasAdminAccess() ? 'delete' : 'assign', slot);
+        if (!session) {
+            openAuthRequiredDialog(slot.assignedEmployeeProfileId ? 'manage' : 'reserve', slot);
             return;
         }
 
-        openDialog('release', slot);
+        if (App.hasAdminAccess()) {
+            if (slot.assignedEmployeeProfileId) {
+                openAdminOccupiedDialog(slot);
+            } else {
+                openAdminFreeDialog(slot);
+            }
+            return;
+        }
+
+        if (!slot.assignedEmployeeProfileId) {
+            openEmployeeAssignDialog(slot);
+        } else if (slot.assignedEmployeeProfileId === session.employeeId) {
+            openEmployeeReleaseDialog(slot);
+        } else {
+            openEmployeeInfoDialog(slot);
+        }
     }
 
-    function openDialog(mode, slot, day, hour) {
+    function openAuthRequiredDialog(intent, slot, day, hour) {
+        openDialog({
+            key: 'auth-required',
+            label: 'Sesion requerida',
+            badge: 'Sesion requerida',
+            title: 'Inicia sesion desde el panel publico',
+            summary: slot ? buildSlotSummary(slot) : buildPendingSummary(day, hour),
+            body: intent === 'manage'
+                ? 'Para gestionar el horario debes primero iniciar sesion.'
+                : 'Para reservar debes primero iniciar sesion.',
+            note: 'Te llevamos al panel publico en 3 segundos.',
+            primaryAction: '',
+            secondaryAction: '',
+            showAdminPanel: false
+        });
+
+        cancelAuthRedirect();
+        authRedirectTimer = setTimeout(function () {
+            authRedirectTimer = 0;
+            if (dialogEl) dialogEl.open = false;
+            App.navigate('screen-menu');
+        }, AUTH_REDIRECT_MS);
+    }
+
+    function openEmployeeAssignDialog(slot) {
+        openDialog({
+            key: 'employee-assign',
+            label: 'Reservar franja',
+            badge: 'Franja disponible',
+            title: 'Reservar tu turno',
+            summary: buildSlotSummary(slot),
+            body: 'Tu sesion de empleado esta activa. Confirma para reservar esta franja.',
+            note: '',
+            primaryAction: 'employee-assign',
+            primaryLabel: 'Reservar franja',
+            primaryVariant: 'brand',
+            primaryAppearance: 'accent',
+            secondaryAction: '',
+            showAdminPanel: false
+        }, slot);
+    }
+
+    function openEmployeeCreateDialog(day, hour) {
+        openDialog({
+            key: 'employee-create',
+            label: 'Crear y reservar franja',
+            badge: 'Hueco disponible',
+            title: 'Crear y reservar tu turno',
+            summary: buildPendingSummary(day, hour),
+            body: 'No existe franja en este hueco. Al confirmar se creara y quedara reservada a tu nombre.',
+            note: '',
+            primaryAction: 'employee-create',
+            primaryLabel: 'Crear y reservar',
+            primaryVariant: 'brand',
+            primaryAppearance: 'accent',
+            secondaryAction: '',
+            showAdminPanel: false
+        }, null, day, hour);
+    }
+
+    function openEmployeeReleaseDialog(slot) {
+        openDialog({
+            key: 'employee-release',
+            label: 'Liberar franja',
+            badge: 'Tu franja',
+            title: 'Liberar franja',
+            summary: buildSlotSummary(slot),
+            body: 'Tu sesion esta activa. Confirma para liberar esta franja.',
+            note: '',
+            primaryAction: 'employee-release',
+            primaryLabel: 'Liberar franja',
+            primaryVariant: 'neutral',
+            primaryAppearance: 'outlined',
+            secondaryAction: '',
+            showAdminPanel: false
+        }, slot);
+    }
+
+    function openEmployeeInfoDialog(slot) {
+        openDialog({
+            key: 'employee-info',
+            label: 'Franja ocupada',
+            badge: 'Ocupada',
+            title: 'Franja reservada',
+            summary: buildSlotSummary(slot),
+            body: 'Esta franja ya esta ocupada por otro companero. Solo esa persona o un admin puede modificarla.',
+            note: '',
+            primaryAction: '',
+            secondaryAction: '',
+            showAdminPanel: false
+        }, slot);
+    }
+
+    function openAdminCreateDialog(day, hour) {
+        openDialog({
+            key: 'admin-create-assign',
+            label: 'Crear y asignar franja',
+            badge: 'Modo ajustes',
+            title: 'Crear y asignar nueva franja',
+            summary: buildPendingSummary(day, hour),
+            body: 'Selecciona a quien quieres asignar este nuevo puesto.',
+            note: '',
+            primaryAction: 'admin-create-assign',
+            primaryLabel: 'Crear y asignar',
+            primaryVariant: 'brand',
+            primaryAppearance: 'accent',
+            secondaryAction: '',
+            showAdminPanel: true,
+            requiresEmployeeSelection: true,
+            helperText: 'Selecciona un empleado para crear y asignar esta franja.',
+            selectedEmployeeId: ''
+        }, null, day, hour);
+    }
+
+    function openAdminFreeDialog(slot) {
+        openDialog({
+            key: 'admin-assign-free',
+            label: 'Gestionar franja libre',
+            badge: 'Modo ajustes',
+            title: 'Franja libre',
+            summary: buildSlotSummary(slot),
+            body: 'La franja ya existe y esta libre. Puedes asignarla a un empleado o borrarla.',
+            note: '',
+            primaryAction: 'admin-assign-free',
+            primaryLabel: 'Asignar franja',
+            primaryVariant: 'brand',
+            primaryAppearance: 'accent',
+            secondaryAction: 'admin-delete',
+            secondaryLabel: 'Borrar franja',
+            secondaryVariant: 'danger',
+            secondaryAppearance: 'outlined',
+            showAdminPanel: true,
+            requiresEmployeeSelection: true,
+            helperText: 'Selecciona un empleado para asignar esta franja.',
+            selectedEmployeeId: ''
+        }, slot);
+    }
+
+    function openAdminOccupiedDialog(slot) {
+        openDialog({
+            key: 'admin-manage-occupied',
+            label: 'Gestionar franja ocupada',
+            badge: 'Modo ajustes',
+            title: 'Reasignar o liberar franja',
+            summary: buildSlotSummary(slot),
+            body: 'Puedes reasignar esta franja a otra persona o liberarla si necesitas quitar ese puesto.',
+            note: '',
+            primaryAction: 'admin-reassign',
+            primaryLabel: 'Reasignar franja',
+            primaryVariant: 'brand',
+            primaryAppearance: 'accent',
+            secondaryAction: 'admin-release',
+            secondaryLabel: 'Liberar franja',
+            secondaryVariant: 'neutral',
+            secondaryAppearance: 'outlined',
+            showAdminPanel: true,
+            requiresEmployeeSelection: true,
+            helperText: 'Selecciona a otro empleado para reasignar la franja o usa liberar.',
+            sameSelectionHelperText: 'Selecciona a otra persona para reasignar esta franja.',
+            selectedEmployeeId: slot.assignedEmployeeProfileId || '',
+            currentAssigneeId: slot.assignedEmployeeProfileId || ''
+        }, slot);
+    }
+
+    function openDialog(state, slot, day, hour) {
         selectedSlot = slot || null;
-        dialogMode = mode;
+        dialogState = state || null;
         pendingDay = day || null;
         pendingHour = hour || null;
+        isSubmitting = false;
+        dialogToken++;
+        cancelAuthRedirect();
         clearDialogFeedback();
 
-        var needsPin = (mode === 'assign' || mode === 'release' || mode === 'assign-empty') && !App.getSession();
-        dialogPinEl.value = '';
-        updateSlotPinDots();
-        dialogPinEntryEl.classList.toggle('hidden', !needsPin);
+        dialogEl.label = state.label || 'Gestionar franja';
+        dialogModeEl.textContent = state.badge || '';
+        dialogModeEl.classList.toggle('hidden', !state.badge);
+        dialogTitleEl.textContent = state.title || 'Gestionar franja';
+        dialogSummaryEl.textContent = state.summary || '--';
+        dialogBodyEl.textContent = state.body || '';
+        dialogBodyEl.classList.toggle('hidden', !state.body);
+        dialogNoteEl.textContent = state.note || '';
+        dialogNoteEl.classList.toggle('hidden', !state.note);
 
-        if (mode === 'create') {
-            dialogModeEl.classList.remove('hidden');
-            dialogBodyEl.classList.remove('hidden');
-            dialogEl.label = 'Crear franja';
-            dialogModeEl.textContent = 'Modo ajustes';
-            dialogTitleEl.textContent = 'Crear nueva franja';
-            dialogBodyEl.textContent = 'Se creara una franja libre de una hora en este hueco.';
-            dialogSubmitEl.textContent = 'Crear franja';
-            dialogSubmitEl.setAttribute('variant', 'brand');
-        } else if (mode === 'delete') {
-            dialogModeEl.classList.remove('hidden');
-            dialogBodyEl.classList.remove('hidden');
-            dialogEl.label = 'Borrar franja';
-            dialogModeEl.textContent = 'Modo ajustes';
-            dialogTitleEl.textContent = 'Borrar franja libre';
-            dialogBodyEl.textContent = 'Esta franja esta libre. Puedes borrarla para limpiar el horario.';
-            dialogSubmitEl.textContent = 'Borrar franja';
-            dialogSubmitEl.setAttribute('variant', 'danger');
-        } else if (mode === 'assign' || mode === 'assign-empty') {
-            dialogEl.label = 'Reservar franja';
-            dialogTitleEl.textContent = 'Reservar tu turno';
-            if (needsPin) {
-                dialogModeEl.classList.add('hidden');
-                dialogBodyEl.classList.add('hidden');
-            } else {
-                dialogModeEl.classList.remove('hidden');
-                dialogModeEl.textContent = 'Franja disponible';
-                dialogBodyEl.classList.remove('hidden');
-                dialogBodyEl.textContent = 'Tu sesion de empleado esta activa. Confirma para reservar esta franja.';
-            }
-            dialogSubmitEl.textContent = needsPin ? 'Entrar y reservar' : 'Reservar franja';
-            dialogSubmitEl.setAttribute('variant', 'brand');
-        } else {
-            dialogModeEl.classList.remove('hidden');
-            dialogBodyEl.classList.remove('hidden');
-            dialogEl.label = 'Liberar franja';
-            dialogModeEl.textContent = App.hasAdminAccess() ? 'Modo ajustes' : 'Tu franja';
-            dialogTitleEl.textContent = 'Liberar franja';
-            dialogBodyEl.textContent = needsPin
-                ? 'Introduce tu PIN de empleado para abrir sesion y liberar esta franja.'
-                : App.hasAdminAccess()
-                ? 'Como admin puedes liberar cualquier franja ocupada.'
-                : 'Tu sesion esta activa. Confirma para liberar esta franja.';
-            dialogSubmitEl.textContent = 'Liberar franja';
-            dialogSubmitEl.setAttribute('variant', 'neutral');
-        }
-
-        if (mode === 'create' || mode === 'assign-empty') {
-            dialogSummaryEl.textContent = Utils.DAY_NAMES[pendingDay] + ' · ' + pad2(pendingHour) + ':00 - ' + pad2(pendingHour + 1) + ':00';
-        } else if (slot) {
-            dialogSummaryEl.textContent = buildSlotSummary(slot);
-        }
+        setupFooterButtons(state);
+        setupAdminPanel(state, dialogToken);
 
         dialogEl.open = true;
         handleDialogViewportChange();
-        if (needsPin) {
-            setTimeout(function () {
-                dialogPinEl.focus();
-                handleDialogViewportChange();
-            }, 100);
-        }
     }
 
-    function submitDialog() {
-        if (isSubmitting) return;
+    function setupFooterButtons(state) {
+        configureDialogButton(dialogSubmitEl, state.primaryLabel, state.primaryVariant, state.primaryAppearance, !state.primaryAction);
+        configureDialogButton(dialogSecondaryEl, state.secondaryLabel, state.secondaryVariant, state.secondaryAppearance, !state.secondaryAction);
+    }
 
-        if ((dialogMode === 'assign' || dialogMode === 'release' || dialogMode === 'assign-empty') && !ensureEmployeeSession()) {
+    function configureDialogButton(button, label, variant, appearance, hidden) {
+        button.textContent = label || '';
+        button.setAttribute('variant', variant || 'neutral');
+        button.setAttribute('appearance', appearance || 'outlined');
+        button.classList.toggle('hidden', !!hidden);
+        button.disabled = !!hidden;
+    }
+
+    function setupAdminPanel(state, token) {
+        dialogAdminPanelEl.classList.toggle('hidden', !state.showAdminPanel);
+        if (!state.showAdminPanel) {
+            dialogEmployeeEl.innerHTML = '<option value="">Selecciona un empleado</option>';
+            dialogEmployeeEl.value = '';
+            dialogEmployeeEl.disabled = true;
+            dialogHelperEl.textContent = '';
+            dialogHelperEl.classList.add('hidden');
+            updateActionAvailability();
             return;
         }
 
-        isSubmitting = true;
-        dialogSubmitEl.disabled = true;
+        dialogHelperEl.textContent = 'Cargando empleados...';
+        dialogHelperEl.classList.remove('hidden');
+        dialogEmployeeEl.innerHTML = '<option value="">Cargando empleados...</option>';
+        dialogEmployeeEl.disabled = true;
+        updateActionAvailability();
 
-        var request;
-        if (dialogMode === 'create') {
-            request = Api.createAdminSlot({
-                year: currentYear,
-                week: currentWeek,
-                dayOfWeek: pendingDay,
-                startTime: pad2(pendingHour) + ':00:00',
-                endTime: pad2(pendingHour + 1) + ':00:00'
-            });
-        } else if (dialogMode === 'delete') {
-            request = Api.deleteAdminSlot(selectedSlot.id);
-        } else if (dialogMode === 'assign') {
-            request = Api.assignSlot(selectedSlot.id);
-        } else if (dialogMode === 'assign-empty') {
-            request = Api.createAndAssignSlot(currentYear, currentWeek, pendingDay, pendingHour);
-        } else {
-            request = Api.releaseSlot(selectedSlot.id);
+        loadAdminEmployees(false).then(function (employees) {
+            if (!dialogState || token !== dialogToken || !dialogState.showAdminPanel) return;
+            populateEmployeeSelect(employees, state.selectedEmployeeId || '');
+            dialogEmployeeEl.disabled = employees.length === 0;
+            if (!employees.length) {
+                dialogHelperEl.textContent = state.secondaryAction
+                    ? 'No hay empleados disponibles para asignar. Aun puedes usar la accion secundaria.'
+                    : 'No hay empleados disponibles para asignar esta franja.';
+                dialogHelperEl.classList.remove('hidden');
+            }
+            updateActionAvailability();
+            handleDialogViewportChange();
+        }).catch(function (error) {
+            if (!dialogState || token !== dialogToken || !dialogState.showAdminPanel) return;
+            dialogEmployeeEl.innerHTML = '<option value="">No disponible</option>';
+            dialogEmployeeEl.disabled = true;
+            dialogHelperEl.textContent = '';
+            dialogHelperEl.classList.add('hidden');
+            showDialogFeedback('danger', error && error.message ? error.message : 'No se pudo cargar la lista de empleados.');
+            updateActionAvailability();
+        });
+    }
+
+    function populateEmployeeSelect(employees, selectedEmployeeId) {
+        var options = ['<option value="">Selecciona un empleado</option>'];
+        for (var i = 0; i < employees.length; i++) {
+            var label = employeeDisplayName(employees[i]);
+            if (employees[i].attendance_enabled === false) {
+                label += ' (inactivo)';
+            }
+            options.push('<option value="' + escapeHtml(employees[i].id) + '">' + escapeHtml(label) + '</option>');
         }
+        dialogEmployeeEl.innerHTML = options.join('');
+        dialogEmployeeEl.value = selectedEmployeeId || '';
+    }
+
+    function submitDialog() {
+        runDialogAction(dialogState && dialogState.primaryAction);
+    }
+
+    function submitSecondaryDialog() {
+        runDialogAction(dialogState && dialogState.secondaryAction);
+    }
+
+    function runDialogAction(action) {
+        if (!action || isSubmitting) return;
+
+        var selectedEmployeeId = getSelectedEmployeeId();
+        var actionNeedsEmployeeSelection = dialogState && dialogState.requiresEmployeeSelection && action === dialogState.primaryAction;
+        if (actionNeedsEmployeeSelection) {
+            if (!selectedEmployeeId) {
+                showDialogFeedback('warning', 'Selecciona un empleado para continuar.');
+                updateActionAvailability();
+                return;
+            }
+            if (dialogState.currentAssigneeId && selectedEmployeeId === dialogState.currentAssigneeId && action === 'admin-reassign') {
+                showDialogFeedback('warning', 'Selecciona a otra persona para reasignar la franja.');
+                updateActionAvailability();
+                return;
+            }
+        }
+
+        var request = null;
+
+        if (action === 'employee-assign') {
+            request = Api.assignSlot(selectedSlot.id);
+        } else if (action === 'employee-create') {
+            request = Api.createAndAssignSlot(currentYear, currentWeek, pendingDay, pendingHour);
+        } else if (action === 'employee-release') {
+            request = Api.releaseSlot(selectedSlot.id);
+        } else if (action === 'admin-create-assign') {
+            request = Api.createAndAssignSlot(currentYear, currentWeek, pendingDay, pendingHour, selectedEmployeeId);
+        } else if (action === 'admin-assign-free' || action === 'admin-reassign') {
+            request = Api.assignSlot(selectedSlot.id, selectedEmployeeId);
+        } else if (action === 'admin-release') {
+            request = Api.releaseSlot(selectedSlot.id);
+        } else if (action === 'admin-delete') {
+            request = Api.deleteAdminSlot(selectedSlot.id);
+        }
+
+        if (!request) return;
+
+        isSubmitting = true;
+        setDialogBusy(true);
+        clearDialogFeedback();
 
         request.then(function (res) {
             if (res && res.success) {
@@ -344,95 +574,139 @@ var Schedule = (function () {
             showDialogFeedback('danger', 'No se pudo completar la accion.');
         }).finally(function () {
             isSubmitting = false;
-            dialogSubmitEl.disabled = false;
+            setDialogBusy(false);
+            updateActionAvailability();
         });
     }
 
-    function ensureEmployeeSession() {
-        var session = App.getSession();
-        if (session && session.role === 'respondent') {
-            return true;
+    function setDialogBusy(busy) {
+        var selectionLocked = busy || !dialogState || !dialogState.showAdminPanel || dialogEmployeeEl.options.length <= 1;
+
+        if (!dialogSubmitEl.classList.contains('hidden')) {
+            dialogSubmitEl.disabled = busy;
         }
-
-        var pin = String(dialogPinEl.value || '').trim();
-        if (!/^\d{4}$/.test(pin)) {
-            showDialogFeedback('warning', 'Introduce tu PIN de 4 cifras para continuar.');
-            shakeSlotPinDots();
-            return false;
+        if (!dialogSecondaryEl.classList.contains('hidden')) {
+            dialogSecondaryEl.disabled = busy;
         }
+        dialogEmployeeEl.disabled = selectionLocked;
+    }
 
-        isSubmitting = true;
-        dialogSubmitEl.disabled = true;
+    function updateActionAvailability() {
+        if (!dialogState) return;
 
-        Api.verifyPin(pin).then(function (res) {
-            if (res && res.success && res.data) {
-                App.setSession({
-                    accessToken: res.data.accessToken,
-                    expiresAt: res.data.expiresAt,
-                    role: res.data.role || 'respondent',
-                    employeeId: res.data.employeeId || null,
-                    employeeName: res.data.employeeName || '',
-                    organizationId: res.data.organizationId || null,
-                    currentStatus: res.data.currentStatus || 'not_checked_in'
-                });
-                dialogPinEl.value = '';
-                updateSlotPinDots();
-                dialogPinEntryEl.classList.add('hidden');
-                isSubmitting = false;
-                dialogSubmitEl.disabled = false;
-                submitDialog();
-            } else {
-                isSubmitting = false;
-                dialogSubmitEl.disabled = false;
-                showDialogFeedback('danger', (res && res.message) || 'PIN incorrecto.');
-                shakeSlotPinDots();
+        if (dialogState.showAdminPanel) {
+            var selectedEmployeeId = getSelectedEmployeeId();
+            var helper = dialogState.helperText || '';
+            var disablePrimary = false;
+
+            if (dialogState.requiresEmployeeSelection && !selectedEmployeeId) {
+                disablePrimary = true;
             }
+
+            if (dialogState.currentAssigneeId && selectedEmployeeId && selectedEmployeeId === dialogState.currentAssigneeId && dialogState.primaryAction === 'admin-reassign') {
+                disablePrimary = true;
+                helper = dialogState.sameSelectionHelperText || helper;
+            }
+
+            if (!selectedEmployeeId && dialogEmployeeEl.options.length <= 1 && dialogState.secondaryAction) {
+                helper = 'No hay empleados disponibles para asignar. Puedes usar la accion secundaria.';
+            }
+
+            dialogHelperEl.textContent = helper;
+            dialogHelperEl.classList.toggle('hidden', !helper);
+
+            if (!dialogSubmitEl.classList.contains('hidden')) {
+                dialogSubmitEl.disabled = isSubmitting || disablePrimary;
+            }
+            if (!dialogSecondaryEl.classList.contains('hidden')) {
+                dialogSecondaryEl.disabled = isSubmitting;
+            }
+            dialogEmployeeEl.disabled = isSubmitting || dialogEmployeeEl.options.length <= 1;
+            return;
+        }
+
+        dialogHelperEl.textContent = '';
+        dialogHelperEl.classList.add('hidden');
+        if (!dialogSubmitEl.classList.contains('hidden')) {
+            dialogSubmitEl.disabled = isSubmitting;
+        }
+        if (!dialogSecondaryEl.classList.contains('hidden')) {
+            dialogSecondaryEl.disabled = isSubmitting;
+        }
+        dialogEmployeeEl.disabled = true;
+    }
+
+    function getSelectedEmployeeId() {
+        return String(dialogEmployeeEl.value || '').trim();
+    }
+
+    function loadAdminEmployees(forceRefresh) {
+        if (!forceRefresh && employeesCache) {
+            return Promise.resolve(employeesCache);
+        }
+        if (!forceRefresh && employeesPromise) {
+            return employeesPromise;
+        }
+
+        employeesPromise = Api.getEmployees().then(function (res) {
+            if (!res || !res.success) {
+                throw new Error((res && res.message) || 'No se pudo cargar la lista de empleados.');
+            }
+
+            var employees = Array.isArray(res.data) ? res.data.slice() : [];
+            employees.sort(function (a, b) {
+                var nameA = employeeDisplayName(a);
+                var nameB = employeeDisplayName(b);
+                return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+            });
+
+            employeesCache = employees;
+            employeesPromise = null;
+            return employees;
+        }).catch(function (error) {
+            employeesPromise = null;
+            throw error;
         });
 
-        return false;
-    }
-
-    function handlePinInput() {
-        var raw = dialogPinEl.value.replace(/[^0-9]/g, '');
-        if (raw.length > 4) raw = raw.substring(0, 4);
-        dialogPinEl.value = raw;
-        updateSlotPinDots();
-        if (raw.length === 4) {
-            setTimeout(submitDialog, 150);
-        }
-    }
-
-    function updateSlotPinDots() {
-        var len = dialogPinEl.value.length;
-        for (var i = 0; i < dialogPinDots.length; i++) {
-            dialogPinDots[i].classList.toggle('filled', i < len);
-            dialogPinDots[i].classList.remove('error');
-        }
-    }
-
-    function shakeSlotPinDots() {
-        for (var i = 0; i < dialogPinDots.length; i++) {
-            dialogPinDots[i].classList.add('error');
-        }
-        setTimeout(function () {
-            dialogPinEl.value = '';
-            updateSlotPinDots();
-        }, 500);
+        return employeesPromise;
     }
 
     function resetDialog() {
+        var keepAuthRedirect = !!(dialogState && dialogState.key === 'auth-required' && authRedirectTimer);
+        if (!keepAuthRedirect) {
+            cancelAuthRedirect();
+        }
         selectedSlot = null;
-        dialogMode = 'assign';
+        dialogState = null;
         pendingDay = null;
         pendingHour = null;
         isSubmitting = false;
-        dialogSubmitEl.disabled = false;
-        dialogPinEl.value = '';
-        updateSlotPinDots();
-        dialogPinEntryEl.classList.remove('hidden');
+        dialogToken++;
+        dialogEl.label = 'Gestionar franja';
         dialogModeEl.classList.remove('hidden');
+        dialogModeEl.textContent = 'Turno';
+        dialogTitleEl.textContent = 'Gestionar franja';
+        dialogSummaryEl.textContent = '--';
+        dialogBodyEl.textContent = '';
         dialogBodyEl.classList.remove('hidden');
+        dialogNoteEl.textContent = '';
+        dialogNoteEl.classList.add('hidden');
+        dialogAdminPanelEl.classList.add('hidden');
+        dialogEmployeeEl.innerHTML = '<option value="">Selecciona un empleado</option>';
+        dialogEmployeeEl.value = '';
+        dialogEmployeeEl.disabled = true;
+        dialogHelperEl.textContent = '';
+        dialogHelperEl.classList.add('hidden');
+        configureDialogButton(dialogSubmitEl, 'Continuar', 'brand', 'accent', false);
+        configureDialogButton(dialogSecondaryEl, '', 'neutral', 'outlined', true);
         clearDialogFeedback();
+    }
+
+    function cancelAuthRedirect() {
+        if (authRedirectTimer) {
+            clearTimeout(authRedirectTimer);
+            authRedirectTimer = 0;
+        }
     }
 
     function handleDialogViewportChange() {
@@ -502,8 +776,12 @@ var Schedule = (function () {
     }
 
     function buildSlotSummary(slot) {
-        var assigned = slot.assignedEmployeeName ? ' · ' + firstName(slot.assignedEmployeeName) : '';
-        return Utils.DAY_NAMES[slot.dayOfWeek] + ' · ' + stripSeconds(slot.startTime) + ' - ' + stripSeconds(slot.endTime) + assigned;
+        var assigned = slot.assignedEmployeeName ? ' - ' + slot.assignedEmployeeName : '';
+        return Utils.DAY_NAMES[slot.dayOfWeek] + ' - ' + stripSeconds(slot.startTime) + ' - ' + stripSeconds(slot.endTime) + assigned;
+    }
+
+    function buildPendingSummary(day, hour) {
+        return Utils.DAY_NAMES[day] + ' - ' + pad2(hour) + ':00 - ' + pad2(hour + 1) + ':00';
     }
 
     function formatMonthLabel(year, week) {
@@ -518,6 +796,10 @@ var Schedule = (function () {
 
     function stripSeconds(time) {
         return String(time || '').slice(0, 5);
+    }
+
+    function employeeDisplayName(employee) {
+        return (((employee && employee.nombre) || '') + (((employee && employee.apellido) ? ' ' + employee.apellido : ''))).trim();
     }
 
     function pad2(value) {

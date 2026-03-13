@@ -448,21 +448,20 @@
                 <h3 class="slot-dialog-title" id="schedule-slot-title">Gestionar franja</h3>
                 <p class="slot-dialog-summary" id="schedule-slot-summary">--</p>
                 <p class="slot-dialog-body" id="schedule-slot-body">Inicia sesion para continuar.</p>
-                <wa-callout id="schedule-slot-feedback" variant="neutral" appearance="filled-outlined" class="hidden"></wa-callout>
-                <div class="slot-pin-entry hidden" id="schedule-slot-pin-entry">
-                    <label class="slot-pin-label">Introduce tu PIN</label>
-                    <div class="slot-pin-dots" id="schedule-slot-dots">
-                        <span class="slot-pin-dot"></span>
-                        <span class="slot-pin-dot"></span>
-                        <span class="slot-pin-dot"></span>
-                        <span class="slot-pin-dot"></span>
+                <p class="slot-dialog-note hidden" id="schedule-slot-note"></p>
+                <div class="slot-dialog-admin hidden" id="schedule-slot-admin-panel">
+                    <div class="form-row slot-dialog-field">
+                        <label for="schedule-slot-employee">Empleado</label>
+                        <select id="schedule-slot-employee" aria-label="Selecciona un empleado">
+                            <option value="">Selecciona un empleado</option>
+                        </select>
                     </div>
-                    <input id="schedule-slot-pin" class="slot-pin-hidden-input"
-                           type="password" inputmode="numeric" maxlength="4"
-                           autocomplete="off" aria-label="PIN de empleado">
+                    <p class="slot-dialog-helper hidden" id="schedule-slot-helper"></p>
                 </div>
+                <wa-callout id="schedule-slot-feedback" variant="neutral" appearance="filled-outlined" class="hidden"></wa-callout>
             </div>
             <wa-button slot="footer" variant="neutral" appearance="outlined" data-dialog="close">Cancelar</wa-button>
+            <wa-button slot="footer" id="schedule-slot-secondary" variant="neutral" appearance="outlined" class="hidden">Accion secundaria</wa-button>
             <wa-button slot="footer" id="schedule-slot-submit" variant="brand" appearance="accent">Continuar</wa-button>
         </wa-dialog>
 

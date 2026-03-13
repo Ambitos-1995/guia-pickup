@@ -21,7 +21,15 @@ interface RequestBody {
   endTime?: string;
   slotId?: string;
   hour?: number;
+  employeeId?: string;
 }
+
+type ScheduleSession = {
+  id: string;
+  organization_id: string;
+  role: "respondent" | "org_admin";
+  employee_id: string | null;
+};
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -149,13 +157,9 @@ async function handleList(
 async function handleAssign(
   url: string,
   key: string,
-  session: { id: string; organization_id: string; role: "respondent" | "org_admin"; employee_id: string | null },
+  session: ScheduleSession,
   body: RequestBody,
 ): Promise<Response> {
-  if (!session.employee_id && session.role !== "org_admin") {
-    return json({ success: false, message: "Sesion de empleado requerida" }, 403);
-  }
-
   const slotId = String(body.slotId || "").trim();
   if (!slotId) {
     return json({ success: false, message: "Falta la franja" }, 400);
@@ -166,13 +170,17 @@ async function handleAssign(
     return json({ success: false, message: "Franja no encontrada" }, 404);
   }
 
-  if (slot.employee_id) {
+  const target = await resolveAssignmentEmployee(url, key, session, body);
+  if (target instanceof Response) {
+    return target;
+  }
+
+  if (session.role !== "org_admin" && slot.employee_id) {
     return json({ success: false, message: "La franja ya esta ocupada" }, 409);
   }
 
-  const employeeId = session.role === "org_admin" ? session.employee_id : session.employee_id;
-  if (!employeeId) {
-    return json({ success: false, message: "El admin necesita una sesion de empleado para asignarse la franja" }, 400);
+  if (session.role === "org_admin" && slot.employee_id === target.employeeId) {
+    return json({ success: false, message: "La franja ya esta asignada a ese empleado" }, 409);
   }
 
   const update = await fetchJson<Array<{
@@ -182,7 +190,7 @@ async function handleAssign(
     end_time: string;
     employee_id: string | null;
   }>>(
-    `${url}/rest/v1/kiosk_schedule_slots?id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${session.organization_id}&employee_id=is.null`,
+    `${url}/rest/v1/kiosk_schedule_slots?id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${session.organization_id}&${buildOccupancyFilter(slot.employee_id)}`,
     {
       method: "PATCH",
       headers: {
@@ -190,21 +198,26 @@ async function handleAssign(
         "Content-Type": "application/json",
         Prefer: "return=representation",
       },
-      body: JSON.stringify({ employee_id: employeeId }),
+      body: JSON.stringify({ employee_id: target.employeeId }),
     },
   );
 
   if (!update.ok || !update.data[0]) {
-    return json({ success: false, message: "No se pudo asignar la franja" }, 409);
+    return json({ success: false, message: "No se pudo actualizar la franja. Recarga el horario y prueba otra vez." }, 409);
   }
 
   await logAudit(url, key, {
     organizationId: session.organization_id,
     actorSessionId: session.id,
     actorRole: session.role,
-    employeeId,
+    employeeId: target.employeeId,
     slotId,
-    action: "schedule_slot_assigned",
+    action: session.role === "org_admin" && slot.employee_id ? "schedule_slot_reassigned" : "schedule_slot_assigned",
+    metadata: {
+      targetEmployeeId: target.employeeId,
+      targetEmployeeName: target.employeeName,
+      previousEmployeeId: slot.employee_id,
+    },
   });
 
   return json({
@@ -214,7 +227,7 @@ async function handleAssign(
       day_of_week: update.data[0].day_of_week,
       start_time: update.data[0].start_time,
       end_time: update.data[0].end_time,
-      assigned_employee_profile_id: employeeId,
+      assigned_employee_profile_id: target.employeeId,
       status: "occupied",
     },
   });
@@ -223,7 +236,7 @@ async function handleAssign(
 async function handleRelease(
   url: string,
   key: string,
-  session: { id: string; organization_id: string; role: "respondent" | "org_admin"; employee_id: string | null },
+  session: ScheduleSession,
   body: RequestBody,
 ): Promise<Response> {
   const slotId = String(body.slotId || "").trim();
@@ -236,12 +249,16 @@ async function handleRelease(
     return json({ success: false, message: "Franja no encontrada" }, 404);
   }
 
+  if (!slot.employee_id) {
+    return json({ success: false, message: "La franja ya esta libre" }, 409);
+  }
+
   if (session.role !== "org_admin" && slot.employee_id !== session.employee_id) {
     return json({ success: false, message: "No puedes liberar esta franja" }, 403);
   }
 
   const update = await fetchJson<Array<{ id: string; day_of_week: number; start_time: string; end_time: string }>>(
-    `${url}/rest/v1/kiosk_schedule_slots?id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${session.organization_id}`,
+    `${url}/rest/v1/kiosk_schedule_slots?id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${session.organization_id}&${buildOccupancyFilter(slot.employee_id)}`,
     {
       method: "PATCH",
       headers: {
@@ -254,7 +271,7 @@ async function handleRelease(
   );
 
   if (!update.ok || !update.data[0]) {
-    return json({ success: false, message: "No se pudo liberar la franja" }, 500);
+    return json({ success: false, message: "No se pudo liberar la franja. Recarga el horario y prueba otra vez." }, 409);
   }
 
   await logAudit(url, key, {
@@ -440,13 +457,9 @@ async function handleDelete(
 async function handleCreateAndAssign(
   url: string,
   key: string,
-  session: { id: string; organization_id: string; role: "respondent" | "org_admin"; employee_id: string | null },
+  session: ScheduleSession,
   body: RequestBody,
 ): Promise<Response> {
-  if (!session.employee_id) {
-    return json({ success: false, message: "Sesion de empleado requerida" }, 403);
-  }
-
   const year = Number(body.year);
   const week = Number(body.week);
   const dayOfWeek = Number(body.dayOfWeek);
@@ -458,6 +471,10 @@ async function handleCreateAndAssign(
 
   const startTime = String(hour).padStart(2, "0") + ":00:00";
   const endTime = String(hour + 1).padStart(2, "0") + ":00:00";
+  const target = await resolveAssignmentEmployee(url, key, session, body);
+  if (target instanceof Response) {
+    return target;
+  }
 
   const insert = await fetchJson<Array<{
     id: string;
@@ -481,7 +498,7 @@ async function handleCreateAndAssign(
         day_of_week: dayOfWeek,
         start_time: startTime,
         end_time: endTime,
-        employee_id: session.employee_id,
+        employee_id: target.employeeId,
       }),
     },
   );
@@ -494,10 +511,18 @@ async function handleCreateAndAssign(
     organizationId: session.organization_id,
     actorSessionId: session.id,
     actorRole: session.role,
-    employeeId: session.employee_id,
+    employeeId: target.employeeId,
     slotId: insert.data[0].id,
     action: "schedule_slot_created_and_assigned",
-    metadata: { year, week, dayOfWeek, startTime, endTime },
+    metadata: {
+      year,
+      week,
+      dayOfWeek,
+      startTime,
+      endTime,
+      targetEmployeeId: target.employeeId,
+      targetEmployeeName: target.employeeName,
+    },
   });
 
   return json({
@@ -507,10 +532,67 @@ async function handleCreateAndAssign(
       day_of_week: insert.data[0].day_of_week,
       start_time: insert.data[0].start_time,
       end_time: insert.data[0].end_time,
-      assigned_employee_profile_id: session.employee_id,
+      assigned_employee_profile_id: target.employeeId,
       status: "occupied",
     },
   });
+}
+
+async function resolveAssignmentEmployee(
+  url: string,
+  key: string,
+  session: ScheduleSession,
+  body: RequestBody,
+): Promise<{ employeeId: string; employeeName: string } | Response> {
+  if (session.role !== "org_admin") {
+    if (!session.employee_id) {
+      return json({ success: false, message: "Sesion de empleado requerida" }, 403);
+    }
+    return {
+      employeeId: session.employee_id,
+      employeeName: "",
+    };
+  }
+
+  const employeeId = String(body.employeeId || "").trim();
+  if (!employeeId) {
+    return json({ success: false, message: "Selecciona un empleado para esta accion" }, 400);
+  }
+
+  const employee = await fetchEmployee(url, key, session.organization_id, employeeId);
+  if (!employee) {
+    return json({ success: false, message: "Empleado invalido o fuera de la organizacion" }, 404);
+  }
+
+  return {
+    employeeId: employee.id,
+    employeeName: `${employee.nombre} ${employee.apellido}`.trim(),
+  };
+}
+
+function buildOccupancyFilter(employeeId: string | null): string {
+  if (!employeeId) {
+    return "employee_id=is.null";
+  }
+  return `employee_id=eq.${encodeURIComponent(employeeId)}`;
+}
+
+async function fetchEmployee(
+  url: string,
+  key: string,
+  orgId: string,
+  employeeId: string,
+): Promise<{ id: string; nombre: string; apellido: string } | null> {
+  const employee = await fetchJson<Array<{
+    id: string;
+    nombre: string;
+    apellido: string;
+  }>>(
+    `${url}/rest/v1/kiosk_employees?select=id,nombre,apellido&id=eq.${encodeURIComponent(employeeId)}&organization_id=eq.${orgId}&limit=1`,
+    { headers: authHeaders(key) },
+  );
+
+  return employee.ok ? employee.data[0] || null : null;
 }
 
 async function fetchSlot(

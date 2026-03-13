@@ -100,23 +100,31 @@ var Api = (function () {
         });
     }
 
-    function assignSlot(slotId) {
-        return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
+    function assignSlot(slotId, employeeId) {
+        var body = {
             action: 'assign',
             orgSlug: ORG_SLUG,
             slotId: slotId
-        }, { requiresAuth: true });
+        };
+
+        if (employeeId) body.employeeId = employeeId;
+
+        return postJson(FUNCTIONS_BASE + '/kiosk-schedule', body, { requiresAuth: true });
     }
 
-    function createAndAssignSlot(year, week, dayOfWeek, hour) {
-        return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
+    function createAndAssignSlot(year, week, dayOfWeek, hour, employeeId) {
+        var body = {
             action: 'create-and-assign',
             orgSlug: ORG_SLUG,
             year: year,
             week: week,
             dayOfWeek: dayOfWeek,
             hour: hour
-        }, { requiresAuth: true });
+        };
+
+        if (employeeId) body.employeeId = employeeId;
+
+        return postJson(FUNCTIONS_BASE + '/kiosk-schedule', body, { requiresAuth: true });
     }
 
     function releaseSlot(slotId) {
