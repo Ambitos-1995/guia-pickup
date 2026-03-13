@@ -19,7 +19,6 @@ var App = (function () {
         Payment.init();
         Admin.init();
         Install.init();
-        Realtime.init();
 
         Utils.delegatePress(document.getElementById('menu-grid'), '.menu-card', function (e, card) {
             if (card.id === 'card-admin') {
@@ -76,6 +75,8 @@ var App = (function () {
         });
 
         navigate('screen-menu');
+
+        try { Realtime.init(); } catch (e) { console.warn('Realtime init failed:', e); }
     }
 
     function navigate(screenId) {

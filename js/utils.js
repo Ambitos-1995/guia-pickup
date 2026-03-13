@@ -1,3 +1,11 @@
+/* Debug: show JS errors visually on screen */
+window.onerror = function (msg, src, line) {
+    var d = document.createElement('div');
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:red;color:white;padding:8px;font-size:12px;word-break:break-all';
+    d.textContent = 'JS Error: ' + msg + ' (' + src + ':' + line + ')';
+    document.body.appendChild(d);
+};
+
 /* =====================================================
    UTILS - Date helpers, ISO week, formatters
    ===================================================== */
@@ -145,36 +153,17 @@ var Utils = (function () {
         return !!(element && (element.disabled || element.getAttribute('aria-disabled') === 'true'));
     }
 
-    // Timestamp of last touch event handled — shared across all bindPress/delegatePress
-    // to prevent click from double-firing after touch.
-    var lastTouchTime = 0;
-
-    function isRecentTouchLikePress(thresholdMs) {
-        var threshold = typeof thresholdMs === 'number' ? thresholdMs : 500;
-        return Date.now() - lastTouchTime < threshold;
-    }
-
     function bindPress(target, handler) {
         if (!target || typeof handler !== 'function') return function () {};
 
-        function onTouch(event) {
-            if (isDisabled(target)) return;
-            event.preventDefault();
-            lastTouchTime = Date.now();
-            handler.call(target, event);
-        }
-
         function onClick(event) {
             if (isDisabled(target)) return;
-            if (Date.now() - lastTouchTime < 500) return;
             handler.call(target, event);
         }
 
-        target.addEventListener('touchend', onTouch);
         target.addEventListener('click', onClick);
 
         return function () {
-            target.removeEventListener('touchend', onTouch);
             target.removeEventListener('click', onClick);
         };
     }
@@ -182,26 +171,15 @@ var Utils = (function () {
     function delegatePress(container, selector, handler) {
         if (!container || !selector || typeof handler !== 'function') return function () {};
 
-        function onTouch(event) {
-            var matched = closest(event.target, selector, container);
-            if (!matched || isDisabled(matched)) return;
-            event.preventDefault();
-            lastTouchTime = Date.now();
-            handler.call(matched, event, matched);
-        }
-
         function onClick(event) {
             var matched = closest(event.target, selector, container);
             if (!matched || isDisabled(matched)) return;
-            if (Date.now() - lastTouchTime < 500) return;
             handler.call(matched, event, matched);
         }
 
-        container.addEventListener('touchend', onTouch);
         container.addEventListener('click', onClick);
 
         return function () {
-            container.removeEventListener('touchend', onTouch);
             container.removeEventListener('click', onClick);
         };
     }
@@ -227,7 +205,6 @@ var Utils = (function () {
         matches: matches,
         closest: closest,
         bindPress: bindPress,
-        delegatePress: delegatePress,
-        isRecentTouchLikePress: isRecentTouchLikePress
+        delegatePress: delegatePress
     };
 })();
