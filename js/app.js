@@ -172,6 +172,10 @@ var App = (function () {
             logoutBtn.classList.add('hidden');
         }
 
+        // Toggle odd-cards class for full-width Ajustes on mobile
+        var visibleCards = document.querySelectorAll('#menu-grid > .menu-card:not(.hidden)');
+        document.getElementById('menu-grid').classList.toggle('odd-cards', visibleCards.length % 2 === 1);
+
         if (currentScreen !== 'screen-menu') {
             if (menuClockTimer) {
                 clearInterval(menuClockTimer);

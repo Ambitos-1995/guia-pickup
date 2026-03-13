@@ -366,7 +366,7 @@ button:focus-visible {
 .menu-container {
     display: flex;
     flex-direction: column;
-    min-height: 100dvh;
+    flex: 1;
     padding: 24px 20px;
     background: var(--bg);
 }
@@ -1894,25 +1894,131 @@ body {
     }
 }
 
-/* Mobile 2-column: all cards fill viewport equally */
+/* Mobile 2-column: cards fill viewport equally */
 @media (max-width: 833px) {
     .menu-grid {
-        grid-template-rows: 1fr 1fr;
+        grid-auto-rows: 1fr;
         align-content: stretch;
     }
     .menu-card {
         height: 100%;
+        min-height: 0;
+    }
+    .menu-grid.odd-cards > .card-admin {
+        grid-column: 1 / -1;
+        min-height: 0;
+        flex-direction: row;
+        gap: 16px;
+        padding: 16px 24px;
     }
 }
 
-/* Guia grid: stretch 3 rows on mobile (2-column layout) */
+/* Small phones: compact spacing */
+@media (max-width: 599px) {
+    .menu-container {
+        padding: 20px 16px;
+    }
+    .menu-header {
+        margin-bottom: 16px;
+    }
+    .logout-btn {
+        margin-top: 12px;
+        padding: 10px;
+    }
+
+    /* Schedule compact */
+    .schedule-shell {
+        gap: 10px;
+        padding: 10px 8px 16px;
+    }
+    .schedule-board {
+        padding: 5px;
+        border-radius: 20px;
+    }
+    .sched-header,
+    .sched-time {
+        min-height: 42px;
+    }
+    .sched-header {
+        padding: 6px 4px;
+        font-size: 0.65rem;
+    }
+    .sched-cell {
+        min-height: 56px;
+        padding: 8px 6px;
+        border-radius: 16px;
+    }
+    .week-arrow {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+    }
+    .week-label {
+        font-size: 1.15rem;
+    }
+    .schedule-range {
+        font-size: 0.72rem;
+    }
+    .schedule-context {
+        font-size: 0.82rem;
+        line-height: 1.35;
+    }
+    .legend-item {
+        padding: 6px 10px;
+        font-size: 0.62rem;
+    }
+    .legend-dot {
+        width: 12px;
+        height: 12px;
+    }
+
+    /* Guia compact */
+    .guia-card {
+        padding: 20px 12px 16px;
+        gap: 8px;
+    }
+    .guia-card-icon {
+        font-size: 3rem;
+    }
+    .guia-card-title {
+        font-size: 0.95rem;
+    }
+    .guia-card-desc {
+        font-size: 0.75rem;
+    }
+}
+
+/* Schedule dialog: position above keyboard on phones */
+@media (max-width: 767px) {
+    .schedule-slot-dialog::part(panel) {
+        width: min(95vw, 28rem);
+        border-radius: 20px;
+        margin-top: 10vh;
+        margin-bottom: auto;
+        max-height: 80dvh;
+        overflow-y: auto;
+    }
+    .slot-dialog-stack {
+        gap: 10px;
+    }
+    .slot-pin-entry {
+        gap: 8px;
+        padding: 4px 0;
+    }
+    .slot-pin-dots {
+        padding: 10px 20px;
+    }
+}
+
+/* Guia grid: auto-size rows on mobile so text is not clipped */
 @media (max-width: 767px) {
     .guia-grid {
-        grid-template-rows: 1fr 1fr 1fr;
-        align-content: stretch;
+        grid-auto-rows: auto;
+        align-content: start;
     }
     .guia-card {
-        height: 100%;
+        overflow: visible;
+        min-height: auto;
     }
 }
 
