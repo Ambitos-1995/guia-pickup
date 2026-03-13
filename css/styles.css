@@ -836,13 +836,22 @@ button:focus-visible {
     overflow-wrap: anywhere;
 }
 
+.guia-media-area {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
 .guia-content {
     display: flex;
     flex-direction: column;
     width: 100%;
     margin-inline: auto;
     gap: 12px;
+    flex: 1;
+    cursor: pointer;
 }
+.guia-content:active { opacity: 0.92; }
 
 /* Guia Steps */
 .guia-steps {
@@ -871,13 +880,14 @@ button:focus-visible {
     justify-content: center;
     padding: 10px;
     box-shadow: var(--shadow-card);
+    flex: 1;
 }
 
 .guia-image-wrap img {
     width: min(100%, 520px);
     max-width: 100%;
     height: auto;
-    max-height: 45vh;
+    max-height: 60vh;
     display: block;
     margin: 0 auto;
     object-fit: contain;
@@ -893,9 +903,9 @@ button:focus-visible {
     background: var(--blue-light);
     border-radius: var(--radius);
     text-align: center;
-    min-height: 120px;
-    box-shadow: var(--shadow-card);
     min-height: 180px;
+    box-shadow: var(--shadow-card);
+    flex: 1;
 }
 
 .guia-no-image-icon { color: var(--blue); }
@@ -915,7 +925,7 @@ button:focus-visible {
     background: var(--white);
     border-radius: var(--radius);
     border-left: 4px solid var(--red);
-    min-height: 120px;
+    min-height: 80px;
     width: 100%;
 }
 
@@ -923,36 +933,6 @@ button:focus-visible {
     color: var(--red);
 }
 
-.guia-nav {
-    display: flex;
-    gap: 12px;
-    margin-top: auto;
-    padding-top: 8px;
-}
-
-.guia-nav-btn {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 16px;
-    font-weight: 700;
-    font-size: 1rem;
-    border-radius: var(--radius);
-    background: var(--gray-100);
-    color: var(--text);
-    transition: all var(--transition);
-}
-.guia-nav-btn:hover { background: var(--gray-200); }
-.guia-nav-btn:active { transform: scale(0.97); }
-.guia-nav-btn:disabled { opacity: 0.3; pointer-events: none; }
-
-.guia-nav-next {
-    background: var(--red);
-    color: var(--white);
-}
-.guia-nav-next:hover { background: var(--red-dark); }
 
 /* Guia Complete */
 .guia-complete {
@@ -1816,7 +1796,7 @@ body {
     }
 
     .guia-instruction {
-        min-height: 300px;
+        min-height: 200px;
         display: flex;
         align-items: center;
     }
@@ -1838,10 +1818,10 @@ body {
     }
 }
 
-/* Mobile 2-column: second row stretches to fill viewport */
+/* Mobile 2-column: all cards fill viewport equally */
 @media (max-width: 833px) {
     .menu-grid {
-        grid-template-rows: minmax(150px, auto) 1fr;
+        grid-template-rows: 1fr 1fr;
         align-content: stretch;
     }
     .menu-card {
