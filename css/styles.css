@@ -1842,6 +1842,7 @@ body {
 @media (max-width: 833px) {
     .menu-grid {
         grid-template-rows: minmax(150px, auto) 1fr;
+        align-content: stretch;
     }
 }
 
