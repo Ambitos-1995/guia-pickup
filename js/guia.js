@@ -186,10 +186,6 @@ var Guia = (function () {
 
         // Tap anywhere on steps to advance
         stepsEl.addEventListener('click', function () {
-            if (Utils.isRecentTouchLikePress(700)) {
-                swipeHandled = false;
-                return;
-            }
             if (swipeHandled) { swipeHandled = false; return; }
             nextStep();
         });
