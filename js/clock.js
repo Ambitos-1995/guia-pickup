@@ -1,5 +1,5 @@
 /* =====================================================
-   CLOCK - Fichar (Check in solo — salida automatica)
+   CLOCK - Fichar entrada con conciliacion posterior
    ===================================================== */
 var Clock = (function () {
     'use strict';
@@ -24,6 +24,13 @@ var Clock = (function () {
     }
 
     function show() {
+        var session = App.getSession();
+        if (!session || session.role !== 'respondent') {
+            Pin.openForEmployee('screen-clock');
+            App.navigate('screen-pin');
+            return;
+        }
+
         updateClock();
         clockTimer = setInterval(updateClock, 1000);
         refreshStatus();
@@ -44,20 +51,14 @@ var Clock = (function () {
 
         feedbackEl.classList.add('hidden');
 
-        var status = session.currentStatus;
-
-        if (status === 'not_checked_in' || status === 'checked_out') {
-            statusEl.className = 'clock-status status-pending-in';
-            statusEl.textContent = 'ENTRADA pendiente';
-            btnIn.classList.remove('hidden');
-        } else if (status === 'checked_in') {
+        if (session.currentStatus === 'checked_in') {
             statusEl.className = 'clock-status status-done';
             statusEl.textContent = 'Entrada registrada hoy';
             btnIn.classList.add('hidden');
         } else {
-            statusEl.className = 'clock-status status-done';
-            statusEl.textContent = 'Fichaje completo hoy';
-            btnIn.classList.add('hidden');
+            statusEl.className = 'clock-status status-pending-in';
+            statusEl.textContent = 'Entrada pendiente';
+            btnIn.classList.remove('hidden');
         }
     }
 
@@ -67,7 +68,7 @@ var Clock = (function () {
 
         var info = Utils.currentWeekInfo();
         var today = new Date();
-        var dow = today.getDay(); // 0=Sun, 1=Mon...
+        var dow = today.getDay();
 
         if (dow === 0 || dow === 6) {
             todaySlotEl.textContent = 'Hoy no hay turno (fin de semana)';
@@ -84,17 +85,17 @@ var Clock = (function () {
 
             var mySlot = null;
             for (var i = 0; i < res.data.length; i++) {
-                var s = res.data[i];
-                if (s.day_of_week === dow && s.assigned_employee_profile_id === session.employeeProfileId) {
-                    mySlot = s;
+                var slot = res.data[i];
+                if (slot.day_of_week === dow && slot.assigned_employee_profile_id === session.employeeId) {
+                    mySlot = slot;
                     break;
                 }
             }
 
             if (mySlot) {
-                var start = mySlot.start_time.substring(0, 5);
-                var end = mySlot.end_time.substring(0, 5);
-                todaySlotEl.textContent = 'Hoy tienes turno de ' + start + ' a ' + end;
+                todaySlotEl.textContent = 'Hoy tienes turno de ' +
+                    mySlot.start_time.substring(0, 5) + ' a ' +
+                    mySlot.end_time.substring(0, 5);
             } else {
                 todaySlotEl.textContent = 'No tienes turno asignado hoy';
             }
@@ -108,33 +109,29 @@ var Clock = (function () {
         btnIn.disabled = true;
         btnIn.textContent = 'Procesando...';
 
-        Api.checkIn(session.pin).then(function (res) {
+        Api.checkIn().then(function (res) {
             btnIn.disabled = false;
             btnIn.textContent = 'ENTRADA';
 
             if (res && res.success) {
-                var endTime = res.data && res.data.shiftEndTime ? ' · Turno hasta las ' + res.data.shiftEndTime : '';
-                showFeedback('success', (res.message || 'Entrada registrada') + endTime);
                 session.currentStatus = 'checked_in';
                 App.setSession(session);
-                setTimeout(function () { App.navigate('screen-menu'); }, 3000);
-            } else {
-                var noShift = res && res.message === 'No tienes turno asignado hoy';
-                showFeedback('error', res.message || 'Error al fichar', noShift);
+                showFeedback('success', res.message || 'Entrada registrada');
+                setTimeout(function () { App.navigate('screen-menu'); }, 1800);
+                return;
             }
+
+            showFeedback('error', (res && res.message) || 'Error al fichar', res && res.message === 'No tienes turno asignado hoy');
         });
     }
 
-    function showFeedback(type, msg, showScheduleBtn) {
+    function showFeedback(type, message, showScheduleBtn) {
         feedbackEl.classList.remove('hidden', 'feedback-success', 'feedback-error');
         feedbackEl.classList.add('feedback-' + type);
-        feedbackMsg.textContent = msg;
+        feedbackMsg.textContent = message;
         btnIn.classList.add('hidden');
-        if (showScheduleBtn) {
-            feedbackScheduleBtn.classList.remove('hidden');
-        } else {
-            feedbackScheduleBtn.classList.add('hidden');
-        }
+        if (showScheduleBtn) feedbackScheduleBtn.classList.remove('hidden');
+        else feedbackScheduleBtn.classList.add('hidden');
     }
 
     return { init: init, show: show, hide: hide };

@@ -8,17 +8,39 @@ var Api = (function () {
     var SUPABASE_PROJECT_URL = 'https://mzuvkinwebqgmnutchsv.supabase.co';
     var FUNCTIONS_BASE = SUPABASE_PROJECT_URL + '/functions/v1';
 
-    /** POST JSON helper */
-    function postJson(url, body) {
+    function postJson(url, body, options) {
+        var opts = options || {};
+        var headers = { 'Content-Type': 'application/json' };
+        var session = (typeof App !== 'undefined' && App.getSession) ? App.getSession() : null;
+
+        if (opts.requiresAuth) {
+            if (!session || !session.accessToken) {
+                return Promise.resolve({ success: false, error: 'AUTH_REQUIRED', message: 'Sesion requerida' });
+            }
+            headers.Authorization = 'Bearer ' + session.accessToken;
+        }
+
         return fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        }).then(function (res) { return res.json(); })
-          .catch(function () { return { success: false, message: 'Error de conexion' }; });
+            headers: headers,
+            body: JSON.stringify(body || {})
+        }).then(function (res) {
+            return res.json().catch(function () {
+                return { success: false, message: 'Respuesta invalida del servidor' };
+            }).then(function (payload) {
+                payload.httpStatus = res.status;
+                if (opts.requiresAuth && (res.status === 401 || res.status === 403) &&
+                    payload && (payload.error === 'SESSION_EXPIRED' || payload.error === 'TOKEN_INVALID' || payload.error === 'SESSION_NOT_FOUND')) {
+                    if (typeof App !== 'undefined' && App.handleAuthFailure) {
+                        App.handleAuthFailure(payload.message || 'Tu sesion ha caducado.');
+                    }
+                }
+                return payload;
+            });
+        }).catch(function () {
+            return { success: false, message: 'Error de conexion' };
+        });
     }
-
-    // ---- ADMIN: Verify admin PIN ----
 
     function verifyAdminPin(pin) {
         return postJson(FUNCTIONS_BASE + '/kiosk-admin-verify', {
@@ -26,8 +48,6 @@ var Api = (function () {
             pin: pin
         });
     }
-
-    // ---- EMPLOYEES: Verify employee PIN ----
 
     function verifyPin(pin) {
         return postJson(FUNCTIONS_BASE + '/kiosk-employees', {
@@ -37,105 +57,121 @@ var Api = (function () {
         });
     }
 
-    // ---- EMPLOYEES: List (admin) ----
-
-    function getEmployees(adminPin) {
+    function getEmployees() {
         return postJson(FUNCTIONS_BASE + '/kiosk-employees', {
             action: 'list',
-            orgSlug: ORG_SLUG,
-            adminPin: adminPin
-        });
+            orgSlug: ORG_SLUG
+        }, { requiresAuth: true });
     }
 
-    // ---- EMPLOYEES: Create (admin) ----
-
-    function updateEmployee(employeeId, nombre, apellido, pin, adminPin) {
-        var body = { action: 'update', orgSlug: ORG_SLUG, adminPin: adminPin, employeeId: employeeId };
-        if (nombre) body.nombre = nombre;
-        if (apellido) body.apellido = apellido;
+    function updateEmployee(employeeId, nombre, apellido, pin) {
+        var body = { action: 'update', orgSlug: ORG_SLUG, employeeId: employeeId };
+        if (nombre !== undefined) body.nombre = nombre;
+        if (apellido !== undefined) body.apellido = apellido;
         if (pin) body.pin = pin;
-        return postJson(FUNCTIONS_BASE + '/kiosk-employees', body);
+
+        return postJson(FUNCTIONS_BASE + '/kiosk-employees', body, { requiresAuth: true });
     }
 
-    function createEmployee(nombre, apellido, pin, adminPin) {
+    function createEmployee(nombre, apellido, pin) {
         return postJson(FUNCTIONS_BASE + '/kiosk-employees', {
             action: 'create',
             orgSlug: ORG_SLUG,
-            adminPin: adminPin,
             nombre: nombre,
             apellido: apellido,
             pin: pin
-        });
+        }, { requiresAuth: true });
     }
 
-    // ---- CLOCK: Check in / Check out ----
-
-    function checkIn(pin, clientDate) {
+    function checkIn(clientDate) {
         return postJson(FUNCTIONS_BASE + '/kiosk-clock', {
             orgSlug: ORG_SLUG,
-            pin: pin,
             action: 'check-in',
-            clientDate: clientDate || Utils.today(),
-            tzOffset: -new Date().getTimezoneOffset()
-        });
+            clientDate: clientDate || Utils.today()
+        }, { requiresAuth: true });
     }
-
-    // ---- SCHEDULE: Slots (Supabase Edge Functions) ----
 
     function getWeekSlots(year, week) {
         return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
-            action: 'list', orgSlug: ORG_SLUG, year: year, week: week
+            action: 'list',
+            orgSlug: ORG_SLUG,
+            year: year,
+            week: week
         });
     }
 
-    function assignByPin(pin, slotId, year, week) {
+    function assignSlot(slotId) {
         return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
-            action: 'assign', orgSlug: ORG_SLUG,
-            pin: pin, slotId: slotId, year: year, week: week
-        });
+            action: 'assign',
+            orgSlug: ORG_SLUG,
+            slotId: slotId
+        }, { requiresAuth: true });
+    }
+
+    function releaseSlot(slotId) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
+            action: 'release',
+            orgSlug: ORG_SLUG,
+            slotId: slotId
+        }, { requiresAuth: true });
     }
 
     function createAdminSlot(body) {
-        var session = (typeof App !== 'undefined') ? App.getSession() : null;
-        var adminPin = (session && session.pin) || '';
         return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
-            action: 'create', orgSlug: ORG_SLUG, adminPin: adminPin,
-            year: body.year, week: body.week,
-            dayOfWeek: body.dayOfWeek, startTime: body.startTime, endTime: body.endTime
-        });
+            action: 'create',
+            orgSlug: ORG_SLUG,
+            year: body.year,
+            week: body.week,
+            dayOfWeek: body.dayOfWeek,
+            startTime: body.startTime,
+            endTime: body.endTime
+        }, { requiresAuth: true });
     }
 
-    function modifyByPin(slotId, pin, action, options) {
+    function updateAdminSlot(body) {
         return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
-            action: 'release', orgSlug: ORG_SLUG,
-            pin: pin, slotId: slotId,
-            signupId: options && options.signupId ? options.signupId : slotId,
-            year: options && options.year ? options.year : null,
-            week: options && options.week ? options.week : null
-        });
+            action: 'update',
+            orgSlug: ORG_SLUG,
+            slotId: body.slotId,
+            startTime: body.startTime,
+            endTime: body.endTime
+        }, { requiresAuth: true });
     }
 
-    // ---- PAYMENTS ----
-
-    function getMyPaymentSummary(pin, year, month) {
-        return postJson(FUNCTIONS_BASE + '/kiosk-payment', {
-            action: 'my-summary', orgSlug: ORG_SLUG,
-            pin: pin, year: year, month: month
-        });
+    function deleteAdminSlot(slotId) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
+            action: 'delete',
+            orgSlug: ORG_SLUG,
+            slotId: slotId
+        }, { requiresAuth: true });
     }
 
-    function setPaymentAmount(year, month, totalAmount, adminPin) {
+    function getMyPaymentSummary(year, month) {
         return postJson(FUNCTIONS_BASE + '/kiosk-payment', {
-            action: 'set-amount', orgSlug: ORG_SLUG,
-            adminPin: adminPin, year: year, month: month, totalAmount: totalAmount
-        });
+            action: 'my-summary',
+            orgSlug: ORG_SLUG,
+            year: year,
+            month: month
+        }, { requiresAuth: true });
     }
 
-    function calculatePayments(year, month, adminPin) {
+    function setPaymentAmount(year, month, totalAmount) {
         return postJson(FUNCTIONS_BASE + '/kiosk-payment', {
-            action: 'calculate', orgSlug: ORG_SLUG,
-            adminPin: adminPin, year: year, month: month
-        });
+            action: 'set-amount',
+            orgSlug: ORG_SLUG,
+            year: year,
+            month: month,
+            totalAmount: totalAmount
+        }, { requiresAuth: true });
+    }
+
+    function calculatePayments(year, month) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-payment', {
+            action: 'calculate',
+            orgSlug: ORG_SLUG,
+            year: year,
+            month: month
+        }, { requiresAuth: true });
     }
 
     return {
@@ -144,9 +180,11 @@ var Api = (function () {
         verifyAdminPin: verifyAdminPin,
         checkIn: checkIn,
         getWeekSlots: getWeekSlots,
-        assignByPin: assignByPin,
-        modifyByPin: modifyByPin,
+        assignSlot: assignSlot,
+        releaseSlot: releaseSlot,
         createAdminSlot: createAdminSlot,
+        updateAdminSlot: updateAdminSlot,
+        deleteAdminSlot: deleteAdminSlot,
         getMyPaymentSummary: getMyPaymentSummary,
         setPaymentAmount: setPaymentAmount,
         calculatePayments: calculatePayments,

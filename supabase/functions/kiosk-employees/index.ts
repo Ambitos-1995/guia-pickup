@@ -1,16 +1,34 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
-};
+import {
+  corsHeaders,
+  createPinLookupHash,
+  currentAttendanceStatus,
+  fetchJson,
+  getClientIp,
+  getSessionSecret,
+  getSupabaseConfig,
+  getUserAgent,
+  getRateLimitStatus,
+  hashPin,
+  issueSession,
+  json,
+  logAudit,
+  recordAuthAttempt,
+  requireSession,
+  resolveEmployeeByPin,
+  resolveOrgId,
+} from "../_shared/kiosk.ts";
+
+const EMPLOYEE_PIN_REGEX = /^[0-9]{4}$/;
+const EMPLOYEE_IDLE_TIMEOUT_SECONDS = 10 * 60;
+const EMPLOYEE_ABSOLUTE_TIMEOUT_SECONDS = 30 * 60;
+const EMPLOYEE_FAILURE_LIMIT = 8;
+const EMPLOYEE_BLOCK_MINUTES = 10;
 
 interface RequestBody {
   action?: string;
   orgSlug?: string;
-  adminPin?: string;
   pin?: string;
   nombre?: string;
   apellido?: string;
@@ -21,12 +39,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
   if (req.method !== "POST") {
-    return json({ success: false, message: "Method not allowed" }, 405);
+    return json({ success: false, message: "Metodo no permitido" }, 405);
   }
 
   try {
-    const body = (await req.json()) as RequestBody;
+    getSessionSecret();
+    const body = await req.json() as RequestBody;
     const action = String(body.action || "").trim();
     const orgSlug = String(body.orgSlug || "").trim();
 
@@ -34,188 +54,154 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return json({ success: false, message: "Falta la organizacion" }, 400);
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      return json({ success: false, message: "Config error" }, 500);
-    }
-
-    const orgId = await resolveOrgId(supabaseUrl, serviceRoleKey, orgSlug);
+    const { url, serviceRoleKey } = getSupabaseConfig();
+    const orgId = await resolveOrgId(url, serviceRoleKey, orgSlug);
     if (!orgId) {
       return json({ success: false, message: "Organizacion no encontrada" }, 404);
     }
 
-    // --- VERIFY: no admin required ---
     if (action === "verify") {
-      return handleVerify(supabaseUrl, serviceRoleKey, orgId, body);
+      return await handleVerify(req, url, serviceRoleKey, orgId, body);
     }
 
-    // --- ADMIN actions: list, create ---
-    const adminPin = String(body.adminPin || "").trim();
-    if (!adminPin) {
-      return json({ success: false, message: "Se requiere PIN de admin" }, 401);
+    const auth = await requireSession(req, url, serviceRoleKey, ["org_admin"]);
+    if (auth instanceof Response) {
+      return auth;
     }
 
-    const isAdmin = await verifyAdminPin(supabaseUrl, serviceRoleKey, orgId, adminPin);
-    if (!isAdmin) {
-      return json({ success: false, message: "PIN de admin invalido" }, 401);
+    if (auth.session.organization_id !== orgId) {
+      return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
     }
 
     if (action === "list") {
-      return handleList(supabaseUrl, serviceRoleKey, orgId);
+      return await handleList(url, serviceRoleKey, auth.session.organization_id);
     }
 
     if (action === "create") {
-      return handleCreate(supabaseUrl, serviceRoleKey, orgId, body);
+      return await handleCreate(url, serviceRoleKey, auth.session.organization_id, auth.session.id, body);
     }
 
     if (action === "update") {
-      return handleUpdate(supabaseUrl, serviceRoleKey, orgId, body);
+      return await handleUpdate(url, serviceRoleKey, auth.session.organization_id, auth.session.id, body);
     }
 
     return json({ success: false, message: "Accion no valida" }, 400);
   } catch (error) {
     console.error("kiosk-employees error", error);
-    return json({
-      success: false,
-      message: "Error interno",
-      details: error instanceof Error ? error.message : String(error),
-    }, 500);
+    return json({ success: false, message: "Error interno" }, 500);
   }
 });
 
-// ---- Resolve organization ID from slug ----
-
-async function resolveOrgId(
-  supabaseUrl: string,
-  key: string,
-  slug: string,
-): Promise<string | null> {
-  const res = await fetch(
-    `${supabaseUrl}/rest/v1/organizations?select=id&slug=eq.${encodeURIComponent(slug)}&limit=1`,
-    { headers: authHeaders(key) },
-  );
-  if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ id: string }>;
-  return rows.length > 0 ? rows[0].id : null;
-}
-
-// ---- Verify admin PIN via existing RPC ----
-
-async function verifyAdminPin(
-  supabaseUrl: string,
-  key: string,
-  orgId: string,
-  pin: string,
-): Promise<boolean> {
-  const res = await fetch(
-    `${supabaseUrl}/rest/v1/rpc/verify_organization_super_admin_pin`,
-    {
-      method: "POST",
-      headers: { ...authHeaders(key), "Content-Type": "application/json" },
-      body: JSON.stringify({ p_organization_id: orgId, p_pin: pin }),
-    },
-  );
-  if (!res.ok) return false;
-  return (await res.json()) === true;
-}
-
-// ---- VERIFY employee PIN ----
-
 async function handleVerify(
+  req: Request,
   supabaseUrl: string,
   key: string,
   orgId: string,
   body: RequestBody,
 ): Promise<Response> {
   const pin = String(body.pin || "").trim();
-
-  if (!/^[0-9]{4}$/.test(pin)) {
-    return json({ success: false, message: "PIN debe ser 4 cifras" }, 400);
+  if (!EMPLOYEE_PIN_REGEX.test(pin)) {
+    return json({ success: false, message: "El PIN debe ser exactamente 4 cifras" }, 400);
   }
 
-  const res = await fetch(
-    `${supabaseUrl}/rest/v1/kiosk_employees?select=id,nombre,apellido,pin,attendance_enabled&organization_id=eq.${orgId}&pin=eq.${encodeURIComponent(pin)}&limit=1`,
-    { headers: authHeaders(key) },
-  );
-
-  if (!res.ok) {
-    return json({ success: false, message: "Error al verificar" }, 500);
+  const ipAddress = getClientIp(req);
+  const limiter = await getRateLimitStatus(supabaseUrl, key, orgId, "employee", ipAddress);
+  if (limiter.blockedUntil) {
+    return json({
+      success: false,
+      error: "TOO_MANY_ATTEMPTS",
+      message: "Demasiados intentos. Espera unos minutos antes de volver a probar.",
+      retryAt: limiter.blockedUntil,
+    }, 429);
   }
 
-  const rows = (await res.json()) as Array<{
-    id: string;
-    nombre: string;
-    apellido: string;
-    attendance_enabled: boolean;
-  }>;
+  const employee = await resolveEmployeeByPin(supabaseUrl, key, orgId, pin);
+  if (!employee) {
+    const nextFailureCount = limiter.failureCount + 1;
+    const blockedUntil = nextFailureCount >= EMPLOYEE_FAILURE_LIMIT
+      ? new Date(Date.now() + EMPLOYEE_BLOCK_MINUTES * 60 * 1000).toISOString()
+      : null;
 
-  if (rows.length === 0) {
+    await recordAuthAttempt(supabaseUrl, key, orgId, "employee", ipAddress, false, nextFailureCount, blockedUntil);
+    await logAudit(supabaseUrl, key, {
+      organizationId: orgId,
+      actorRole: "system",
+      action: "employee_login_failed",
+      metadata: { ipAddress, blockedUntil },
+    });
+
     return json({ success: false, message: "PIN incorrecto" }, 401);
   }
 
-  const emp = rows[0];
-
-  if (!emp.attendance_enabled) {
+  if (!employee.attendance_enabled) {
     return json({ success: false, message: "Empleado desactivado" }, 403);
   }
 
-  // Get today's attendance status
+  const userAgent = getUserAgent(req);
   const today = new Date().toISOString().slice(0, 10);
-  const attRes = await fetch(
-    `${supabaseUrl}/rest/v1/kiosk_attendance?select=action,recorded_at&employee_id=eq.${emp.id}&client_date=eq.${today}&order=recorded_at.desc&limit=1`,
-    { headers: authHeaders(key) },
-  );
+  const currentStatus = await currentAttendanceStatus(supabaseUrl, key, employee.id, today);
+  const issued = await issueSession(supabaseUrl, key, {
+    organizationId: orgId,
+    employeeId: employee.id,
+    role: "respondent",
+    idleTimeoutSeconds: EMPLOYEE_IDLE_TIMEOUT_SECONDS,
+    absoluteTimeoutSeconds: EMPLOYEE_ABSOLUTE_TIMEOUT_SECONDS,
+    ipAddress,
+    userAgent,
+  });
 
-  let currentStatus = "not_checked_in";
-  if (attRes.ok) {
-    const attRows = (await attRes.json()) as Array<{ action: string }>;
-    if (attRows.length > 0) {
-      currentStatus = attRows[0].action === "check_in" ? "checked_in" : "checked_out";
-    }
-  }
+  await recordAuthAttempt(supabaseUrl, key, orgId, "employee", ipAddress, true, 0, null);
+  await logAudit(supabaseUrl, key, {
+    organizationId: orgId,
+    actorSessionId: issued.session.id,
+    actorRole: "respondent",
+    employeeId: employee.id,
+    action: "employee_login_success",
+    metadata: { ipAddress },
+  });
 
   return json({
     success: true,
     data: {
-      employeeProfileId: emp.id,
-      employeeName: emp.nombre + " " + emp.apellido,
-      employeeCode: emp.id,
-      currentStatus: currentStatus,
+      accessToken: issued.accessToken,
+      expiresAt: issued.expiresAt,
+      employeeId: employee.id,
+      employeeName: `${employee.nombre} ${employee.apellido}`.trim(),
+      currentStatus,
       role: "respondent",
+      organizationId: orgId,
     },
   });
 }
-
-// ---- LIST employees ----
 
 async function handleList(
   supabaseUrl: string,
   key: string,
   orgId: string,
 ): Promise<Response> {
-  const res = await fetch(
+  const res = await fetchJson<Array<{
+    id: string;
+    nombre: string;
+    apellido: string;
+    attendance_enabled: boolean;
+    created_at: string;
+  }>>(
     `${supabaseUrl}/rest/v1/kiosk_employees?select=id,nombre,apellido,attendance_enabled,created_at&organization_id=eq.${orgId}&order=created_at.desc`,
-    { headers: authHeaders(key) },
+    { headers: { ...getHeaders(key) } },
   );
 
   if (!res.ok) {
-    const details = await res.text();
-    console.error("list employees failed", details);
     return json({ success: false, message: "Error al listar empleados" }, 500);
   }
 
-  const rows = await res.json();
-  return json({ success: true, data: rows });
+  return json({ success: true, data: res.data });
 }
-
-// ---- CREATE employee ----
 
 async function handleCreate(
   supabaseUrl: string,
   key: string,
   orgId: string,
+  sessionId: string,
   body: RequestBody,
 ): Promise<Response> {
   const nombre = String(body.nombre || "").trim();
@@ -226,30 +212,27 @@ async function handleCreate(
     return json({ success: false, message: "Nombre y apellido son obligatorios" }, 400);
   }
 
-  if (!/^[0-9]{4}$/.test(pin)) {
+  if (!EMPLOYEE_PIN_REGEX.test(pin)) {
     return json({ success: false, message: "El PIN debe ser exactamente 4 cifras" }, 400);
   }
 
-  // Check PIN uniqueness within org
-  const checkRes = await fetch(
-    `${supabaseUrl}/rest/v1/kiosk_employees?select=id&organization_id=eq.${orgId}&pin=eq.${encodeURIComponent(pin)}&limit=1`,
-    { headers: authHeaders(key) },
+  const pinLookupHash = await createPinLookupHash(orgId, pin);
+  const existing = await fetchJson<Array<{ id: string }>>(
+    `${supabaseUrl}/rest/v1/kiosk_employees?select=id&organization_id=eq.${orgId}&pin_lookup_hash=eq.${pinLookupHash}&limit=1`,
+    { headers: getHeaders(key) },
   );
 
-  if (checkRes.ok) {
-    const existing = await checkRes.json();
-    if (Array.isArray(existing) && existing.length > 0) {
-      return json({ success: false, message: "Ya existe un empleado con ese PIN" }, 409);
-    }
+  if (existing.ok && existing.data[0]) {
+    return json({ success: false, message: "Ya existe un empleado con ese PIN" }, 409);
   }
 
-  // Insert
-  const insertRes = await fetch(
+  const pinHash = await hashPin(pin);
+  const insert = await fetchJson<Array<{ id: string; nombre: string; apellido: string; attendance_enabled: boolean }>>(
     `${supabaseUrl}/rest/v1/kiosk_employees`,
     {
       method: "POST",
       headers: {
-        ...authHeaders(key),
+        ...getHeaders(key),
         "Content-Type": "application/json",
         Prefer: "return=representation",
       },
@@ -257,78 +240,92 @@ async function handleCreate(
         organization_id: orgId,
         nombre,
         apellido,
-        pin,
         attendance_enabled: true,
+        pin: null,
+        pin_hash: pinHash,
+        pin_lookup_hash: pinLookupHash,
+        pin_algorithm: "argon2id",
+        pin_migrated_at: new Date().toISOString(),
       }),
     },
   );
 
-  if (!insertRes.ok) {
-    const details = await insertRes.text();
-    console.error("create employee failed", details);
+  if (!insert.ok || !insert.data[0]) {
     return json({ success: false, message: "Error al crear empleado" }, 500);
   }
 
-  const created = await insertRes.json();
-  return json({ success: true, data: created[0] || created });
-}
+  await logAudit(supabaseUrl, key, {
+    organizationId: orgId,
+    actorSessionId: sessionId,
+    actorRole: "org_admin",
+    employeeId: insert.data[0].id,
+    action: "employee_created",
+    metadata: { nombre, apellido },
+  });
 
-// ---- UPDATE employee ----
+  return json({ success: true, data: insert.data[0] });
+}
 
 async function handleUpdate(
   supabaseUrl: string,
   key: string,
   orgId: string,
+  sessionId: string,
   body: RequestBody,
 ): Promise<Response> {
   const employeeId = String(body.employeeId || "").trim();
   const nombre = body.nombre !== undefined ? String(body.nombre).trim() : undefined;
   const apellido = body.apellido !== undefined ? String(body.apellido).trim() : undefined;
-  const pin = body.pin !== undefined && body.pin !== null ? String(body.pin).trim() : undefined;
+  const pin = body.pin !== undefined ? String(body.pin).trim() : undefined;
 
   if (!employeeId) {
-    return json({ success: false, message: "Falta el ID del empleado" }, 400);
+    return json({ success: false, message: "Falta el empleado" }, 400);
   }
+
   if (nombre !== undefined && !nombre) {
-    return json({ success: false, message: "El nombre no puede estar vacío" }, 400);
+    return json({ success: false, message: "El nombre no puede estar vacio" }, 400);
   }
+
   if (apellido !== undefined && !apellido) {
-    return json({ success: false, message: "El apellido no puede estar vacío" }, 400);
+    return json({ success: false, message: "El apellido no puede estar vacio" }, 400);
   }
-  if (pin !== undefined && pin !== "" && !/^[0-9]{4}$/.test(pin)) {
+
+  if (pin !== undefined && pin !== "" && !EMPLOYEE_PIN_REGEX.test(pin)) {
     return json({ success: false, message: "El PIN debe ser exactamente 4 cifras" }, 400);
   }
 
-  // Check PIN uniqueness (excluding current employee)
-  if (pin) {
-    const checkRes = await fetch(
-      `${supabaseUrl}/rest/v1/kiosk_employees?select=id&organization_id=eq.${orgId}&pin=eq.${encodeURIComponent(pin)}&id=neq.${encodeURIComponent(employeeId)}&limit=1`,
-      { headers: authHeaders(key) },
-    );
-    if (checkRes.ok) {
-      const existing = await checkRes.json();
-      if (Array.isArray(existing) && existing.length > 0) {
-        return json({ success: false, message: "Ya existe un empleado con ese PIN" }, 409);
-      }
-    }
-  }
-
-  // Build update payload
-  const updates: Record<string, string> = {};
+  const updates: Record<string, unknown> = {};
   if (nombre) updates.nombre = nombre;
   if (apellido) updates.apellido = apellido;
-  if (pin) updates.pin = pin;
+
+  if (pin) {
+    const pinLookupHash = await createPinLookupHash(orgId, pin);
+    const existing = await fetchJson<Array<{ id: string }>>(
+      `${supabaseUrl}/rest/v1/kiosk_employees?select=id&organization_id=eq.${orgId}&pin_lookup_hash=eq.${pinLookupHash}&id=neq.${encodeURIComponent(employeeId)}&limit=1`,
+      { headers: getHeaders(key) },
+    );
+
+    if (existing.ok && existing.data[0]) {
+      return json({ success: false, message: "Ya existe un empleado con ese PIN" }, 409);
+    }
+
+    updates.pin_hash = await hashPin(pin);
+    updates.pin_lookup_hash = pinLookupHash;
+    updates.pin_algorithm = "argon2id";
+    updates.pin_migrated_at = new Date().toISOString();
+    updates.pin = null;
+  }
 
   if (Object.keys(updates).length === 0) {
     return json({ success: false, message: "No hay cambios para guardar" }, 400);
   }
 
-  const updateRes = await fetch(
+  const update = await fetchJson<Array<{ id: string; nombre: string; apellido: string; attendance_enabled: boolean }>>(
     `${supabaseUrl}/rest/v1/kiosk_employees?id=eq.${encodeURIComponent(employeeId)}&organization_id=eq.${orgId}`,
     {
       method: "PATCH",
       headers: {
-        ...authHeaders(key),
+        ...getHeaders(key),
         "Content-Type": "application/json",
         Prefer: "return=representation",
       },
@@ -336,28 +333,27 @@ async function handleUpdate(
     },
   );
 
-  if (!updateRes.ok) {
-    const details = await updateRes.text();
-    console.error("update employee failed", details);
+  if (!update.ok || !update.data[0]) {
     return json({ success: false, message: "Error al actualizar empleado" }, 500);
   }
 
-  const updated = await updateRes.json();
-  return json({ success: true, data: updated[0] || updated });
+  await logAudit(supabaseUrl, key, {
+    organizationId: orgId,
+    actorSessionId: sessionId,
+    actorRole: "org_admin",
+    employeeId,
+    action: "employee_updated",
+    metadata: {
+      fields: Object.keys(updates),
+    },
+  });
+
+  return json({ success: true, data: update.data[0] });
 }
 
-// ---- Helpers ----
-
-function authHeaders(key: string): Record<string, string> {
+function getHeaders(key: string): Record<string, string> {
   return {
     Authorization: `Bearer ${key}`,
     apikey: key,
   };
-}
-
-function json(payload: unknown, status = 200): Response {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: corsHeaders,
-  });
 }

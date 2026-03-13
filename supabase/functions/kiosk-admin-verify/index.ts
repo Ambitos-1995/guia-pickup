@@ -1,13 +1,25 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
-};
+import {
+  corsHeaders,
+  getClientIp,
+  getSessionSecret,
+  getSupabaseConfig,
+  getUserAgent,
+  getRateLimitStatus,
+  issueSession,
+  json,
+  logAudit,
+  recordAuthAttempt,
+  resolveOrgId,
+  verifyAdminPin,
+} from "../_shared/kiosk.ts";
 
 const PIN_REGEX = /^[0-9]{4,8}$/;
+const ADMIN_IDLE_TIMEOUT_SECONDS = 5 * 60;
+const ADMIN_ABSOLUTE_TIMEOUT_SECONDS = 15 * 60;
+const ADMIN_FAILURE_LIMIT = 5;
+const ADMIN_BLOCK_MINUTES = 15;
 
 interface VerifyBody {
   orgSlug?: string;
@@ -21,174 +33,129 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   if (req.method !== "POST") {
-    return json(
-      { success: false, error: "Method not allowed" },
-      405,
-    );
+    return json({ success: false, error: "METHOD_NOT_ALLOWED", message: "Metodo no permitido" }, 405);
   }
 
   try {
+    getSessionSecret();
     const body = await req.json() as VerifyBody;
     const pin = String(body.pin || "").trim();
     const orgSlug = String(body.orgSlug || "").trim();
     const organizationId = String(body.organizationId || "").trim();
 
     if (!PIN_REGEX.test(pin)) {
-      return json(
-        {
-          success: false,
-          error: "PIN_INVALID",
-          message: "El PIN debe tener entre 4 y 8 digitos numericos",
-        },
-        400,
-      );
+      return json({
+        success: false,
+        error: "PIN_INVALID",
+        message: "El PIN debe tener entre 4 y 8 digitos numericos",
+      }, 400);
     }
 
     if (!orgSlug && !organizationId) {
-      return json(
-        {
-          success: false,
-          error: "ORG_REQUIRED",
-          message: "Falta la organizacion",
-        },
-        400,
-      );
+      return json({
+        success: false,
+        error: "ORG_REQUIRED",
+        message: "Falta la organizacion",
+      }, 400);
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      return json(
-        {
-          success: false,
-          error: "CONFIG_ERROR",
-          message: "Faltan credenciales de Supabase",
-        },
-        500,
-      );
-    }
-
-    let resolvedOrganizationId = organizationId;
-    let resolvedOrgSlug = orgSlug;
-
+    const { url, serviceRoleKey } = getSupabaseConfig();
+    const resolvedOrganizationId = organizationId || await resolveOrgId(url, serviceRoleKey, orgSlug);
     if (!resolvedOrganizationId) {
-      const orgResponse = await fetch(
-        `${supabaseUrl}/rest/v1/organizations?select=id,slug&slug=eq.${encodeURIComponent(resolvedOrgSlug)}&limit=1`,
-        {
-          headers: {
-            Authorization: `Bearer ${serviceRoleKey}`,
-            apikey: serviceRoleKey,
-          },
-        },
-      );
-
-      if (!orgResponse.ok) {
-        const details = await orgResponse.text();
-        console.error("organization lookup failed", details);
-        return json(
-          {
-            success: false,
-            error: "ORG_LOOKUP_FAILED",
-            message: "No se ha podido validar la organizacion",
-            details,
-          },
-          500,
-        );
-      }
-
-      const organizations = await orgResponse.json() as Array<{ id: string; slug: string }>;
-      const organization = organizations[0];
-
-      if (!organization) {
-        return json(
-          {
-            success: false,
-            error: "ORG_NOT_FOUND",
-            message: "Organizacion no encontrada",
-          },
-          404,
-        );
-      }
-
-      resolvedOrganizationId = organization.id;
-      resolvedOrgSlug = organization.slug;
+      return json({
+        success: false,
+        error: "ORG_NOT_FOUND",
+        message: "Organizacion no encontrada",
+      }, 404);
     }
 
-    const verifyResponse = await fetch(
-      `${supabaseUrl}/rest/v1/rpc/verify_organization_super_admin_pin`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${serviceRoleKey}`,
-          apikey: serviceRoleKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          p_organization_id: resolvedOrganizationId,
-          p_pin: pin,
-        }),
-      },
-    );
+    const ipAddress = getClientIp(req);
+    const userAgent = getUserAgent(req);
+    const limiter = await getRateLimitStatus(url, serviceRoleKey, resolvedOrganizationId, "admin", ipAddress);
 
-    if (!verifyResponse.ok) {
-      const details = await verifyResponse.text();
-      console.error("super admin pin verify failed", details);
-      return json(
-        {
-          success: false,
-          error: "VERIFY_FAILED",
-          message: "No se ha podido validar el PIN",
-          details,
-        },
-        500,
-      );
+    if (limiter.blockedUntil) {
+      return json({
+        success: false,
+        error: "TOO_MANY_ATTEMPTS",
+        message: "Demasiados intentos. Espera unos minutos antes de volver a probar.",
+        retryAt: limiter.blockedUntil,
+      }, 429);
     }
 
-    const isValid = await verifyResponse.json();
-
+    const isValid = await verifyAdminPin(url, serviceRoleKey, resolvedOrganizationId, pin);
     if (!isValid) {
-      return json(
-        {
-          success: false,
-          error: "INVALID_PIN",
-          message: "PIN incorrecto",
-        },
-        401,
+      const nextFailureCount = limiter.failureCount + 1;
+      const blockedUntil = nextFailureCount >= ADMIN_FAILURE_LIMIT
+        ? new Date(Date.now() + ADMIN_BLOCK_MINUTES * 60 * 1000).toISOString()
+        : null;
+
+      await recordAuthAttempt(
+        url,
+        serviceRoleKey,
+        resolvedOrganizationId,
+        "admin",
+        ipAddress,
+        false,
+        nextFailureCount,
+        blockedUntil,
       );
+
+      await logAudit(url, serviceRoleKey, {
+        organizationId: resolvedOrganizationId,
+        action: "admin_login_failed",
+        actorRole: "system",
+        metadata: {
+          ipAddress,
+          blockedUntil,
+        },
+      });
+
+      return json({
+        success: false,
+        error: "INVALID_PIN",
+        message: "PIN incorrecto",
+      }, 401);
     }
+
+    const issued = await issueSession(url, serviceRoleKey, {
+      organizationId: resolvedOrganizationId,
+      role: "org_admin",
+      employeeId: null,
+      idleTimeoutSeconds: ADMIN_IDLE_TIMEOUT_SECONDS,
+      absoluteTimeoutSeconds: ADMIN_ABSOLUTE_TIMEOUT_SECONDS,
+      ipAddress,
+      userAgent,
+    });
+
+    await recordAuthAttempt(url, serviceRoleKey, resolvedOrganizationId, "admin", ipAddress, true, 0, null);
+    await logAudit(url, serviceRoleKey, {
+      organizationId: resolvedOrganizationId,
+      actorSessionId: issued.session.id,
+      actorRole: "org_admin",
+      action: "admin_login_success",
+      metadata: {
+        ipAddress,
+      },
+    });
 
     return json({
       success: true,
       data: {
+        accessToken: issued.accessToken,
+        expiresAt: issued.expiresAt,
         role: "org_admin",
+        employeeId: null,
         employeeName: "Ajustes",
-        employeeCode: "SUPER_ADMIN",
-        employeeProfileId: null,
-        userId: null,
-        photoUrl: null,
         currentStatus: "unlocked",
         organizationId: resolvedOrganizationId,
-        orgSlug: resolvedOrgSlug,
       },
     });
   } catch (error) {
     console.error("kiosk-admin-verify exception", error);
-    return json(
-      {
-        success: false,
-        error: "INTERNAL_ERROR",
-        message: "Error interno al validar el PIN",
-        details: error instanceof Error ? error.message : String(error),
-      },
-      500,
-    );
+    return json({
+      success: false,
+      error: "INTERNAL_ERROR",
+      message: "Error interno al validar el PIN",
+    }, 500);
   }
 });
-
-function json(payload: unknown, status = 200): Response {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: corsHeaders,
-  });
-}

@@ -5,14 +5,12 @@ var Pin = (function () {
     'use strict';
 
     var MAX_PIN_LENGTH = 8;
-
     var pin = '';
     var isVerifying = false;
     var mode = 'admin';
     var employeeTarget = 'screen-clock';
 
-    var dots, errorEl, loadingEl, keypad, submitBtn;
-    var promptEl;
+    var dots, errorEl, loadingEl, keypad, submitBtn, promptEl;
 
     function init() {
         dots = document.querySelectorAll('.pin-dot');
@@ -27,38 +25,30 @@ var Pin = (function () {
             if (!btn || isVerifying) return;
 
             var key = btn.dataset.key;
-            if (key === 'clear') {
-                clearPin();
-            } else if (key && pin.length < MAX_PIN_LENGTH) {
-                addDigit(key);
-            }
+            if (key === 'clear') clearPin();
+            else if (key && pin.length < MAX_PIN_LENGTH) addDigit(key);
         });
 
         submitBtn.addEventListener('click', verify);
 
-        // Keyboard support
         document.addEventListener('keydown', function (e) {
             if (!App.isScreen('screen-pin') || isVerifying) return;
-            if (e.key >= '0' && e.key <= '9') {
-                addDigit(e.key);
-            } else if (e.key === 'Backspace') {
-                if (pin.length > 0) {
-                    pin = pin.slice(0, -1);
-                    updateDots();
-                }
+            if (e.key >= '0' && e.key <= '9') addDigit(e.key);
+            else if (e.key === 'Backspace' && pin.length > 0) {
+                pin = pin.slice(0, -1);
+                updateDots();
             } else if (e.key === 'Enter') {
                 verify();
             }
         });
 
-        // Clock
         updateClock();
         setInterval(updateClock, 1000);
     }
 
-    function addDigit(d) {
+    function addDigit(digit) {
         if (pin.length >= MAX_PIN_LENGTH) return;
-        pin += d;
+        pin += digit;
         updateDots();
         hideError();
     }
@@ -70,13 +60,13 @@ var Pin = (function () {
     }
 
     function updateDots() {
-        dots.forEach(function (dot, i) {
-            dot.classList.toggle('filled', i < pin.length);
+        dots.forEach(function (dot, index) {
+            dot.classList.toggle('filled', index < pin.length);
         });
     }
 
-    function showError(msg) {
-        errorEl.textContent = msg;
+    function showError(message) {
+        errorEl.textContent = message;
         errorEl.classList.remove('hidden');
     }
 
@@ -99,51 +89,34 @@ var Pin = (function () {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Verificando...';
 
-        console.log('[PIN] Enviando verify, modo:', mode, 'pin:', pin);
-        var request = mode === 'admin'
-            ? Api.verifyAdminPin(pin)
-            : Api.verifyPin(pin);
-
+        var request = mode === 'admin' ? Api.verifyAdminPin(pin) : Api.verifyPin(pin);
         request.then(function (res) {
-            console.log('[PIN] Respuesta:', JSON.stringify(res));
             isVerifying = false;
             loadingEl.classList.add('hidden');
             keypad.style.opacity = '1';
             keypad.style.pointerEvents = 'auto';
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Acceder';
+            submitBtn.textContent = mode === 'employee' ? 'Entrar' : 'Acceder';
 
-            if (res && res.success && res.data) {
-                if (mode === 'admin' && res.data.role !== 'admin' && res.data.role !== 'org_admin') {
-                    showError('Ese PIN no tiene acceso a ajustes');
-                    clearPin();
-                    return;
-                }
-
-                console.log('[PIN] Acceso OK, modo:', mode);
-                App.setSession({
-                    pin: pin,
-                    employeeProfileId: res.data.employeeProfileId,
-                    userId: res.data.userId,
-                    employeeCode: res.data.employeeCode,
-                    employeeName: res.data.employeeName,
-                    photoUrl: res.data.photoUrl,
-                    currentStatus: res.data.currentStatus,
-                    role: res.data.role || 'respondent'
-                });
+            if (!(res && res.success && res.data)) {
+                showError((res && res.message) || 'PIN incorrecto');
                 clearPin();
-
-                if (mode === 'admin') {
-                    App.navigate('screen-admin');
-                } else if (mode === 'employee') {
-                    App.navigate(employeeTarget);
-                } else {
-                    App.navigate('screen-menu');
-                }
-            } else {
-                showError('PIN incorrecto');
-                clearPin();
+                return;
             }
+
+            App.setSession({
+                accessToken: res.data.accessToken,
+                expiresAt: res.data.expiresAt,
+                role: res.data.role || 'respondent',
+                employeeId: res.data.employeeId || null,
+                employeeName: res.data.employeeName || '',
+                organizationId: res.data.organizationId || null,
+                currentStatus: res.data.currentStatus || 'not_checked_in'
+            });
+
+            clearPin();
+            if (mode === 'admin') App.navigate('screen-admin');
+            else App.navigate(employeeTarget || 'screen-clock');
         });
     }
 
@@ -158,24 +131,16 @@ var Pin = (function () {
     function openForAdmin() {
         mode = 'admin';
         clearPin();
-        hideError();
         if (promptEl) promptEl.textContent = 'Introduce el PIN de ajustes';
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Acceder';
-        }
+        if (submitBtn) submitBtn.textContent = 'Acceder';
     }
 
     function openForEmployee(targetScreen) {
         mode = 'employee';
         employeeTarget = targetScreen || 'screen-clock';
         clearPin();
-        hideError();
         if (promptEl) promptEl.textContent = 'Introduce tu PIN de empleado';
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Fichar';
-        }
+        if (submitBtn) submitBtn.textContent = 'Entrar';
     }
 
     return {

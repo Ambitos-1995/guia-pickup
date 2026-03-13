@@ -6,3 +6,9 @@ verify_jwt = false
 
 [functions.kiosk-clock]
 verify_jwt = false
+
+[functions.kiosk-schedule]
+verify_jwt = false
+
+[functions.kiosk-payment]
+verify_jwt = false

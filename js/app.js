@@ -10,7 +10,6 @@ var App = (function () {
     var modalCallback = null;
 
     function init() {
-        // Init all modules
         Pin.init();
         Schedule.init();
         Clock.init();
@@ -19,21 +18,32 @@ var App = (function () {
         Admin.init();
         Install.init();
 
-        // Menu card navigation
         document.getElementById('menu-grid').addEventListener('click', function (e) {
             var card = e.target.closest('.menu-card');
             if (!card) return;
 
-            // Admin always requires PIN
             if (card.id === 'card-admin') {
-                Pin.openForAdmin();
-                navigate('screen-pin');
+                if (hasAdminAccess()) {
+                    navigate('screen-admin');
+                } else {
+                    Pin.openForAdmin();
+                    navigate('screen-pin');
+                }
                 return;
             }
 
-            // Fichar always requires employee PIN
             if (card.id === 'card-fichar') {
-                Pin.openForEmployee('screen-clock');
+                if (hasEmployeeAccess()) {
+                    navigate('screen-clock');
+                } else {
+                    Pin.openForEmployee('screen-clock');
+                    navigate('screen-pin');
+                }
+                return;
+            }
+
+            if (card.id === 'card-payment' && !hasEmployeeAccess()) {
+                Pin.openForEmployee('screen-payment');
                 navigate('screen-pin');
                 return;
             }
@@ -46,17 +56,14 @@ var App = (function () {
             navigate('screen-menu');
         });
 
-        // All back buttons
         document.querySelectorAll('.back-btn[data-back]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 navigate(btn.dataset.back);
             });
         });
 
-        // Logout
         document.getElementById('logout-btn').addEventListener('click', logout);
 
-        // Modal
         document.getElementById('modal-cancel').addEventListener('click', closeModal);
         document.getElementById('modal-ok').addEventListener('click', function () {
             var cb = modalCallback;
@@ -67,32 +74,23 @@ var App = (function () {
         navigate('screen-menu');
     }
 
-    // ---- NAVIGATION ----
-
     function navigate(screenId) {
-        // Leave current screen — clear session when leaving admin or clock
-        if (currentScreen === 'screen-admin') {
-            session = null;
-            Pin.clearPin();
-        }
         if (currentScreen === 'screen-clock') {
             Clock.hide();
-            session = null;
-            Pin.clearPin();
         }
         if (currentScreen === 'screen-menu' && menuClockTimer) {
             clearInterval(menuClockTimer);
             menuClockTimer = null;
         }
 
-        // Switch screens
-        var screens = document.querySelectorAll('.screen');
-        screens.forEach(function (s) { s.classList.remove('active'); });
+        document.querySelectorAll('.screen').forEach(function (screen) {
+            screen.classList.remove('active');
+        });
+
         var target = document.getElementById(screenId);
         if (target) target.classList.add('active');
         currentScreen = screenId;
 
-        // Enter new screen
         if (screenId === 'screen-menu') showMenu();
         if (screenId === 'screen-schedule') Schedule.show();
         if (screenId === 'screen-clock') Clock.show();
@@ -105,25 +103,45 @@ var App = (function () {
         return currentScreen === screenId;
     }
 
-    // ---- SESSION ----
-
     function setSession(data) {
         session = data;
+        showMenu();
+    }
+
+    function clearSession() {
+        session = null;
+        Pin.clearPin();
     }
 
     function getSession() {
+        if (!session) return null;
+
+        if (session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now()) {
+            clearSession();
+            if (currentScreen !== 'screen-menu' && currentScreen !== 'screen-pin') {
+                navigate('screen-menu');
+            }
+            return null;
+        }
+
         return session;
     }
 
     function logout() {
-        session = null;
-        Pin.clearPin();
+        clearSession();
         navigate('screen-menu');
     }
 
-    // ---- MENU ----
+    function handleAuthFailure(message) {
+        clearSession();
+        navigate('screen-menu');
+        if (message) {
+            confirm('Sesion caducada', message, null);
+        }
+    }
 
     function showMenu() {
+        var activeSession = getSession();
         var greetingEl = document.getElementById('greeting');
         var statusEl = document.getElementById('fichar-status');
         var ficharCard = document.getElementById('card-fichar');
@@ -131,15 +149,38 @@ var App = (function () {
         var adminCard = document.getElementById('card-admin');
         var logoutBtn = document.getElementById('logout-btn');
 
-        // Public menu — Fichar always visible, requires PIN on tap
-        greetingEl.textContent = 'Panel publico';
-        statusEl.textContent = '';
-        ficharCard.classList.remove('hidden');
-        paymentCard.classList.add('hidden');
-        adminCard.classList.remove('hidden');
-        logoutBtn.classList.add('hidden');
+        if (activeSession && activeSession.role === 'respondent') {
+            greetingEl.textContent = activeSession.employeeName || 'Sesion activa';
+            statusEl.textContent = activeSession.currentStatus === 'checked_in' ? 'Entrada registrada' : '';
+            ficharCard.classList.remove('hidden');
+            paymentCard.classList.remove('hidden');
+            adminCard.classList.remove('hidden');
+            logoutBtn.classList.remove('hidden');
+        } else if (activeSession && activeSession.role === 'org_admin') {
+            greetingEl.textContent = 'Ajustes';
+            statusEl.textContent = '';
+            ficharCard.classList.remove('hidden');
+            paymentCard.classList.add('hidden');
+            adminCard.classList.remove('hidden');
+            logoutBtn.classList.remove('hidden');
+        } else {
+            greetingEl.textContent = 'Panel publico';
+            statusEl.textContent = '';
+            ficharCard.classList.remove('hidden');
+            paymentCard.classList.add('hidden');
+            adminCard.classList.remove('hidden');
+            logoutBtn.classList.add('hidden');
+        }
 
-        // Menu clock
+        if (currentScreen !== 'screen-menu') {
+            if (menuClockTimer) {
+                clearInterval(menuClockTimer);
+                menuClockTimer = null;
+            }
+            return;
+        }
+
+        if (menuClockTimer) clearInterval(menuClockTimer);
         updateMenuClock();
         menuClockTimer = setInterval(updateMenuClock, 1000);
     }
@@ -149,21 +190,15 @@ var App = (function () {
         if (el) el.textContent = Utils.formatTime(new Date());
     }
 
-    // ---- MODAL ----
-
     function confirm(title, body, onOk) {
         var modal = document.getElementById('modal-confirm');
         document.getElementById('modal-title').textContent = title;
         document.getElementById('modal-body').textContent = body;
         modalCallback = onOk;
 
-        // Hide cancel button if no callback (info-only modal)
         var cancelBtn = document.getElementById('modal-cancel');
-        if (onOk) {
-            cancelBtn.classList.remove('hidden');
-        } else {
-            cancelBtn.classList.add('hidden');
-        }
+        if (onOk) cancelBtn.classList.remove('hidden');
+        else cancelBtn.classList.add('hidden');
 
         modal.classList.remove('hidden');
     }
@@ -174,10 +209,14 @@ var App = (function () {
     }
 
     function hasAdminAccess() {
-        return !!(session && (session.role === 'admin' || session.role === 'org_admin'));
+        var activeSession = getSession();
+        return !!(activeSession && activeSession.role === 'org_admin');
     }
 
-    // ---- BOOTSTRAP ----
+    function hasEmployeeAccess() {
+        var activeSession = getSession();
+        return !!(activeSession && activeSession.role === 'respondent');
+    }
 
     document.addEventListener('DOMContentLoaded', function () {
         init();
@@ -188,7 +227,12 @@ var App = (function () {
         isScreen: isScreen,
         setSession: setSession,
         getSession: getSession,
+        clearSession: clearSession,
+        logout: logout,
         hasAdminAccess: hasAdminAccess,
-        confirm: confirm
+        hasEmployeeAccess: hasEmployeeAccess,
+        handleAuthFailure: handleAuthFailure,
+        confirm: confirm,
+        showMenu: showMenu
     };
 })();

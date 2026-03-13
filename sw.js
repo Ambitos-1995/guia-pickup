@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pickup-tmg-v21';
+var CACHE_NAME = 'pickup-tmg-v22';
 var FILES_TO_CACHE = [
     './',
     './index.html',
@@ -14,6 +14,7 @@ var FILES_TO_CACHE = [
     './js/payment.js',
     './js/admin.js',
     './js/install.js',
+    './js/sw-register.js',
     './js/app.js',
     './vendor/webawesome/dist-cdn/styles/webawesome.css',
     './vendor/webawesome/dist-cdn/styles/layers.css',
@@ -26,6 +27,7 @@ var FILES_TO_CACHE = [
     './icons/icon-192.png',
     './icons/icon-512.png',
     './icons/icon.svg',
+    './fonts/Lexend-Variable.ttf',
     './img/fotos con circulos/1.png',
     './img/fotos con circulos/2.png',
     './img/fotos con circulos/3.png',

@@ -24,9 +24,6 @@
 
     <link rel="stylesheet" href="vendor/webawesome/dist-cdn/styles/webawesome.css">
     <link rel="stylesheet" href="css/styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
@@ -175,6 +172,10 @@
                     </button>
                 </div>
 
+                <p class="schedule-context" id="schedule-context">
+                    Consulta el horario. Si inicias sesion como empleado podras reservar o liberar tus franjas.
+                </p>
+
                 <div class="schedule-board">
                     <div class="schedule-grid" id="schedule-grid">
                         <!-- Populated by JS -->
@@ -317,6 +318,7 @@
                     </div>
                 </div>
 
+                <p class="payment-status hidden" id="payment-status"></p>
                 <p class="payment-note" id="payment-note">Los pagos se calculan a final de mes.</p>
             </div>
         </div>
@@ -375,6 +377,7 @@
                                 <tr>
                                     <th>Empleado</th>
                                     <th>Horas</th>
+                                    <th>Estado</th>
                                     <th>Importe</th>
                                 </tr>
                             </thead>
@@ -440,8 +443,8 @@
                     <input type="text" id="edit-emp-surname" placeholder="Apellido">
                 </div>
                 <div class="form-row">
-                    <label for="edit-emp-pin">Nuevo PIN (4 cifras, dejar vacío para no cambiar)</label>
-                    <input type="text" id="edit-emp-pin" maxlength="4" inputmode="numeric" placeholder="••••" pattern="[0-9]{4}">
+                    <label for="edit-emp-pin">Nuevo PIN (4 cifras, dejar vacio para no cambiar)</label>
+                    <input type="text" id="edit-emp-pin" maxlength="4" inputmode="numeric" placeholder="1234" pattern="[0-9]{4}">
                 </div>
                 <div class="employee-form-feedback hidden" id="edit-emp-feedback"></div>
                 <div class="modal-actions">
@@ -451,21 +454,21 @@
             </div>
         </div>
 
-        <wa-dialog label="Gestionar turno" id="schedule-slot-dialog" class="schedule-slot-dialog" style="--width:min(92vw, 32rem);">
+        <wa-dialog label="Gestionar turno" id="schedule-slot-dialog" class="schedule-slot-dialog">
             <div class="slot-dialog-stack">
                 <div class="slot-dialog-badge" id="schedule-slot-mode">Turno</div>
                 <h3 class="slot-dialog-title" id="schedule-slot-title">Gestionar franja</h3>
                 <p class="slot-dialog-summary" id="schedule-slot-summary">--</p>
-                <p class="slot-dialog-body" id="schedule-slot-body">Introduce tu PIN para continuar.</p>
+                <p class="slot-dialog-body" id="schedule-slot-body">Inicia sesion para continuar.</p>
                 <wa-callout id="schedule-slot-feedback" variant="neutral" appearance="filled-outlined" class="hidden"></wa-callout>
                 <wa-input
                     id="schedule-slot-pin"
                     label="PIN"
-                    hint="Introduce tu PIN personal para asignarte o liberar la franja."
+                    hint="Solo hace falta si tu sesion de empleado no esta activa."
                     placeholder="4 cifras"
                     type="password"
                     inputmode="numeric"
-                    maxlength="8"
+                    maxlength="4"
                     size="large"
                     appearance="filled-outlined"
                     password-toggle
@@ -520,59 +523,6 @@
     <script src="js/admin.js"></script>
     <script src="js/install.js"></script>
     <script src="js/app.js"></script>
-
-    <!-- PWA Service Worker -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            var refreshing = false;
-            navigator.serviceWorker.addEventListener('controllerchange', function () {
-                if (refreshing) return;
-                refreshing = true;
-                window.location.reload();
-            });
-
-            window.addEventListener('load', function () {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(function (reg) {
-                        // Check for updates every 60s and on visibility change
-                        setInterval(function () { reg.update(); }, 60000);
-                        document.addEventListener('visibilitychange', function () {
-                            if (document.visibilityState === 'visible') reg.update();
-                        });
-
-                        // Show update button when new SW is waiting
-                        function onNewSW(sw) {
-                            if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-                                showUpdateButton(sw);
-                            }
-                        }
-
-                        // Check if there's already a waiting worker
-                        if (reg.waiting) {
-                            showUpdateButton(reg.waiting);
-                        }
-
-                        reg.addEventListener('updatefound', function () {
-                            var nw = reg.installing;
-                            nw.addEventListener('statechange', function () {
-                                onNewSW(nw);
-                            });
-                        });
-                    })
-                    .catch(function (err) { console.warn('SW error:', err); });
-            });
-        }
-
-        function showUpdateButton(waitingSW) {
-            var btn = document.getElementById('update-btn');
-            if (!btn) return;
-            btn.classList.remove('hidden');
-            btn.onclick = function () {
-                btn.textContent = 'Actualizando...';
-                btn.disabled = true;
-                waitingSW.postMessage({ type: 'SKIP_WAITING' });
-            };
-        }
-    </script>
+    <script src="js/sw-register.js"></script>
 </body>
 </html>

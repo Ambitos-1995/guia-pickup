@@ -3,6 +3,14 @@
    Warm Kiosk: Chunky, tactile, cognitively accessible
    ===================================================== */
 
+@font-face {
+    font-family: 'Lexend';
+    src: url('../fonts/Lexend-Variable.ttf') format('truetype');
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+}
+
 /* --- Reset & Variables --- */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -61,17 +69,17 @@ body {
     background: var(--bg);
     color: var(--text);
     line-height: 1.5;
-    overflow: hidden;
-    height: 100svh;
-    width: 100vw;
-    position: fixed;
-    top: 0;
-    left: 0;
+    min-height: 100dvh;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     touch-action: manipulation;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+}
+
+#app {
+    position: relative;
+    min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 
 @media (display-mode: standalone) {
@@ -89,6 +97,7 @@ body {
     transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    min-height: 100%;
 }
 
 .screen.active {
@@ -191,7 +200,7 @@ button:focus-visible {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 100svh;
+    min-height: 100dvh;
     padding: 24px;
     background: linear-gradient(170deg, var(--gray-900) 0%, #2d1b1c 100%);
     color: var(--white);
@@ -326,7 +335,7 @@ button:focus-visible {
 .menu-container {
     display: flex;
     flex-direction: column;
-    min-height: 100svh;
+    min-height: 100dvh;
     padding: 24px 20px;
     background: var(--bg);
 }
@@ -763,7 +772,7 @@ button:focus-visible {
     padding: 16px 20px;
     display: flex;
     flex-direction: column;
-    min-height: calc(100vh - 60px);
+    min-height: calc(100dvh - 60px);
 }
 
 .guia-progress {
@@ -966,11 +975,40 @@ button:focus-visible {
     color: var(--green-dark);
 }
 
+.payment-status {
+    margin-top: 18px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.payment-status-pending {
+    background: var(--gray-100);
+    color: var(--gray-600);
+}
+
+.payment-status-calculated {
+    background: var(--blue-light);
+    color: var(--blue-dark);
+}
+
+.payment-status-review {
+    background: var(--yellow-light);
+    color: var(--yellow-dark);
+}
+
+.payment-status-confirmed {
+    background: var(--green-light);
+    color: var(--green-dark);
+}
+
 .payment-note {
     text-align: center;
     font-size: 0.8rem;
     color: var(--gray-400);
-    margin-top: 24px;
+    margin-top: 14px;
 }
 
 /* =====================================================
@@ -1317,10 +1355,17 @@ body {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    padding: 18px 16px 24px;
+    padding: 16px 12px 22px;
     background:
         radial-gradient(circle at top right, rgba(227, 30, 36, 0.12), transparent 26%),
         linear-gradient(180deg, rgba(255,255,255,0.76) 0%, rgba(245,247,245,0.94) 100%);
+}
+
+.schedule-context {
+    padding: 0 4px;
+    color: var(--gray-600);
+    font-size: 0.88rem;
+    line-height: 1.45;
 }
 
 
@@ -1374,7 +1419,7 @@ body {
 .week-arrow:active { background: #f8fafc; }
 
 .schedule-board {
-    padding: 10px;
+    padding: 8px;
     border-radius: 30px;
     background: rgba(250,251,250,0.92);
     border: 1px solid rgba(17,24,39,0.08);
@@ -1384,8 +1429,8 @@ body {
 
 .schedule-grid {
     display: grid;
-    grid-template-columns: 52px repeat(5, minmax(0, 1fr));
-    gap: 6px;
+    grid-template-columns: 44px repeat(5, minmax(0, 1fr));
+    gap: 5px;
     padding: 0;
     flex: 1;
 }
@@ -1553,6 +1598,7 @@ body {
 .legend-empty { background: #e2e8f0; border: 1px solid rgba(148,163,184,0.3); }
 
 .admin-container {
+    width: 100%;
     padding: 0 0 24px;
 }
 
@@ -1569,6 +1615,7 @@ body {
 }
 
 .schedule-slot-dialog::part(panel) {
+    width: min(92vw, 32rem);
     border-radius: 28px;
 }
 
@@ -1615,22 +1662,56 @@ body {
 @media (min-width: 600px) {
     .pin-keypad { max-width: 360px; }
     .key-btn { font-size: 1.8rem; min-height: 72px; }
-    .menu-container { padding: 24px 32px; }
-    .clock-container { padding: 0 32px; }
-    .payment-container { padding: 0 32px; }
-    .guia-home, .guia-steps, .guia-complete { padding-left: 32px; padding-right: 32px; }
-    .schedule-shell { padding: 18px 24px 24px; }
-    .admin-container { padding: 0 32px; }
+    .menu-container { padding: 24px 20px; }
+    .clock-container { padding: 0 20px 24px; }
+    .payment-container { padding: 0 20px 24px; }
+    .guia-home, .guia-steps, .guia-complete { padding-left: 20px; padding-right: 20px; }
+    .schedule-shell { padding: 18px 18px 24px; }
+    .admin-container { padding: 0 20px 24px; }
 }
 
 /* Tablet portrait (768px+) */
 @media (min-width: 768px) {
+    .screen-header {
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+    .menu-container,
+    .clock-container,
+    .payment-container,
+    .admin-container {
+        width: 100%;
+        padding-left: 24px;
+        padding-right: 24px;
+    }
+    .guia-home, .guia-steps, .guia-complete {
+        width: 100%;
+        padding-left: 24px;
+        padding-right: 24px;
+    }
+    .schedule-shell {
+        width: 100%;
+        padding: 18px 24px 26px;
+    }
     .menu-grid {
         gap: 20px;
         grid-auto-rows: minmax(170px, auto);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .menu-card {
         padding: 28px 20px;
+    }
+    .schedule-board {
+        padding: 10px;
+        overflow-x: hidden;
+    }
+    .schedule-grid {
+        grid-template-columns: 46px repeat(5, minmax(0, 1fr));
+        gap: 6px;
+    }
+    .sched-cell {
+        min-height: 94px;
+        padding: 12px 10px;
     }
     .guia-grid {
         grid-template-columns: repeat(3, 1fr);
@@ -1646,15 +1727,57 @@ body {
     }
 }
 
-/* Large tablets and desktop (900px+) */
-@media (min-width: 900px) {
-    .sched-cell { min-height: 118px; }
-    .menu-container { max-width: 900px; margin: 0 auto; }
-    .clock-container { max-width: 900px; margin: 0 auto; }
-    .payment-container { max-width: 900px; margin: 0 auto; }
-    .guia-home, .guia-steps, .guia-complete { max-width: 900px; margin: 0 auto; }
-    .schedule-shell { max-width: 960px; margin: 0 auto; }
-    .admin-container { max-width: 900px; margin: 0 auto; }
+/* iPad / tablets grandes (834px+) */
+@media (min-width: 834px) {
+    .menu-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .payment-cards {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .pay-card-total {
+        grid-column: auto;
+    }
+    .schedule-grid {
+        grid-template-columns: 50px repeat(5, minmax(0, 1fr));
+    }
+}
+
+/* Tablet landscape / small desktop (1024px+) */
+@media (min-width: 1024px) {
+    .screen-header,
+    .menu-container,
+    .clock-container,
+    .payment-container,
+    .admin-container,
+    .guia-home,
+    .guia-steps,
+    .guia-complete,
+    .schedule-shell {
+        padding-left: 24px;
+        padding-right: 24px;
+    }
+    .sched-cell {
+        min-height: 108px;
+    }
+}
+
+/* Desktop amplio (1280px+) */
+@media (min-width: 1280px) {
+    .menu-container,
+    .clock-container,
+    .payment-container,
+    .admin-container,
+    .guia-home,
+    .guia-steps,
+    .guia-complete {
+        max-width: 1180px;
+        margin: 0 auto;
+    }
+    .schedule-shell {
+        max-width: 1240px;
+        margin: 0 auto;
+    }
 }
 
 

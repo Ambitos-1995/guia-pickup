@@ -1,17 +1,22 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
-};
+import {
+  authHeaders,
+  computeWorkedMinutes,
+  corsHeaders,
+  fetchJson,
+  getSupabaseConfig,
+  isoWeekToDate,
+  json,
+  logAudit,
+  requireSession,
+  resolveOrgId,
+  slotFallsInMonth,
+} from "../_shared/kiosk.ts";
 
 interface RequestBody {
   action?: string;
   orgSlug?: string;
-  adminPin?: string;
-  pin?: string;
   year?: number;
   month?: number;
   totalAmount?: number;
@@ -19,48 +24,63 @@ interface RequestBody {
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ success: false, message: "Method not allowed" }, 405);
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return json({ success: false, message: "Metodo no permitido" }, 405);
+  }
 
   try {
-    const body = (await req.json()) as RequestBody;
+    const body = await req.json() as RequestBody;
     const action = String(body.action || "").trim();
     const orgSlug = String(body.orgSlug || "").trim();
 
-    if (!orgSlug) return json({ success: false, message: "Falta la organizacion" }, 400);
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    if (!supabaseUrl || !serviceRoleKey) return json({ success: false, message: "Config error" }, 500);
-
-    const orgId = await resolveOrgId(supabaseUrl, serviceRoleKey, orgSlug);
-    if (!orgId) return json({ success: false, message: "Organizacion no encontrada" }, 404);
-
-    // Employee action — no admin required
-    if (action === "my-summary") {
-      return handleMySummary(supabaseUrl, serviceRoleKey, orgId, body);
+    if (!orgSlug) {
+      return json({ success: false, message: "Falta la organizacion" }, 400);
     }
 
-    // Admin actions
-    const adminPin = String(body.adminPin || "").trim();
-    const isAdmin = await verifyAdminPin(supabaseUrl, serviceRoleKey, orgId, adminPin);
-    if (!isAdmin) return json({ success: false, message: "PIN admin invalido" }, 401);
+    const { url, serviceRoleKey } = getSupabaseConfig();
+    const orgId = await resolveOrgId(url, serviceRoleKey, orgSlug);
+    if (!orgId) {
+      return json({ success: false, message: "Organizacion no encontrada" }, 404);
+    }
 
-    if (action === "set-amount") return handleSetAmount(supabaseUrl, serviceRoleKey, orgId, body);
-    if (action === "calculate") return handleCalculate(supabaseUrl, serviceRoleKey, orgId, body);
+    if (action === "my-summary") {
+      const auth = await requireSession(req, url, serviceRoleKey, ["respondent"]);
+      if (auth instanceof Response) return auth;
+      if (auth.session.organization_id !== orgId || !auth.session.employee_id) {
+        return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
+      }
+      return await handleMySummary(url, serviceRoleKey, auth.session, body);
+    }
+
+    const auth = await requireSession(req, url, serviceRoleKey, ["org_admin"]);
+    if (auth instanceof Response) return auth;
+    if (auth.session.organization_id !== orgId) {
+      return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
+    }
+
+    if (action === "set-amount") {
+      return await handleSetAmount(url, serviceRoleKey, auth.session.id, auth.session.organization_id, body);
+    }
+
+    if (action === "calculate") {
+      return await handleCalculate(url, serviceRoleKey, auth.session.id, auth.session.organization_id, body);
+    }
 
     return json({ success: false, message: "Accion no valida" }, 400);
   } catch (error) {
     console.error("kiosk-payment error", error);
-    return json({ success: false, message: "Error interno", details: error instanceof Error ? error.message : String(error) }, 500);
+    return json({ success: false, message: "Error interno" }, 500);
   }
 });
-
-// ---- SET AMOUNT (admin) ----
 
 async function handleSetAmount(
   url: string,
   key: string,
+  sessionId: string,
   orgId: string,
   body: RequestBody,
 ): Promise<Response> {
@@ -72,36 +92,49 @@ async function handleSetAmount(
   if (!year || !month || month < 1 || month > 12) {
     return json({ success: false, message: "Ano o mes invalido" }, 400);
   }
-  if (isNaN(totalAmount) || totalAmount < 0) {
+
+  if (Number.isNaN(totalAmount) || totalAmount < 0) {
     return json({ success: false, message: "Importe invalido" }, 400);
   }
 
-  // UPSERT via POST with on-conflict
-  const res = await fetch(`${url}/rest/v1/kiosk_payment_months`, {
-    method: "POST",
-    headers: {
-      ...authHeaders(key),
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=representation",
+  const save = await fetchJson<Array<{ id: string; total_amount: string; notes: string }>>(
+    `${url}/rest/v1/kiosk_payment_months`,
+    {
+      method: "POST",
+      headers: {
+        ...authHeaders(key),
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify({
+        organization_id: orgId,
+        year,
+        month,
+        total_amount: totalAmount,
+        notes,
+      }),
     },
-    body: JSON.stringify({ organization_id: orgId, year, month, total_amount: totalAmount, notes }),
-  });
+  );
 
-  if (!res.ok) {
-    const details = await res.text();
-    console.error("set-amount failed", details);
+  if (!save.ok || !save.data[0]) {
     return json({ success: false, message: "Error al guardar el importe" }, 500);
   }
 
-  const rows = await res.json();
-  return json({ success: true, data: Array.isArray(rows) ? rows[0] : rows });
-}
+  await logAudit(url, key, {
+    organizationId: orgId,
+    actorSessionId: sessionId,
+    actorRole: "org_admin",
+    action: "payment_amount_saved",
+    metadata: { year, month, totalAmount },
+  });
 
-// ---- CALCULATE (admin) ----
+  return json({ success: true, data: save.data[0] });
+}
 
 async function handleCalculate(
   url: string,
   key: string,
+  sessionId: string,
   orgId: string,
   body: RequestBody,
 ): Promise<Response> {
@@ -112,24 +145,19 @@ async function handleCalculate(
     return json({ success: false, message: "Ano o mes invalido" }, 400);
   }
 
-  // Get saved amount for this month
-  const pmRes = await fetch(
-    `${url}/rest/v1/kiosk_payment_months?organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}&limit=1`,
+  const amountRes = await fetchJson<Array<{ total_amount: string }>>(
+    `${url}/rest/v1/kiosk_payment_months?select=total_amount&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}&limit=1`,
     { headers: authHeaders(key) },
   );
-  if (!pmRes.ok) return json({ success: false, message: "Error al obtener el importe" }, 500);
-  const pms = (await pmRes.json()) as Array<{ total_amount: string }>;
-  if (pms.length === 0) return json({ success: false, message: "No hay importe configurado para este mes" }, 404);
-  const totalAmount = Number(pms[0].total_amount);
 
-  // Get all slots for surrounding years (to handle week/month boundary)
-  const slotsRes = await fetch(
-    `${url}/rest/v1/kiosk_schedule_slots?select=year,week,day_of_week,start_time,end_time,employee_id,kiosk_employees(id,nombre,apellido)&organization_id=eq.${orgId}&year=in.(${year - 1},${year},${year + 1})`,
-    { headers: authHeaders(key) },
-  );
-  if (!slotsRes.ok) return json({ success: false, message: "Error al obtener turnos" }, 500);
+  const paymentMonth = amountRes.ok ? amountRes.data[0] : null;
+  if (!paymentMonth) {
+    return json({ success: false, message: "No hay importe configurado para este mes" }, 404);
+  }
 
-  const allSlots = (await slotsRes.json()) as Array<{
+  const totalAmount = Number(paymentMonth.total_amount);
+  const slotsRes = await fetchJson<Array<{
+    id: string;
     year: number;
     week: number;
     day_of_week: number;
@@ -137,181 +165,271 @@ async function handleCalculate(
     end_time: string;
     employee_id: string | null;
     kiosk_employees: { id: string; nombre: string; apellido: string } | null;
-  }>;
-
-  // Filter slots to those falling in the target month
-  const monthSlots = allSlots.filter((s) =>
-    slotFallsInMonth(s.year, s.week, s.day_of_week, year, month)
+  }>>(
+    `${url}/rest/v1/kiosk_schedule_slots?select=id,year,week,day_of_week,start_time,end_time,employee_id,kiosk_employees(id,nombre,apellido)&organization_id=eq.${orgId}&year=in.(${year - 1},${year},${year + 1})`,
+    { headers: authHeaders(key) },
   );
 
-  // Total hours across ALL slots (assigned + free)
-  let totalHours = 0;
-  for (const s of monthSlots) {
-    totalHours += slotHours(s.start_time, s.end_time);
+  if (!slotsRes.ok) {
+    return json({ success: false, message: "Error al obtener los turnos del mes" }, 500);
   }
 
-  const ratePerHour = totalHours > 0 ? totalAmount / totalHours : 0;
+  const monthSlots = slotsRes.data.filter((slot) => slotFallsInMonth(slot.year, slot.week, slot.day_of_week, year, month));
+  const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
+  const monthEnd = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
 
-  // Group assigned slots by employee
-  const byEmployee = new Map<string, { name: string; hours: number }>();
-  for (const s of monthSlots) {
-    if (!s.employee_id) continue;
-    const emp = s.kiosk_employees;
-    const name = emp ? `${emp.nombre} ${emp.apellido}` : s.employee_id;
-    const hours = slotHours(s.start_time, s.end_time);
-    const existing = byEmployee.get(s.employee_id);
-    if (existing) {
-      existing.hours += hours;
-    } else {
-      byEmployee.set(s.employee_id, { name, hours });
+  const attendanceRes = await fetchJson<Array<{
+    employee_id: string;
+    slot_id: string | null;
+    recorded_at: string;
+    client_date: string;
+    action: string;
+  }>>(
+    `${url}/rest/v1/kiosk_attendance?select=employee_id,slot_id,recorded_at,client_date,action&organization_id=eq.${orgId}&client_date=gte.${monthStart}&client_date=lte.${monthEnd}&action=eq.check_in`,
+    { headers: authHeaders(key) },
+  );
+
+  if (!attendanceRes.ok) {
+    return json({ success: false, message: "Error al obtener los fichajes del mes" }, 500);
+  }
+
+  const slotMap = new Map(monthSlots.map((slot) => [slot.id, slot]));
+  const attendanceBySlot = new Map<string, Array<{ employee_id: string; recorded_at: string }>>();
+  const anomalies = new Map<string, string[]>();
+  const names = new Map<string, string>();
+
+  for (const slot of monthSlots) {
+    if (slot.employee_id && slot.kiosk_employees) {
+      names.set(slot.employee_id, `${slot.kiosk_employees.nombre} ${slot.kiosk_employees.apellido}`.trim());
     }
   }
 
-  const calculations = Array.from(byEmployee.entries()).map(([id, e]) => ({
-    employee_id: id,
-    employee_name: e.name,
-    hours_worked: round2(e.hours),
-    amount_earned: round2(e.hours * ratePerHour),
+  for (const row of attendanceRes.data) {
+    if (!row.slot_id) {
+      pushAnomaly(anomalies, row.employee_id, "Fichaje sin franja asociada");
+      continue;
+    }
+
+    const slot = slotMap.get(row.slot_id);
+    if (!slot) {
+      pushAnomaly(anomalies, row.employee_id, "Fichaje fuera del calendario conciliable");
+      continue;
+    }
+
+    if (!slot.employee_id || slot.employee_id !== row.employee_id) {
+      pushAnomaly(anomalies, row.employee_id, "Fichaje con franja asignada a otra persona");
+      continue;
+    }
+
+    const list = attendanceBySlot.get(row.slot_id) || [];
+    list.push({ employee_id: row.employee_id, recorded_at: row.recorded_at });
+    attendanceBySlot.set(row.slot_id, list);
+  }
+
+  const perEmployee = new Map<string, { workedMinutes: number; slotCount: number }>();
+  for (const slot of monthSlots) {
+    if (!slot.employee_id) continue;
+
+    const rows = attendanceBySlot.get(slot.id) || [];
+    if (rows.length === 0) continue;
+    if (rows.length > 1) {
+      pushAnomaly(anomalies, slot.employee_id, "Mas de un fichaje para la misma franja");
+      continue;
+    }
+
+    const slotDate = isoWeekToDate(slot.year, slot.week, slot.day_of_week);
+    const workedMinutes = computeWorkedMinutes(slotDate, slot.start_time, slot.end_time, rows[0].recorded_at);
+    if (workedMinutes <= 0) {
+      pushAnomaly(anomalies, slot.employee_id, "Fichaje fuera de la ventana valida del turno");
+      continue;
+    }
+
+    const current = perEmployee.get(slot.employee_id) || { workedMinutes: 0, slotCount: 0 };
+    current.workedMinutes += workedMinutes;
+    current.slotCount += 1;
+    perEmployee.set(slot.employee_id, current);
+  }
+
+  const validatedMinutes = Array.from(perEmployee.values()).reduce((sum, item) => sum + item.workedMinutes, 0);
+  const validatedHours = validatedMinutes / 60;
+  const hourlyRate = validatedHours > 0 ? totalAmount / validatedHours : 0;
+
+  const affectedEmployeeIds = new Set<string>([
+    ...Array.from(perEmployee.keys()),
+    ...Array.from(anomalies.keys()),
+  ]);
+
+  const settlementRows = Array.from(affectedEmployeeIds).map((employeeId) => {
+    const entry = perEmployee.get(employeeId) || { workedMinutes: 0, slotCount: 0 };
+    const anomalyNotes = anomalies.get(employeeId) || [];
+    const hasAnomalies = anomalyNotes.length > 0;
+    const status = hasAnomalies
+      ? "review_required"
+      : entry.workedMinutes > 0
+      ? "calculated"
+      : "pending";
+    const hoursWorked = round2(entry.workedMinutes / 60);
+    const amountEarned = status === "calculated" ? round2(hoursWorked * hourlyRate) : 0;
+
+    return {
+      organization_id: orgId,
+      employee_id: employeeId,
+      year,
+      month,
+      status,
+      hours_worked: hoursWorked,
+      hourly_rate: status === "calculated" ? round4(hourlyRate) : 0,
+      amount_earned: amountEarned,
+      worked_minutes: entry.workedMinutes,
+      slot_count: entry.slotCount,
+      employee_name_snapshot: names.get(employeeId) || "",
+      notes: anomalyNotes.join(" | "),
+      meta: { anomalies: anomalyNotes },
+    };
+  });
+
+  if (settlementRows.length > 0) {
+    const insert = await fetch(
+      `${url}/rest/v1/kiosk_payment_settlements`,
+      {
+        method: "POST",
+        headers: {
+          ...authHeaders(key),
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates",
+        },
+        body: JSON.stringify(settlementRows),
+      },
+    );
+
+    if (!insert.ok) {
+      return json({ success: false, message: "Error al guardar las liquidaciones" }, 500);
+    }
+    const employeeIds = settlementRows.map((row) => row.employee_id);
+    await fetch(
+      `${url}/rest/v1/kiosk_payment_settlements?organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}&employee_id=not.in.(${employeeIds.join(",")})`,
+      {
+        method: "DELETE",
+        headers: authHeaders(key),
+      },
+    );
+  } else {
+    await fetch(
+      `${url}/rest/v1/kiosk_payment_settlements?organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}`,
+      {
+        method: "DELETE",
+        headers: authHeaders(key),
+      },
+    );
+  }
+
+  const calculations = settlementRows.map((row) => ({
+    employee_id: row.employee_id,
+    employee_name: row.employee_name_snapshot || row.employee_id,
+    hours_worked: row.hours_worked,
+    amount_earned: row.amount_earned,
+    status: row.status,
   }));
 
-  const assignedHours = calculations.reduce((s, c) => s + c.hours_worked, 0);
-  const totalPaid = calculations.reduce((s, c) => s + c.amount_earned, 0);
-  const freeHours = round2(totalHours - assignedHours);
+  const totalPaid = round2(settlementRows.reduce((sum, row) => sum + row.amount_earned, 0));
+  const reviewCount = settlementRows.filter((row) => row.status === "review_required").length;
+
+  await logAudit(url, key, {
+    organizationId: orgId,
+    actorSessionId: sessionId,
+    actorRole: "org_admin",
+    action: "payments_calculated",
+    metadata: { year, month, reviewCount, totalPaid },
+  });
 
   return json({
     success: true,
     data: {
-      total_seur_amount: totalAmount,
-      total_slot_hours: round2(totalHours),
-      assigned_hours: round2(assignedHours),
-      free_hours: freeHours,
-      rate_per_hour: round2(ratePerHour),
-      total_paid: round2(totalPaid),
+      total_seur_amount: round2(totalAmount),
+      total_validated_hours: round2(validatedHours),
+      rate_per_hour: round2(hourlyRate),
+      total_paid: totalPaid,
       org_keeps: round2(totalAmount - totalPaid),
+      review_required_count: reviewCount,
       calculations,
     },
   });
 }
 
-// ---- MY SUMMARY (employee) ----
-
 async function handleMySummary(
   url: string,
   key: string,
-  orgId: string,
+  session: { organization_id: string; employee_id: string },
   body: RequestBody,
 ): Promise<Response> {
-  const pin = String(body.pin || "").trim();
   const year = Number(body.year);
   const month = Number(body.month);
 
-  if (!/^[0-9]{4}$/.test(pin)) return json({ success: false, message: "PIN invalido" }, 400);
-  if (!year || !month) return json({ success: false, message: "Falta ano o mes" }, 400);
+  if (!year || !month || month < 1 || month > 12) {
+    return json({ success: false, message: "Falta ano o mes" }, 400);
+  }
 
-  // Verify employee
-  const empRes = await fetch(
-    `${url}/rest/v1/kiosk_employees?select=id,nombre,apellido&organization_id=eq.${orgId}&pin=eq.${encodeURIComponent(pin)}&attendance_enabled=eq.true&limit=1`,
+  const employeeRes = await fetchJson<Array<{ id: string; nombre: string; apellido: string }>>(
+    `${url}/rest/v1/kiosk_employees?select=id,nombre,apellido&id=eq.${session.employee_id}&organization_id=eq.${session.organization_id}&limit=1`,
     { headers: authHeaders(key) },
   );
-  if (!empRes.ok) return json({ success: false, message: "Error al verificar" }, 500);
-  const emps = (await empRes.json()) as Array<{ id: string; nombre: string; apellido: string }>;
-  if (emps.length === 0) return json({ success: false, message: "PIN incorrecto" }, 401);
-  const emp = emps[0];
 
-  // Get payment amount
-  const pmRes = await fetch(
-    `${url}/rest/v1/kiosk_payment_months?organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}&limit=1`,
+  const employee = employeeRes.ok ? employeeRes.data[0] : null;
+  if (!employee) {
+    return json({ success: false, message: "Empleado no encontrado" }, 404);
+  }
+
+  const settlementRes = await fetchJson<Array<{
+    hours_worked: number;
+    hourly_rate: number;
+    amount_earned: number;
+    status: "pending" | "calculated" | "review_required" | "confirmed";
+    notes: string;
+  }>>(
+    `${url}/rest/v1/kiosk_payment_settlements?select=hours_worked,hourly_rate,amount_earned,status,notes&organization_id=eq.${session.organization_id}&employee_id=eq.${session.employee_id}&year=eq.${year}&month=eq.${month}&limit=1`,
     { headers: authHeaders(key) },
   );
-  const pms = pmRes.ok ? (await pmRes.json()) as Array<{ total_amount: string }> : [];
-  const totalAmount = pms.length > 0 ? Number(pms[0].total_amount) : 0;
 
-  // Get all slots for the month
-  const slotsRes = await fetch(
-    `${url}/rest/v1/kiosk_schedule_slots?select=year,week,day_of_week,start_time,end_time,employee_id&organization_id=eq.${orgId}&year=in.(${year - 1},${year},${year + 1})`,
-    { headers: authHeaders(key) },
-  );
-  const allSlots = slotsRes.ok
-    ? (await slotsRes.json()) as Array<{ year: number; week: number; day_of_week: number; start_time: string; end_time: string; employee_id: string | null }>
-    : [];
-
-  const monthSlots = allSlots.filter((s) => slotFallsInMonth(s.year, s.week, s.day_of_week, year, month));
-
-  const totalHours = monthSlots.reduce((s, slot) => s + slotHours(slot.start_time, slot.end_time), 0);
-  const myHours = monthSlots
-    .filter((s) => s.employee_id === emp.id)
-    .reduce((s, slot) => s + slotHours(slot.start_time, slot.end_time), 0);
-
-  const ratePerHour = totalHours > 0 ? totalAmount / totalHours : 0;
-  const amountEarned = round2(myHours * ratePerHour);
+  const settlement = settlementRes.ok ? settlementRes.data[0] : null;
+  if (!settlement) {
+    return json({
+      success: true,
+      data: {
+        employee_name: `${employee.nombre} ${employee.apellido}`.trim(),
+        hours_worked: 0,
+        hourly_rate: 0,
+        amount_earned: 0,
+        status: "pending",
+        notes: "",
+      },
+    });
+  }
 
   return json({
     success: true,
     data: {
-      employee_name: emp.nombre + " " + emp.apellido,
-      hours_worked: round2(myHours),
-      hourly_rate: round2(ratePerHour),
-      amount_earned: amountEarned,
-      status: totalAmount > 0 ? "calculated" : "pending",
+      employee_name: `${employee.nombre} ${employee.apellido}`.trim(),
+      hours_worked: Number(settlement.hours_worked || 0),
+      hourly_rate: Number(settlement.hourly_rate || 0),
+      amount_earned: Number(settlement.amount_earned || 0),
+      status: settlement.status,
+      notes: settlement.notes || "",
     },
   });
 }
 
-// ---- Helpers ----
-
-async function resolveOrgId(url: string, key: string, slug: string): Promise<string | null> {
-  const res = await fetch(
-    `${url}/rest/v1/organizations?select=id&slug=eq.${encodeURIComponent(slug)}&limit=1`,
-    { headers: authHeaders(key) },
-  );
-  if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ id: string }>;
-  return rows.length > 0 ? rows[0].id : null;
+function pushAnomaly(map: Map<string, string[]>, employeeId: string, message: string): void {
+  const list = map.get(employeeId) || [];
+  if (!list.includes(message)) {
+    list.push(message);
+  }
+  map.set(employeeId, list);
 }
 
-async function verifyAdminPin(url: string, key: string, orgId: string, pin: string): Promise<boolean> {
-  if (!pin) return false;
-  const res = await fetch(`${url}/rest/v1/rpc/verify_organization_super_admin_pin`, {
-    method: "POST",
-    headers: { ...authHeaders(key), "Content-Type": "application/json" },
-    body: JSON.stringify({ p_organization_id: orgId, p_pin: pin }),
-  });
-  if (!res.ok) return false;
-  return (await res.json()) === true;
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
-/** Returns duration in hours between two TIME strings like "15:00:00" and "16:00:00" */
-function slotHours(startTime: string, endTime: string): number {
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
-}
-
-/** Returns true if the slot (defined by ISO year/week/dayOfWeek) falls in the given calendar month */
-function slotFallsInMonth(slotYear: number, week: number, dayOfWeek: number, targetYear: number, targetMonth: number): boolean {
-  const date = isoWeekToDate(slotYear, week, dayOfWeek);
-  return date.getUTCFullYear() === targetYear && (date.getUTCMonth() + 1) === targetMonth;
-}
-
-/** Converts ISO year+week+dayOfWeek (1=Mon,7=Sun) to a UTC Date */
-function isoWeekToDate(year: number, week: number, dayOfWeek: number): Date {
-  const jan4 = new Date(Date.UTC(year, 0, 4));
-  const jan4Dow = jan4.getUTCDay() || 7;
-  const week1Monday = new Date(jan4);
-  week1Monday.setUTCDate(jan4.getUTCDate() - (jan4Dow - 1));
-  const result = new Date(week1Monday);
-  result.setUTCDate(week1Monday.getUTCDate() + (week - 1) * 7 + (dayOfWeek - 1));
-  return result;
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-function authHeaders(key: string): Record<string, string> {
-  return { Authorization: `Bearer ${key}`, apikey: key };
-}
-
-function json(payload: unknown, status = 200): Response {
-  return new Response(JSON.stringify(payload), { status, headers: corsHeaders });
+function round4(value: number): number {
+  return Math.round(value * 10000) / 10000;
 }

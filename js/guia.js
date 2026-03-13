@@ -183,18 +183,33 @@ var Guia = (function () {
     }
 
     function renderProcessCards() {
-        var html = '';
+        guiaGrid.textContent = '';
         var keys = Object.keys(procesosData);
         for (var i = 0; i < keys.length; i++) {
             var p = procesosData[keys[i]];
             var typeClass = p.tipo === 'repartidor' ? 'guia-card-repartidor' : 'guia-card-cliente';
-            html += '<button class="guia-card ' + typeClass + '" data-process="' + p.id + '">';
-            html += '<span class="guia-card-icon">' + p.icono + '</span>';
-            html += '<span class="guia-card-title">' + p.titulo + '</span>';
-            html += '<span class="guia-card-desc">' + p.descripcion + '</span>';
-            html += '</button>';
+            var button = document.createElement('button');
+            button.className = 'guia-card ' + typeClass;
+            button.dataset.process = p.id;
+            button.type = 'button';
+
+            var icon = document.createElement('span');
+            icon.className = 'guia-card-icon';
+            icon.textContent = p.icono;
+
+            var title = document.createElement('span');
+            title.className = 'guia-card-title';
+            title.textContent = p.titulo;
+
+            var desc = document.createElement('span');
+            desc.className = 'guia-card-desc';
+            desc.textContent = p.descripcion;
+
+            button.appendChild(icon);
+            button.appendChild(title);
+            button.appendChild(desc);
+            guiaGrid.appendChild(button);
         }
-        guiaGrid.innerHTML = html;
 
         guiaGrid.addEventListener('click', function (e) {
             var card = e.target.closest('.guia-card');
@@ -231,23 +246,19 @@ var Guia = (function () {
             imageWrap.classList.remove('hidden');
             noImage.classList.add('hidden');
             stepImage.src = paso.imagen;
-            instruction.innerHTML = paso.texto;
+            setFormattedContent(instruction, paso.texto);
             instruction.classList.remove('hidden');
         } else {
             imageWrap.classList.add('hidden');
             noImage.classList.remove('hidden');
-            noImageText.innerHTML = paso.texto;
+            setFormattedContent(noImageText, paso.texto);
             instruction.classList.add('hidden');
         }
 
         prevBtn.disabled = currentStep === 0;
         prevBtn.style.visibility = currentStep === 0 ? 'hidden' : 'visible';
 
-        if (currentStep === total - 1) {
-            nextBtn.innerHTML = 'Terminar <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-        } else {
-            nextBtn.innerHTML = 'Siguiente <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
-        }
+        setNextButton(currentStep === total - 1);
     }
 
     function nextStep() {
@@ -280,9 +291,78 @@ var Guia = (function () {
             completeWarningEl.classList.add('hidden');
         }
 
-        completeNotesEl.innerHTML = currentProcess.notas.map(function (n) {
-            return '<li>' + n + '</li>';
-        }).join('');
+        completeNotesEl.textContent = '';
+        currentProcess.notas.forEach(function (note) {
+            var item = document.createElement('li');
+            item.textContent = note;
+            completeNotesEl.appendChild(item);
+        });
+    }
+
+    function setFormattedContent(target, text) {
+        target.textContent = '';
+
+        var parser = new DOMParser();
+        var doc = parser.parseFromString('<div>' + String(text || '') + '</div>', 'text/html');
+        appendAllowedNodes(doc.body.firstChild, target);
+    }
+
+    function appendAllowedNodes(source, target) {
+        if (!source) return;
+
+        for (var i = 0; i < source.childNodes.length; i++) {
+            var child = source.childNodes[i];
+            if (child.nodeType === Node.TEXT_NODE) {
+                target.appendChild(document.createTextNode(child.textContent || ''));
+                continue;
+            }
+
+            if (child.nodeType !== Node.ELEMENT_NODE) continue;
+
+            if (child.tagName === 'STRONG') {
+                var strong = document.createElement('strong');
+                strong.textContent = child.textContent || '';
+                target.appendChild(strong);
+                continue;
+            }
+
+            if (child.tagName === 'BR') {
+                target.appendChild(document.createElement('br'));
+            }
+        }
+    }
+
+    function setNextButton(isLastStep) {
+        nextBtn.textContent = '';
+
+        var label = document.createElement('span');
+        label.textContent = isLastStep ? 'Terminar' : 'Siguiente';
+
+        var icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icon.setAttribute('width', '20');
+        icon.setAttribute('height', '20');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        icon.setAttribute('stroke-width', '2.5');
+        icon.setAttribute('stroke-linecap', 'round');
+        icon.setAttribute('stroke-linejoin', 'round');
+
+        if (isLastStep) {
+            var check = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+            check.setAttribute('points', '20 6 9 17 4 12');
+            icon.appendChild(check);
+        } else {
+            var line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            line.setAttribute('d', 'M5 12h14');
+            var arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            arrow.setAttribute('d', 'm12 5 7 7-7 7');
+            icon.appendChild(line);
+            icon.appendChild(arrow);
+        }
+
+        nextBtn.appendChild(label);
+        nextBtn.appendChild(icon);
     }
 
     return { init: init, show: show };

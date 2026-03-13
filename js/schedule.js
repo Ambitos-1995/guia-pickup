@@ -1,5 +1,5 @@
 /* =====================================================
-   SCHEDULE - Public weekly schedule with PIN-based cell actions
+   SCHEDULE - Public schedule with employee/admin modes
    ===================================================== */
 var Schedule = (function () {
     'use strict';
@@ -7,23 +7,21 @@ var Schedule = (function () {
     var DEFAULT_HOURS = [15, 16, 17, 18, 19, 20];
 
     var currentYear, currentWeek;
-    var gridEl, labelEl, rangeEl, contextEl, backBtn;
-    var dialogEl, dialogModeEl, dialogTitleEl, dialogSummaryEl, dialogBodyEl, dialogFeedbackEl, dialogPinEl, dialogSubmitEl;
+    var gridEl, labelEl, rangeEl, contextEl, dialogEl;
+    var dialogModeEl, dialogTitleEl, dialogSummaryEl, dialogBodyEl, dialogFeedbackEl, dialogPinEl, dialogSubmitEl;
 
     var slotsData = [];
     var selectedSlot = null;
     var dialogMode = 'assign';
-    var isSubmitting = false;
     var pendingDay = null;
     var pendingHour = null;
+    var isSubmitting = false;
 
     function init() {
         gridEl = document.getElementById('schedule-grid');
         labelEl = document.getElementById('week-label');
         rangeEl = document.getElementById('week-range');
         contextEl = document.getElementById('schedule-context');
-        backBtn = document.getElementById('schedule-back-btn');
-
         dialogEl = document.getElementById('schedule-slot-dialog');
         dialogModeEl = document.getElementById('schedule-slot-mode');
         dialogTitleEl = document.getElementById('schedule-slot-title');
@@ -57,18 +55,23 @@ var Schedule = (function () {
     }
 
     function updateAccessMode() {
-        if (backBtn) {
-            backBtn.dataset.back = 'screen-menu';
+        if (!contextEl) return;
+
+        if (App.hasAdminAccess()) {
+            contextEl.textContent = 'Modo ajustes: crea franjas en huecos vacios y libera o borra franjas existentes.';
+            return;
         }
 
-        if (contextEl) {
-            contextEl.textContent = 'Pulsa cualquier celda, escribe tu PIN y tu nombre aparecera automaticamente.';
+        if (App.hasEmployeeAccess()) {
+            contextEl.textContent = 'Sesion activa: puedes reservar una franja libre o liberar solo tus turnos.';
+            return;
         }
+
+        contextEl.textContent = 'Consulta el horario. Para reservar o liberar una franja te pediremos el PIN de empleado.';
     }
 
     function changeWeek(delta) {
         currentWeek += delta;
-
         if (currentWeek < 1) {
             currentYear--;
             currentWeek = Utils.getISOWeeksInYear(currentYear);
@@ -76,7 +79,6 @@ var Schedule = (function () {
             currentYear++;
             currentWeek = 1;
         }
-
         loadWeek();
     }
 
@@ -99,16 +101,16 @@ var Schedule = (function () {
 
         html += '<div class="sched-header sched-corner">Hora</div>';
         for (var d = 1; d <= 5; d++) {
-            var headerDate = weekDates[d - 1];
-            var isToday = Utils.formatDateISO(headerDate) === todayIso;
+            var date = weekDates[d - 1];
+            var isToday = Utils.formatDateISO(date) === todayIso;
             html += '<div class="sched-header' + (isToday ? ' sched-header-today' : '') + '">';
             html += '<span class="sched-day-letter">' + Utils.dayOfWeekShort(d) + '</span>';
-            html += '<span class="sched-day-date">' + pad2(headerDate.getDate()) + '</span>';
+            html += '<span class="sched-day-date">' + pad2(date.getDate()) + '</span>';
             html += '</div>';
         }
 
-        for (var h = 0; h < hours.length; h++) {
-            var hour = hours[h];
+        for (var i = 0; i < hours.length; i++) {
+            var hour = hours[i];
             html += '<div class="sched-time"><span>' + pad2(hour) + ':00</span></div>';
 
             for (var day = 1; day <= 5; day++) {
@@ -124,17 +126,18 @@ var Schedule = (function () {
         var dayIso = Utils.formatDateISO(date);
         var isToday = dayIso === todayIso;
         var baseClass = 'sched-cell' + (isToday ? ' sched-cell-today' : '');
+        var session = App.getSession();
 
         if (!slot) {
-            return '<button type="button" class="' + baseClass + ' sched-empty" data-day="' + day + '" data-hour="' + hour + '"></button>';
+            var emptyAttrs = ' data-day="' + day + '" data-hour="' + hour + '"';
+            return '<button type="button" class="' + baseClass + ' sched-empty" ' + emptyAttrs + '></button>';
         }
 
         if (!slot.assignedEmployeeProfileId) {
             return '<button type="button" class="' + baseClass + ' sched-free" data-slot-id="' + slot.id + '" data-mode="assign"></button>';
         }
 
-        var session = App.getSession();
-        var isMine = session && slot.assignedEmployeeProfileId === session.employeeProfileId;
+        var isMine = session && slot.assignedEmployeeProfileId === session.employeeId;
         var shortName = firstName(slot.assignedEmployeeName || slot.assignedEmployeeCode || 'Ocupada');
         var className = isMine ? 'sched-mine' : 'sched-taken';
 
@@ -149,70 +152,82 @@ var Schedule = (function () {
         if (!cell) return;
 
         if (cell.classList.contains('sched-empty')) {
-            var day = parseInt(cell.dataset.day, 10);
-            var hour = parseInt(cell.dataset.hour, 10);
-            openDialog('create-assign', null, day, hour);
+            if (!App.hasAdminAccess()) return;
+            openDialog('create', null, parseInt(cell.dataset.day, 10), parseInt(cell.dataset.hour, 10));
             return;
         }
 
-        var slotId = cell.dataset.slotId;
-        var mode = cell.dataset.mode || 'assign';
-        var slot = findSlotById(slotId);
-
+        var slot = findSlotById(cell.dataset.slotId);
         if (!slot) return;
-        openDialog(mode, slot);
+
+        if (cell.classList.contains('sched-free')) {
+            openDialog(App.hasAdminAccess() ? 'delete' : 'assign', slot);
+            return;
+        }
+
+        openDialog('release', slot);
     }
 
     function openDialog(mode, slot, day, hour) {
-        selectedSlot = slot;
+        selectedSlot = slot || null;
         dialogMode = mode;
         pendingDay = day || null;
         pendingHour = hour || null;
-
         clearDialogFeedback();
-        dialogPinEl.value = '';
 
-        if (mode === 'create-assign' || mode === 'assign') {
-            dialogEl.label = 'Asignar turno';
-            dialogModeEl.textContent = 'Franja disponible';
-            dialogTitleEl.textContent = 'Asignarte con tu PIN';
-            dialogBodyEl.textContent = 'Introduce tu PIN de 4 cifras para reservar esta franja.';
-            dialogSubmitEl.textContent = 'Asignarme';
+        var needsPin = (mode === 'assign' || mode === 'release') && !App.getSession();
+        dialogPinEl.value = '';
+        dialogPinEl.classList.toggle('hidden', !needsPin);
+
+        if (mode === 'create') {
+            dialogEl.label = 'Crear franja';
+            dialogModeEl.textContent = 'Modo ajustes';
+            dialogTitleEl.textContent = 'Crear nueva franja';
+            dialogBodyEl.textContent = 'Se creara una franja libre de una hora en este hueco.';
+            dialogSubmitEl.textContent = 'Crear franja';
             dialogSubmitEl.setAttribute('variant', 'brand');
-            dialogSubmitEl.setAttribute('appearance', 'accent');
-        } else {
-            dialogEl.label = 'Liberar turno';
-            dialogModeEl.textContent = 'Franja ocupada';
-            dialogTitleEl.textContent = 'Gestionar franja ocupada';
-            dialogBodyEl.textContent = 'Si eres la persona asignada, introduce tu PIN para liberar esta franja.';
-            dialogSubmitEl.textContent = 'Liberar mi turno';
+        } else if (mode === 'delete') {
+            dialogEl.label = 'Borrar franja';
+            dialogModeEl.textContent = 'Modo ajustes';
+            dialogTitleEl.textContent = 'Borrar franja libre';
+            dialogBodyEl.textContent = 'Esta franja esta libre. Puedes borrarla para limpiar el horario.';
+            dialogSubmitEl.textContent = 'Borrar franja';
             dialogSubmitEl.setAttribute('variant', 'danger');
-            dialogSubmitEl.setAttribute('appearance', 'filled');
+        } else if (mode === 'assign') {
+            dialogEl.label = 'Reservar franja';
+            dialogModeEl.textContent = 'Franja disponible';
+            dialogTitleEl.textContent = 'Reservar tu turno';
+            dialogBodyEl.textContent = needsPin
+                ? 'Introduce tu PIN de empleado para abrir sesion y reservar esta franja.'
+                : 'Tu sesion de empleado esta activa. Confirma para reservar esta franja.';
+            dialogSubmitEl.textContent = needsPin ? 'Entrar y reservar' : 'Reservar franja';
+            dialogSubmitEl.setAttribute('variant', 'brand');
+        } else {
+            dialogEl.label = 'Liberar franja';
+            dialogModeEl.textContent = App.hasAdminAccess() ? 'Modo ajustes' : 'Tu franja';
+            dialogTitleEl.textContent = 'Liberar franja';
+            dialogBodyEl.textContent = needsPin
+                ? 'Introduce tu PIN de empleado para abrir sesion y liberar esta franja.'
+                : App.hasAdminAccess()
+                ? 'Como admin puedes liberar cualquier franja ocupada.'
+                : 'Tu sesion esta activa. Confirma para liberar esta franja.';
+            dialogSubmitEl.textContent = 'Liberar franja';
+            dialogSubmitEl.setAttribute('variant', 'neutral');
         }
 
-        if (mode === 'create-assign') {
-            var dayName = Utils.DAY_NAMES[day];
-            dialogSummaryEl.textContent = dayName + ' · ' + pad2(hour) + ':00 - ' + pad2(hour + 1) + ':00';
-        } else {
+        if (mode === 'create') {
+            dialogSummaryEl.textContent = Utils.DAY_NAMES[pendingDay] + ' · ' + pad2(pendingHour) + ':00 - ' + pad2(pendingHour + 1) + ':00';
+        } else if (slot) {
             dialogSummaryEl.textContent = buildSlotSummary(slot);
         }
 
         dialogEl.open = true;
-
-        window.setTimeout(function () {
-            if (dialogPinEl && typeof dialogPinEl.focus === 'function') {
-                dialogPinEl.focus();
-            }
-        }, 60);
     }
 
     function submitDialog() {
         if (isSubmitting) return;
-        if (dialogMode !== 'create-assign' && !selectedSlot) return;
 
-        var pin = String(dialogPinEl.value || '').trim();
-        if (pin.length < 4) {
-            showDialogFeedback('warning', 'Introduce tu PIN para continuar.');
+        if ((dialogMode === 'assign' || dialogMode === 'release') && !ensureEmployeeSession()) {
             return;
         }
 
@@ -220,45 +235,77 @@ var Schedule = (function () {
         dialogSubmitEl.disabled = true;
 
         var request;
-
-        if (dialogMode === 'create-assign') {
+        if (dialogMode === 'create') {
             request = Api.createAdminSlot({
                 year: currentYear,
                 week: currentWeek,
                 dayOfWeek: pendingDay,
                 startTime: pad2(pendingHour) + ':00:00',
                 endTime: pad2(pendingHour + 1) + ':00:00'
-            }).then(function (createRes) {
-                if (!createRes || !createRes.success || !createRes.data) {
-                    return { success: false, message: 'No se pudo crear la franja.' };
-                }
-                var newSlotId = createRes.data.slot_id || createRes.data.id;
-                return Api.assignByPin(pin, newSlotId, currentYear, currentWeek);
             });
+        } else if (dialogMode === 'delete') {
+            request = Api.deleteAdminSlot(selectedSlot.id);
         } else if (dialogMode === 'assign') {
-            request = Api.assignByPin(pin, selectedSlot.id, currentYear, currentWeek);
+            request = Api.assignSlot(selectedSlot.id);
         } else {
-            request = Api.modifyByPin(selectedSlot.id, pin, 'release', {
-                signupId: selectedSlot.signupId,
-                year: currentYear,
-                week: currentWeek
-            });
+            request = Api.releaseSlot(selectedSlot.id);
         }
 
         request.then(function (res) {
             if (res && res.success) {
                 dialogEl.open = false;
                 loadWeek();
+                App.showMenu();
                 return;
             }
-
-            showDialogFeedback('danger', (res && res.message) || defaultErrorMessage());
+            showDialogFeedback('danger', (res && res.message) || 'No se pudo completar la accion.');
         }).catch(function () {
-            showDialogFeedback('danger', defaultErrorMessage());
+            showDialogFeedback('danger', 'No se pudo completar la accion.');
         }).finally(function () {
             isSubmitting = false;
             dialogSubmitEl.disabled = false;
         });
+    }
+
+    function ensureEmployeeSession() {
+        var session = App.getSession();
+        if (session && session.role === 'respondent') {
+            return true;
+        }
+
+        var pin = String(dialogPinEl.value || '').trim();
+        if (!/^\d{4}$/.test(pin)) {
+            showDialogFeedback('warning', 'Introduce tu PIN de 4 cifras para continuar.');
+            return false;
+        }
+
+        isSubmitting = true;
+        dialogSubmitEl.disabled = true;
+
+        Api.verifyPin(pin).then(function (res) {
+            if (res && res.success && res.data) {
+                App.setSession({
+                    accessToken: res.data.accessToken,
+                    expiresAt: res.data.expiresAt,
+                    role: res.data.role || 'respondent',
+                    employeeId: res.data.employeeId || null,
+                    employeeName: res.data.employeeName || '',
+                    organizationId: res.data.organizationId || null,
+                    currentStatus: res.data.currentStatus || 'not_checked_in'
+                });
+                dialogPinEl.value = '';
+                dialogPinEl.classList.add('hidden');
+                isSubmitting = false;
+                dialogSubmitEl.disabled = false;
+                submitDialog();
+            } else {
+                isSubmitting = false;
+                dialogSubmitEl.disabled = false;
+                showDialogFeedback('danger', (res && res.message) || 'PIN incorrecto.');
+            }
+        });
+
+        return false;
     }
 
     function resetDialog() {
@@ -269,6 +316,7 @@ var Schedule = (function () {
         isSubmitting = false;
         dialogSubmitEl.disabled = false;
         dialogPinEl.value = '';
+        dialogPinEl.classList.remove('hidden');
         clearDialogFeedback();
     }
 
@@ -286,43 +334,29 @@ var Schedule = (function () {
 
     function normalizeSlots(rawSlots) {
         var normalized = [];
-
         for (var i = 0; i < rawSlots.length; i++) {
-            normalized.push(normalizeSlot(rawSlots[i]));
+            normalized.push({
+                id: rawSlots[i].slot_id || rawSlots[i].id,
+                dayOfWeek: parseInt(rawSlots[i].day_of_week, 10),
+                startTime: rawSlots[i].start_time,
+                endTime: rawSlots[i].end_time,
+                startHour: parseInt(String(rawSlots[i].start_time).substring(0, 2), 10),
+                assignedEmployeeProfileId: rawSlots[i].assigned_employee_profile_id || null,
+                assignedEmployeeName: rawSlots[i].assigned_employee_name || '',
+                assignedEmployeeCode: rawSlots[i].assigned_employee_code || '',
+                status: rawSlots[i].status || (rawSlots[i].assigned_employee_profile_id ? 'occupied' : 'free')
+            });
         }
-
         return normalized;
-    }
-
-    function normalizeSlot(raw) {
-        var startTime = raw.start_time || '00:00:00';
-        var endTime = raw.end_time || addOneHour(startTime);
-
-        return {
-            id: raw.slot_id || raw.id,
-            raw: raw,
-            dayOfWeek: parseInt(raw.day_of_week, 10),
-            startTime: startTime,
-            endTime: endTime,
-            startHour: parseInt(startTime.substring(0, 2), 10),
-            assignedEmployeeProfileId: raw.assigned_employee_profile_id || raw.signup_employee_id || null,
-            assignedEmployeeName: raw.assigned_employee_name || raw.signup_employee_name || '',
-            assignedEmployeeCode: raw.assigned_employee_code || raw.signup_employee_code || '',
-            signupId: raw.signup_id || null,
-            status: raw.status || ((raw.assigned_employee_profile_id || raw.signup_employee_id) ? 'occupied' : 'free'),
-            isEditableBySelf: raw.is_editable_by_self !== undefined ? !!raw.is_editable_by_self : !!raw.signup_id
-        };
     }
 
     function getHoursToRender(slots) {
         var hours = DEFAULT_HOURS.slice();
-
         for (var i = 0; i < slots.length; i++) {
             if (hours.indexOf(slots[i].startHour) === -1) {
                 hours.push(slots[i].startHour);
             }
         }
-
         hours.sort(function (a, b) { return a - b; });
         return hours;
     }
@@ -338,38 +372,28 @@ var Schedule = (function () {
 
     function findSlotById(slotId) {
         for (var i = 0; i < slotsData.length; i++) {
-            if (String(slotsData[i].id) === String(slotId)) {
-                return slotsData[i];
-            }
+            if (String(slotsData[i].id) === String(slotId)) return slotsData[i];
         }
         return null;
     }
 
     function buildSlotSummary(slot) {
-        var dayName = Utils.DAY_NAMES[slot.dayOfWeek];
         var assigned = slot.assignedEmployeeName ? ' · ' + firstName(slot.assignedEmployeeName) : '';
-        return dayName + ' · ' + stripSeconds(slot.startTime) + ' - ' + stripSeconds(slot.endTime) + assigned;
+        return Utils.DAY_NAMES[slot.dayOfWeek] + ' · ' + stripSeconds(slot.startTime) + ' - ' + stripSeconds(slot.endTime) + assigned;
     }
 
     function formatMonthLabel(year, week) {
         var dates = Utils.getWeekDates(year, week);
         var first = dates[0];
         var last = dates[dates.length - 1];
-
         if (first.getMonth() === last.getMonth()) {
             return Utils.MONTH_NAMES[first.getMonth()] + ' ' + year;
         }
-
         return Utils.MONTH_NAMES[first.getMonth()] + ' / ' + Utils.MONTH_NAMES[last.getMonth()] + ' ' + year;
     }
 
     function stripSeconds(time) {
         return String(time || '').slice(0, 5);
-    }
-
-    function addOneHour(time) {
-        var hour = parseInt(String(time).substring(0, 2), 10);
-        return pad2(hour + 1) + ':00:00';
     }
 
     function pad2(value) {
@@ -378,12 +402,6 @@ var Schedule = (function () {
 
     function firstName(name) {
         return String(name || '').split(' ')[0];
-    }
-
-    function defaultErrorMessage() {
-        return (dialogMode === 'assign' || dialogMode === 'create-assign')
-            ? 'No se pudo asignar la franja. PIN no valido o franja ocupada.'
-            : 'No se pudo liberar la franja con ese PIN.';
     }
 
     function escapeHtml(value) {

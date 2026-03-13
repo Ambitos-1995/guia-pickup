@@ -1,36 +1,38 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
-};
+import {
+  authHeaders,
+  corsHeaders,
+  fetchJson,
+  json,
+  logAudit,
+  requireSession,
+  resolveOrgId,
+  getSupabaseConfig,
+} from "../_shared/kiosk.ts";
 
 interface RequestBody {
   action?: string;
   orgSlug?: string;
-  adminPin?: string;
-  pin?: string;
   year?: number;
   week?: number;
   dayOfWeek?: number;
   startTime?: string;
   endTime?: string;
   slotId?: string;
-  signupId?: string;
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
   if (req.method !== "POST") {
-    return json({ success: false, message: "Method not allowed" }, 405);
+    return json({ success: false, message: "Metodo no permitido" }, 405);
   }
 
   try {
-    const body = (await req.json()) as RequestBody;
+    const body = await req.json() as RequestBody;
     const action = String(body.action || "").trim();
     const orgSlug = String(body.orgSlug || "").trim();
 
@@ -38,87 +40,55 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return json({ success: false, message: "Falta la organizacion" }, 400);
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      return json({ success: false, message: "Config error" }, 500);
-    }
-
-    const orgId = await resolveOrgId(supabaseUrl, serviceRoleKey, orgSlug);
+    const { url, serviceRoleKey } = getSupabaseConfig();
+    const orgId = await resolveOrgId(url, serviceRoleKey, orgSlug);
     if (!orgId) {
       return json({ success: false, message: "Organizacion no encontrada" }, 404);
     }
 
     if (action === "list") {
-      return handleList(supabaseUrl, serviceRoleKey, orgId, body);
+      return await handleList(url, serviceRoleKey, orgId, body);
     }
 
     if (action === "assign") {
-      return handleAssign(supabaseUrl, serviceRoleKey, orgId, body);
+      const auth = await requireSession(req, url, serviceRoleKey, ["respondent", "org_admin"]);
+      if (auth instanceof Response) return auth;
+      if (auth.session.organization_id !== orgId) {
+        return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
+      }
+      return await handleAssign(url, serviceRoleKey, auth.session, body);
     }
 
     if (action === "release") {
-      return handleRelease(supabaseUrl, serviceRoleKey, orgId, body);
+      const auth = await requireSession(req, url, serviceRoleKey, ["respondent", "org_admin"]);
+      if (auth instanceof Response) return auth;
+      if (auth.session.organization_id !== orgId) {
+        return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
+      }
+      return await handleRelease(url, serviceRoleKey, auth.session, body);
     }
 
-    if (action === "create") {
-      return handleCreate(supabaseUrl, serviceRoleKey, orgId, body);
+    if (action === "create" || action === "update" || action === "delete") {
+      const auth = await requireSession(req, url, serviceRoleKey, ["org_admin"]);
+      if (auth instanceof Response) return auth;
+      if (auth.session.organization_id !== orgId) {
+        return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
+      }
+      if (action === "create") {
+        return await handleCreate(url, serviceRoleKey, auth.session, body);
+      }
+      if (action === "update") {
+        return await handleUpdate(url, serviceRoleKey, auth.session, body);
+      }
+      return await handleDelete(url, serviceRoleKey, auth.session, body);
     }
 
     return json({ success: false, message: "Accion no valida" }, 400);
   } catch (error) {
     console.error("kiosk-schedule error", error);
-    return json({
-      success: false,
-      message: "Error interno",
-      details: error instanceof Error ? error.message : String(error),
-    }, 500);
+    return json({ success: false, message: "Error interno" }, 500);
   }
 });
-
-// ---- Resolve org ----
-
-async function resolveOrgId(url: string, key: string, slug: string): Promise<string | null> {
-  const res = await fetch(
-    `${url}/rest/v1/organizations?select=id&slug=eq.${encodeURIComponent(slug)}&limit=1`,
-    { headers: authHeaders(key) },
-  );
-  if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ id: string }>;
-  return rows.length > 0 ? rows[0].id : null;
-}
-
-// ---- Verify admin PIN ----
-
-async function verifyAdminPin(url: string, key: string, orgId: string, pin: string): Promise<boolean> {
-  const res = await fetch(`${url}/rest/v1/rpc/verify_organization_super_admin_pin`, {
-    method: "POST",
-    headers: { ...authHeaders(key), "Content-Type": "application/json" },
-    body: JSON.stringify({ p_organization_id: orgId, p_pin: pin }),
-  });
-  if (!res.ok) return false;
-  return (await res.json()) === true;
-}
-
-// ---- Resolve employee by PIN ----
-
-async function resolveEmployee(
-  url: string,
-  key: string,
-  orgId: string,
-  pin: string,
-): Promise<{ id: string; nombre: string; apellido: string } | null> {
-  const res = await fetch(
-    `${url}/rest/v1/kiosk_employees?select=id,nombre,apellido&organization_id=eq.${orgId}&pin=eq.${encodeURIComponent(pin)}&attendance_enabled=eq.true&limit=1`,
-    { headers: authHeaders(key) },
-  );
-  if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ id: string; nombre: string; apellido: string }>;
-  return rows.length > 0 ? rows[0] : null;
-}
-
-// ---- LIST slots ----
 
 async function handleList(
   url: string,
@@ -133,51 +103,176 @@ async function handleList(
     return json({ success: false, message: "Falta year o week" }, 400);
   }
 
-  const res = await fetch(
-    `${url}/rest/v1/kiosk_schedule_slots?select=id,day_of_week,start_time,end_time,employee_id,kiosk_employees(id,nombre,apellido)&organization_id=eq.${orgId}&year=eq.${year}&week=eq.${week}&order=day_of_week.asc,start_time.asc`,
-    { headers: authHeaders(key) },
-  );
-
-  if (!res.ok) {
-    const details = await res.text();
-    console.error("list slots failed", details);
-    return json({ success: false, message: "Error al listar franjas" }, 500);
-  }
-
-  const rows = (await res.json()) as Array<{
+  const res = await fetchJson<Array<{
     id: string;
     day_of_week: number;
     start_time: string;
     end_time: string;
     employee_id: string | null;
     kiosk_employees: { id: string; nombre: string; apellido: string } | null;
-  }>;
+  }>>(
+    `${url}/rest/v1/kiosk_schedule_slots?select=id,day_of_week,start_time,end_time,employee_id,kiosk_employees(id,nombre,apellido)&organization_id=eq.${orgId}&year=eq.${year}&week=eq.${week}&order=day_of_week.asc,start_time.asc`,
+    { headers: authHeaders(key) },
+  );
 
-  const slots = rows.map((row) => {
-    const emp = row.kiosk_employees;
-    const occupied = !!row.employee_id;
-    return {
-      id: row.id,
-      day_of_week: row.day_of_week,
-      start_time: row.start_time,
-      end_time: row.end_time,
-      assigned_employee_profile_id: occupied ? row.employee_id : null,
-      assigned_employee_name: emp ? emp.nombre + " " + emp.apellido : "",
-      assigned_employee_code: emp ? emp.id : "",
-      signup_id: occupied ? row.id : null,
-      status: occupied ? "occupied" : "free",
-    };
+  if (!res.ok) {
+    return json({ success: false, message: "Error al listar franjas" }, 500);
+  }
+
+  return json({
+    success: true,
+    data: res.data.map((slot) => ({
+      id: slot.id,
+      day_of_week: slot.day_of_week,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      assigned_employee_profile_id: slot.employee_id,
+      assigned_employee_name: slot.kiosk_employees
+        ? `${slot.kiosk_employees.nombre} ${slot.kiosk_employees.apellido}`.trim()
+        : "",
+      assigned_employee_code: slot.kiosk_employees?.id || "",
+      status: slot.employee_id ? "occupied" : "free",
+    })),
   });
-
-  return json({ success: true, data: slots });
 }
 
-// ---- CREATE slot (admin) ----
+async function handleAssign(
+  url: string,
+  key: string,
+  session: { id: string; organization_id: string; role: "respondent" | "org_admin"; employee_id: string | null },
+  body: RequestBody,
+): Promise<Response> {
+  if (!session.employee_id && session.role !== "org_admin") {
+    return json({ success: false, message: "Sesion de empleado requerida" }, 403);
+  }
+
+  const slotId = String(body.slotId || "").trim();
+  if (!slotId) {
+    return json({ success: false, message: "Falta la franja" }, 400);
+  }
+
+  const slot = await fetchSlot(url, key, session.organization_id, slotId);
+  if (!slot) {
+    return json({ success: false, message: "Franja no encontrada" }, 404);
+  }
+
+  if (slot.employee_id) {
+    return json({ success: false, message: "La franja ya esta ocupada" }, 409);
+  }
+
+  const employeeId = session.role === "org_admin" ? session.employee_id : session.employee_id;
+  if (!employeeId) {
+    return json({ success: false, message: "El admin necesita una sesion de empleado para asignarse la franja" }, 400);
+  }
+
+  const update = await fetchJson<Array<{
+    id: string;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+    employee_id: string | null;
+  }>>(
+    `${url}/rest/v1/kiosk_schedule_slots?id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${session.organization_id}&employee_id=is.null`,
+    {
+      method: "PATCH",
+      headers: {
+        ...authHeaders(key),
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ employee_id: employeeId }),
+    },
+  );
+
+  if (!update.ok || !update.data[0]) {
+    return json({ success: false, message: "No se pudo asignar la franja" }, 409);
+  }
+
+  await logAudit(url, key, {
+    organizationId: session.organization_id,
+    actorSessionId: session.id,
+    actorRole: session.role,
+    employeeId,
+    slotId,
+    action: "schedule_slot_assigned",
+  });
+
+  return json({
+    success: true,
+    data: {
+      id: update.data[0].id,
+      day_of_week: update.data[0].day_of_week,
+      start_time: update.data[0].start_time,
+      end_time: update.data[0].end_time,
+      assigned_employee_profile_id: employeeId,
+      status: "occupied",
+    },
+  });
+}
+
+async function handleRelease(
+  url: string,
+  key: string,
+  session: { id: string; organization_id: string; role: "respondent" | "org_admin"; employee_id: string | null },
+  body: RequestBody,
+): Promise<Response> {
+  const slotId = String(body.slotId || "").trim();
+  if (!slotId) {
+    return json({ success: false, message: "Falta la franja" }, 400);
+  }
+
+  const slot = await fetchSlot(url, key, session.organization_id, slotId);
+  if (!slot) {
+    return json({ success: false, message: "Franja no encontrada" }, 404);
+  }
+
+  if (session.role !== "org_admin" && slot.employee_id !== session.employee_id) {
+    return json({ success: false, message: "No puedes liberar esta franja" }, 403);
+  }
+
+  const update = await fetchJson<Array<{ id: string; day_of_week: number; start_time: string; end_time: string }>>(
+    `${url}/rest/v1/kiosk_schedule_slots?id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${session.organization_id}`,
+    {
+      method: "PATCH",
+      headers: {
+        ...authHeaders(key),
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ employee_id: null }),
+    },
+  );
+
+  if (!update.ok || !update.data[0]) {
+    return json({ success: false, message: "No se pudo liberar la franja" }, 500);
+  }
+
+  await logAudit(url, key, {
+    organizationId: session.organization_id,
+    actorSessionId: session.id,
+    actorRole: session.role,
+    employeeId: slot.employee_id,
+    slotId,
+    action: "schedule_slot_released",
+  });
+
+  return json({
+    success: true,
+    data: {
+      id: update.data[0].id,
+      day_of_week: update.data[0].day_of_week,
+      start_time: update.data[0].start_time,
+      end_time: update.data[0].end_time,
+      assigned_employee_profile_id: null,
+      status: "free",
+    },
+  });
+}
 
 async function handleCreate(
   url: string,
   key: string,
-  orgId: string,
+  session: { id: string; organization_id: string; role: string },
   body: RequestBody,
 ): Promise<Response> {
   const year = Number(body.year);
@@ -189,203 +284,165 @@ async function handleCreate(
   if (!year || !week || !dayOfWeek || !startTime || !endTime) {
     return json({ success: false, message: "Faltan datos de la franja" }, 400);
   }
-  if (dayOfWeek < 1 || dayOfWeek > 7) {
-    return json({ success: false, message: "Dia de semana invalido" }, 400);
-  }
 
-  const res = await fetch(`${url}/rest/v1/kiosk_schedule_slots`, {
-    method: "POST",
-    headers: {
-      ...authHeaders(key),
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
+  const insert = await fetchJson<Array<{
+    id: string;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+    employee_id: string | null;
+  }>>(
+    `${url}/rest/v1/kiosk_schedule_slots`,
+    {
+      method: "POST",
+      headers: {
+        ...authHeaders(key),
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        organization_id: session.organization_id,
+        year,
+        week,
+        day_of_week: dayOfWeek,
+        start_time: startTime,
+        end_time: endTime,
+        employee_id: null,
+      }),
     },
-    body: JSON.stringify({
-      organization_id: orgId,
-      year,
-      week,
-      day_of_week: dayOfWeek,
-      start_time: startTime,
-      end_time: endTime,
-      employee_id: null,
-    }),
-  });
+  );
 
-  if (!res.ok) {
-    const details = await res.text();
-    console.error("create slot failed", details);
+  if (!insert.ok || !insert.data[0]) {
     return json({ success: false, message: "Error al crear la franja" }, 500);
   }
 
-  const created = (await res.json()) as Array<{ id: string; day_of_week: number; start_time: string; end_time: string }>;
-  const slot = created[0] || created;
+  await logAudit(url, key, {
+    organizationId: session.organization_id,
+    actorSessionId: session.id,
+    actorRole: session.role,
+    slotId: insert.data[0].id,
+    action: "schedule_slot_created",
+    metadata: { year, week, dayOfWeek, startTime, endTime },
+  });
+
   return json({
     success: true,
     data: {
-      id: (slot as { id: string }).id,
-      slot_id: (slot as { id: string }).id,
-      day_of_week: (slot as { day_of_week: number }).day_of_week,
-      start_time: (slot as { start_time: string }).start_time,
-      end_time: (slot as { end_time: string }).end_time,
+      id: insert.data[0].id,
+      slot_id: insert.data[0].id,
+      day_of_week: insert.data[0].day_of_week,
+      start_time: insert.data[0].start_time,
+      end_time: insert.data[0].end_time,
       status: "free",
     },
   });
 }
 
-// ---- ASSIGN slot ----
-
-async function handleAssign(
+async function handleUpdate(
   url: string,
   key: string,
-  orgId: string,
+  session: { id: string; organization_id: string; role: string },
   body: RequestBody,
 ): Promise<Response> {
-  const pin = String(body.pin || "").trim();
   const slotId = String(body.slotId || "").trim();
+  const startTime = String(body.startTime || "").trim();
+  const endTime = String(body.endTime || "").trim();
 
-  if (!pin || !slotId) {
-    return json({ success: false, message: "Faltan datos" }, 400);
-  }
-
-  const emp = await resolveEmployee(url, key, orgId, pin);
-  if (!emp) {
-    return json({ success: false, message: "PIN incorrecto" }, 401);
+  if (!slotId || !startTime || !endTime) {
+    return json({ success: false, message: "Faltan datos para actualizar la franja" }, 400);
   }
 
-  // Check slot is free and belongs to org
-  const slotRes = await fetch(
-    `${url}/rest/v1/kiosk_schedule_slots?select=id,employee_id&id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${orgId}&limit=1`,
-    { headers: authHeaders(key) },
-  );
-  if (!slotRes.ok) {
-    return json({ success: false, message: "Error al verificar franja" }, 500);
-  }
-  const slots = (await slotRes.json()) as Array<{ id: string; employee_id: string | null }>;
-  if (slots.length === 0) {
-    return json({ success: false, message: "Franja no encontrada" }, 404);
-  }
-  if (slots[0].employee_id !== null) {
-    return json({ success: false, message: "La franja ya esta ocupada" }, 409);
-  }
-
-  const updateRes = await fetch(
-    `${url}/rest/v1/kiosk_schedule_slots?id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${orgId}`,
+  const update = await fetchJson<Array<{ id: string; day_of_week: number; start_time: string; end_time: string }>>(
+    `${url}/rest/v1/kiosk_schedule_slots?id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${session.organization_id}`,
     {
       method: "PATCH",
-      headers: { ...authHeaders(key), "Content-Type": "application/json", Prefer: "return=representation" },
-      body: JSON.stringify({ employee_id: emp.id }),
+      headers: {
+        ...authHeaders(key),
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        start_time: startTime,
+        end_time: endTime,
+      }),
     },
   );
 
-  if (!updateRes.ok) {
-    const details = await updateRes.text();
-    console.error("assign slot failed", details);
-    return json({ success: false, message: "Error al asignar franja" }, 500);
+  if (!update.ok || !update.data[0]) {
+    return json({ success: false, message: "Error al actualizar la franja" }, 500);
   }
 
-  const updated = (await updateRes.json()) as Array<{ id: string; day_of_week: number; start_time: string; end_time: string }>;
-  const slot = updated[0] || updated;
-  return json({
-    success: true,
-    data: {
-      id: (slot as { id: string }).id,
-      day_of_week: (slot as { day_of_week: number }).day_of_week,
-      start_time: (slot as { start_time: string }).start_time,
-      end_time: (slot as { end_time: string }).end_time,
-      assigned_employee_profile_id: emp.id,
-      assigned_employee_name: emp.nombre + " " + emp.apellido,
-      assigned_employee_code: emp.id,
-      signup_id: (slot as { id: string }).id,
-      status: "occupied",
-    },
+  await logAudit(url, key, {
+    organizationId: session.organization_id,
+    actorSessionId: session.id,
+    actorRole: session.role,
+    slotId,
+    action: "schedule_slot_updated",
+    metadata: { startTime, endTime },
   });
+
+  return json({ success: true, data: update.data[0] });
 }
 
-// ---- RELEASE slot ----
-
-async function handleRelease(
+async function handleDelete(
   url: string,
   key: string,
-  orgId: string,
+  session: { id: string; organization_id: string; role: string },
   body: RequestBody,
 ): Promise<Response> {
-  const pin = String(body.pin || "").trim();
   const slotId = String(body.slotId || "").trim();
-
-  if (!pin || !slotId) {
-    return json({ success: false, message: "Faltan datos" }, 400);
+  if (!slotId) {
+    return json({ success: false, message: "Falta la franja" }, 400);
   }
 
-  // Fetch slot first
-  const slotRes = await fetch(
-    `${url}/rest/v1/kiosk_schedule_slots?select=id,employee_id,day_of_week,start_time,end_time&id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${orgId}&limit=1`,
-    { headers: authHeaders(key) },
-  );
-  if (!slotRes.ok) {
-    return json({ success: false, message: "Error al verificar franja" }, 500);
-  }
-  const slots = (await slotRes.json()) as Array<{ id: string; employee_id: string | null; day_of_week: number; start_time: string; end_time: string }>;
-  if (slots.length === 0) {
+  const slot = await fetchSlot(url, key, session.organization_id, slotId);
+  if (!slot) {
     return json({ success: false, message: "Franja no encontrada" }, 404);
   }
 
-  // Admin PIN can release any slot
-  const isAdmin = await verifyAdminPin(url, key, orgId, pin);
-  if (!isAdmin) {
-    // Must be the employee who owns the slot
-    const emp = await resolveEmployee(url, key, orgId, pin);
-    if (!emp) {
-      return json({ success: false, message: "PIN incorrecto" }, 401);
-    }
-    if (slots[0].employee_id !== emp.id) {
-      return json({ success: false, message: "No puedes liberar esta franja" }, 403);
-    }
+  if (slot.employee_id) {
+    return json({ success: false, message: "Libera primero la franja antes de borrarla" }, 409);
   }
 
-  const updateRes = await fetch(
-    `${url}/rest/v1/kiosk_schedule_slots?id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${orgId}`,
+  const remove = await fetch(
+    `${url}/rest/v1/kiosk_schedule_slots?id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${session.organization_id}`,
     {
-      method: "PATCH",
-      headers: { ...authHeaders(key), "Content-Type": "application/json", Prefer: "return=representation" },
-      body: JSON.stringify({ employee_id: null }),
+      method: "DELETE",
+      headers: authHeaders(key),
     },
   );
 
-  if (!updateRes.ok) {
-    const details = await updateRes.text();
-    console.error("release slot failed", details);
-    return json({ success: false, message: "Error al liberar franja" }, 500);
+  if (!remove.ok) {
+    return json({ success: false, message: "Error al borrar la franja" }, 500);
   }
 
-  const slot = slots[0];
-  return json({
-    success: true,
-    data: {
-      id: slot.id,
-      day_of_week: slot.day_of_week,
-      start_time: slot.start_time,
-      end_time: slot.end_time,
-      assigned_employee_profile_id: null,
-      assigned_employee_name: "",
-      assigned_employee_code: "",
-      signup_id: null,
-      status: "free",
-    },
+  await logAudit(url, key, {
+    organizationId: session.organization_id,
+    actorSessionId: session.id,
+    actorRole: session.role,
+    slotId,
+    action: "schedule_slot_deleted",
   });
+
+  return json({ success: true });
 }
 
-// ---- Helpers ----
+async function fetchSlot(
+  url: string,
+  key: string,
+  orgId: string,
+  slotId: string,
+): Promise<{ id: string; day_of_week: number; start_time: string; end_time: string; employee_id: string | null } | null> {
+  const slot = await fetchJson<Array<{
+    id: string;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+    employee_id: string | null;
+  }>>(
+    `${url}/rest/v1/kiosk_schedule_slots?select=id,day_of_week,start_time,end_time,employee_id&id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${orgId}&limit=1`,
+    { headers: authHeaders(key) },
+  );
 
-function authHeaders(key: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${key}`,
-    apikey: key,
-  };
-}
-
-function json(payload: unknown, status = 200): Response {
-  return new Response(JSON.stringify(payload), {
-    status,
-    headers: corsHeaders,
-  });
+  return slot.ok ? slot.data[0] || null : null;
 }
