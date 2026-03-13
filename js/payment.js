@@ -5,12 +5,11 @@ var Payment = (function () {
     'use strict';
 
     var currentYear, currentMonth;
-    var labelEl, hoursEl, rateEl, totalEl, noteEl, statusEl;
+    var labelEl, hoursEl, totalEl, noteEl, statusEl;
 
     function init() {
         labelEl = document.getElementById('pay-month-label');
         hoursEl = document.getElementById('pay-hours');
-        rateEl = document.getElementById('pay-rate');
         totalEl = document.getElementById('pay-total');
         noteEl = document.getElementById('payment-note');
         statusEl = document.getElementById('payment-status');
@@ -49,28 +48,50 @@ var Payment = (function () {
         loadMonth();
     }
 
+    function animateValue(el, endText, duration) {
+        var match = endText.match(/^([\d.]+)/);
+        if (!match) { el.textContent = endText; return; }
+        var endVal = parseFloat(match[1]);
+        var suffix = endText.substring(match[1].length);
+        var isDecimal = endText.indexOf('.') !== -1;
+        var startTime = null;
+        var dur = duration || 600;
+
+        function step(timestamp) {
+            if (!startTime) startTime = timestamp;
+            var progress = Math.min((timestamp - startTime) / dur, 1);
+            var eased = 1 - Math.pow(1 - progress, 3);
+            var current = eased * endVal;
+            el.textContent = (isDecimal ? current.toFixed(2) : Math.round(current)) + suffix;
+            if (progress < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+
     function loadMonth() {
         labelEl.textContent = Utils.MONTH_NAMES[currentMonth - 1] + ' ' + currentYear;
         hoursEl.textContent = '--';
-        rateEl.textContent = '--';
+        hoursEl.classList.add('pay-value-loading');
         totalEl.textContent = '--';
+        totalEl.classList.add('pay-value-loading');
         statusEl.textContent = '';
         statusEl.className = 'payment-status hidden';
         noteEl.textContent = 'Cargando...';
 
         Api.getMyPaymentSummary(currentYear, currentMonth).then(function (res) {
+            hoursEl.classList.remove('pay-value-loading');
+            totalEl.classList.remove('pay-value-loading');
+
             if (!(res && res.success && res.data)) {
                 hoursEl.textContent = '0h';
-                rateEl.textContent = '--';
                 totalEl.textContent = '0 €';
                 noteEl.textContent = 'No hay datos para este mes.';
                 return;
             }
 
             var data = res.data;
-            hoursEl.textContent = (data.hours_worked || 0) + 'h';
-            rateEl.textContent = data.hourly_rate ? data.hourly_rate.toFixed(2) + ' €/h' : '--';
-            totalEl.textContent = Number(data.amount_earned || 0).toFixed(2) + ' €';
+            animateValue(hoursEl, (data.hours_worked || 0) + 'h', 500);
+            animateValue(totalEl, Number(data.amount_earned || 0).toFixed(2) + ' \u20AC', 700);
             renderStatus(data.status, data.notes || '');
         });
     }

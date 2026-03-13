@@ -82,12 +82,20 @@ var App = (function () {
             if (cb) cb();
         });
 
+        var menuEl = document.getElementById('screen-menu');
+        if (menuEl) menuEl.classList.add('no-transition');
         navigate('screen-menu');
+        requestAnimationFrame(function () {
+            if (menuEl) menuEl.classList.remove('no-transition');
+        });
 
         try { Realtime.init(); } catch (e) { console.warn('Realtime init failed:', e); }
     }
 
     function navigate(screenId) {
+        var isBack = (screenId === 'screen-menu');
+        var leavingEl = currentScreen ? document.getElementById(currentScreen) : null;
+
         if (currentScreen === 'screen-clock') {
             Clock.hide();
         }
@@ -97,8 +105,17 @@ var App = (function () {
         }
 
         Utils.each(document.querySelectorAll('.screen'), function (screen) {
-            screen.classList.remove('active');
+            screen.classList.remove('active', 'leaving');
         });
+
+        // Animate the leaving screen
+        if (leavingEl && currentScreen !== screenId) {
+            if (!isBack) {
+                // Going forward: old screen slides left
+                leavingEl.classList.add('leaving');
+            }
+            // Going back: old screen slides right (default translateX(8%) via CSS)
+        }
 
         var target = document.getElementById(screenId);
         if (target) target.classList.add('active');

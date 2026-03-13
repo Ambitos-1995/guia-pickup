@@ -103,38 +103,28 @@
 
                 <nav class="menu-grid" id="menu-grid">
                     <button class="menu-card card-blue" data-screen="screen-schedule" aria-label="Mi Horario">
-                        <span class="card-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></svg>
-                        </span>
+                        <span class="card-icon card-emoji">📅</span>
                         <span class="card-title">Mi Horario</span>
                     </button>
 
                     <button class="menu-card card-green" id="card-fichar" data-screen="screen-clock" aria-label="Fichar">
-                        <span class="card-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        </span>
+                        <span class="card-icon card-emoji">🕐</span>
                         <span class="card-title">Fichar</span>
                         <span class="card-status" id="fichar-status"></span>
                     </button>
 
                     <button class="menu-card card-orange" data-screen="screen-guia" aria-label="Guia Pickup">
-                        <span class="card-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
-                        </span>
+                        <span class="card-icon card-emoji">📦</span>
                         <span class="card-title">Guia Pickup</span>
                     </button>
 
                     <button class="menu-card card-yellow hidden" id="card-payment" data-screen="screen-payment" aria-label="Mi Pago">
-                        <span class="card-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                        </span>
+                        <span class="card-icon card-emoji">💰</span>
                         <span class="card-title">Mi Pago</span>
                     </button>
 
                     <button class="menu-card card-admin" id="card-admin" data-screen="screen-admin" aria-label="Ajustes">
-                        <span class="card-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-                        </span>
+                        <span class="card-icon card-emoji">⚙️</span>
                         <span class="card-title">Ajustes</span>
                     </button>
                 </nav>
@@ -295,17 +285,23 @@
                 </div>
 
                 <div class="payment-cards" id="payment-cards">
-                    <div class="pay-card">
-                        <span class="pay-label">Horas trabajadas</span>
-                        <span class="pay-value" id="pay-hours">--</span>
-                    </div>
-                    <div class="pay-card">
-                        <span class="pay-label">Precio por hora</span>
-                        <span class="pay-value" id="pay-rate">--</span>
+                    <div class="pay-card pay-card-hours">
+                        <span class="pay-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        </span>
+                        <div class="pay-text">
+                            <span class="pay-label">Horas trabajadas</span>
+                            <span class="pay-value" id="pay-hours">--</span>
+                        </div>
                     </div>
                     <div class="pay-card pay-card-total">
-                        <span class="pay-label">Total ganado</span>
-                        <span class="pay-value pay-value-big" id="pay-total">--</span>
+                        <span class="pay-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        </span>
+                        <div class="pay-text">
+                            <span class="pay-label">Total ganado</span>
+                            <span class="pay-value pay-value-big" id="pay-total">--</span>
+                        </div>
                     </div>
                 </div>
 
