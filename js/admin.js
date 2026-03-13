@@ -8,12 +8,12 @@ var Admin = (function () {
 
     function init() {
         var tabs = document.querySelectorAll('.admin-tab');
-        tabs.forEach(function (tab) {
+        Utils.each(tabs, function (tab) {
             tab.addEventListener('click', function () {
-                tabs.forEach(function (item) { item.classList.remove('active'); });
+                Utils.each(tabs, function (item) { item.classList.remove('active'); });
                 tab.classList.add('active');
 
-                document.querySelectorAll('.admin-section').forEach(function (section) {
+                Utils.each(document.querySelectorAll('.admin-section'), function (section) {
                     section.classList.add('hidden');
                     section.classList.remove('active');
                 });

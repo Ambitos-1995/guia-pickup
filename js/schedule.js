@@ -205,7 +205,7 @@ var Schedule = (function () {
     }
 
     function handleCellClick(e) {
-        var cell = e.target.closest('.sched-cell');
+        var cell = Utils.closest(e.target, '.sched-cell', gridEl);
         if (!cell) return;
 
         var session = App.getSession();
@@ -572,7 +572,7 @@ var Schedule = (function () {
             showDialogFeedback('danger', (res && res.message) || 'No se pudo completar la accion.');
         }).catch(function () {
             showDialogFeedback('danger', 'No se pudo completar la accion.');
-        }).finally(function () {
+        }).then(function () {
             isSubmitting = false;
             setDialogBusy(false);
             updateActionAvailability();

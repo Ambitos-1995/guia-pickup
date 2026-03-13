@@ -22,7 +22,7 @@ var App = (function () {
         Realtime.init();
 
         document.getElementById('menu-grid').addEventListener('click', function (e) {
-            var card = e.target.closest('.menu-card');
+            var card = Utils.closest(e.target, '.menu-card', this);
             if (!card) return;
 
             if (card.id === 'card-admin') {
@@ -59,7 +59,7 @@ var App = (function () {
             navigate('screen-menu');
         });
 
-        document.querySelectorAll('.back-btn[data-back]').forEach(function (btn) {
+        Utils.each(document.querySelectorAll('.back-btn[data-back]'), function (btn) {
             btn.addEventListener('click', function () {
                 navigate(btn.dataset.back);
             });
@@ -90,7 +90,7 @@ var App = (function () {
             menuClockTimer = null;
         }
 
-        document.querySelectorAll('.screen').forEach(function (screen) {
+        Utils.each(document.querySelectorAll('.screen'), function (screen) {
             screen.classList.remove('active');
         });
 

@@ -23,7 +23,7 @@ var Pin = (function () {
         promptEl = document.getElementById('pin-prompt');
 
         keypad.addEventListener('click', function (e) {
-            var btn = e.target.closest('.key-btn');
+            var btn = Utils.closest(e.target, '.key-btn', keypad);
             if (!btn || isVerifying) return;
 
             var key = btn.dataset.key;
@@ -68,13 +68,13 @@ var Pin = (function () {
 
     function setDotCount(count) {
         currentMaxLength = count;
-        dots.forEach(function (dot, index) {
+        Utils.each(dots, function (dot, index) {
             dot.style.display = index < count ? '' : 'none';
         });
     }
 
     function updateDots() {
-        dots.forEach(function (dot, index) {
+        Utils.each(dots, function (dot, index) {
             dot.classList.toggle('filled', index < pin.length);
         });
     }

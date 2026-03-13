@@ -217,7 +217,7 @@ var Guia = (function () {
         }
 
         guiaGrid.addEventListener('click', function (e) {
-            var card = e.target.closest('.guia-card');
+            var card = Utils.closest(e.target, '.guia-card', guiaGrid);
             if (!card) return;
             startProcess(card.dataset.process);
         });

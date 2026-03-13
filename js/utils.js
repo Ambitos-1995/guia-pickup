@@ -105,6 +105,43 @@ var Utils = (function () {
         return count;
     }
 
+    function each(list, handler) {
+        if (!list || typeof handler !== 'function') return;
+        for (var i = 0; i < list.length; i++) {
+            handler(list[i], i);
+        }
+    }
+
+    function matches(element, selector) {
+        if (!element || element.nodeType !== 1) return false;
+        var fn = element.matches ||
+                 element.matchesSelector ||
+                 element.msMatchesSelector ||
+                 element.webkitMatchesSelector;
+        return !!(fn && fn.call(element, selector));
+    }
+
+    function closest(target, selector, boundary) {
+        var node = target;
+
+        if (node && node.nodeType !== 1) {
+            node = node.parentElement || node.parentNode || null;
+        }
+
+        while (node && node !== boundary && node !== document) {
+            if (matches(node, selector)) {
+                return node;
+            }
+            node = node.parentElement || node.parentNode || null;
+        }
+
+        if (boundary && matches(boundary, selector)) {
+            return boundary;
+        }
+
+        return null;
+    }
+
     return {
         DAY_NAMES: DAY_NAMES,
         DAY_SHORT: DAY_SHORT,
@@ -121,6 +158,9 @@ var Utils = (function () {
         currentWeekInfo: currentWeekInfo,
         getISOWeeksInYear: getISOWeeksInYear,
         dayOfWeekShort: dayOfWeekShort,
-        countWeekdays: countWeekdays
+        countWeekdays: countWeekdays,
+        each: each,
+        matches: matches,
+        closest: closest
     };
 })();
