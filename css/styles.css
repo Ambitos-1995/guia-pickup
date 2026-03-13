@@ -718,7 +718,12 @@ button:focus-visible {
 /* =====================================================
    GUIA PICKUP SCREEN
    ===================================================== */
-.guia-home { padding: 20px; }
+.guia-home {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
 
 .guia-subtitle {
     font-size: 1.1rem;
@@ -731,6 +736,8 @@ button:focus-visible {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
+    flex: 1;
+    align-content: stretch;
 }
 
 .guia-card {
@@ -738,28 +745,29 @@ button:focus-visible {
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    padding: 16px 10px;
+    padding: 20px 12px;
     background: var(--white);
     border: 2px solid var(--gray-200);
     border-radius: var(--radius);
     text-align: center;
     transition: all var(--transition);
-    min-height: 100px;
+    min-height: 140px;
+    justify-content: center;
     box-shadow: var(--shadow-card);
 }
 
 .guia-card:active { transform: scale(0.96); border-color: var(--red); }
 
-.guia-card-icon { font-size: 2rem; }
+.guia-card-icon { font-size: 2.8rem; }
 
 .guia-card-title {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     font-weight: 700;
     line-height: 1.2;
 }
 
 .guia-card-desc {
-    font-size: 0.65rem;
+    font-size: 0.72rem;
     color: var(--gray-500);
     line-height: 1.3;
 }
@@ -1717,6 +1725,13 @@ body {
         grid-template-columns: repeat(3, 1fr);
         gap: 16px;
     }
+    .guia-card {
+        min-height: 180px;
+        padding: 24px 16px;
+    }
+    .guia-card-icon { font-size: 3.2rem; }
+    .guia-card-title { font-size: 1rem; }
+    .guia-card-desc { font-size: 0.78rem; }
     .payment-cards {
         display: grid;
         grid-template-columns: 1fr 1fr;
