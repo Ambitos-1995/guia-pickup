@@ -453,7 +453,6 @@ button:focus-visible {
     background: var(--gray-100);
     border-color: var(--gray-400);
     color: var(--gray-700);
-    grid-column: 1 / -1;
     min-height: 132px;
 }
 .card-admin .card-icon { color: var(--gray-500); }
@@ -1839,10 +1838,20 @@ body {
     }
 }
 
+/* Mobile 2-column: second row stretches to fill viewport */
+@media (max-width: 833px) {
+    .menu-grid {
+        grid-template-rows: minmax(150px, auto) 1fr;
+    }
+}
+
 /* iPad / tablets grandes (834px+) */
 @media (min-width: 834px) {
     .menu-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .card-admin {
+        grid-column: 1 / -1;
     }
 
     .payment-cards {
