@@ -108,6 +108,17 @@ var Api = (function () {
         }, { requiresAuth: true });
     }
 
+    function createAndAssignSlot(year, week, dayOfWeek, hour) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
+            action: 'create-and-assign',
+            orgSlug: ORG_SLUG,
+            year: year,
+            week: week,
+            dayOfWeek: dayOfWeek,
+            hour: hour
+        }, { requiresAuth: true });
+    }
+
     function releaseSlot(slotId) {
         return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
             action: 'release',
@@ -181,6 +192,7 @@ var Api = (function () {
         checkIn: checkIn,
         getWeekSlots: getWeekSlots,
         assignSlot: assignSlot,
+        createAndAssignSlot: createAndAssignSlot,
         releaseSlot: releaseSlot,
         createAdminSlot: createAdminSlot,
         updateAdminSlot: updateAdminSlot,

@@ -17,6 +17,9 @@ var Schedule = (function () {
     var pendingHour = null;
     var isSubmitting = false;
 
+    var cache = {};
+    var CACHE_TTL = 60000;
+
     function init() {
         gridEl = document.getElementById('schedule-grid');
         labelEl = document.getElementById('week-label');
@@ -44,6 +47,9 @@ var Schedule = (function () {
             if (e.key === 'Enter') submitDialog();
         });
         dialogEl.addEventListener('wa-after-hide', resetDialog);
+
+        var info = Utils.currentWeekInfo();
+        fetchAndCache(info.year, info.week);
     }
 
     function show() {
@@ -85,12 +91,42 @@ var Schedule = (function () {
     function loadWeek() {
         labelEl.textContent = 'Semana ' + String(currentWeek).padStart(2, '0');
         rangeEl.textContent = formatMonthLabel(currentYear, currentWeek);
-        gridEl.innerHTML = '<div class="loading-text schedule-loading" style="grid-column:1/-1">Cargando horario...</div>';
 
-        Api.getWeekSlots(currentYear, currentWeek).then(function (res) {
-            slotsData = normalizeSlots((res && res.success && res.data) ? res.data : []);
+        var key = currentYear + '-' + currentWeek;
+        var cached = cache[key];
+
+        if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+            slotsData = cached.data;
             renderGrid();
+            fetchAndCache(currentYear, currentWeek);
+            return;
+        }
+
+        if (cached) {
+            slotsData = cached.data;
+            renderGrid();
+        } else {
+            gridEl.innerHTML = '<div class="loading-text schedule-loading" style="grid-column:1/-1">Cargando horario...</div>';
+        }
+
+        fetchAndCache(currentYear, currentWeek);
+    }
+
+    function fetchAndCache(y, w) {
+        var key = y + '-' + w;
+        Api.getWeekSlots(y, w).then(function (res) {
+            var data = normalizeSlots((res && res.success && res.data) ? res.data : []);
+            cache[key] = { data: data, timestamp: Date.now() };
+            if (currentYear === y && currentWeek === w) {
+                slotsData = data;
+                renderGrid();
+            }
         });
+    }
+
+    function invalidateCache() {
+        var key = currentYear + '-' + currentWeek;
+        delete cache[key];
     }
 
     function renderGrid() {
@@ -152,8 +188,13 @@ var Schedule = (function () {
         if (!cell) return;
 
         if (cell.classList.contains('sched-empty')) {
-            if (!App.hasAdminAccess()) return;
-            openDialog('create', null, parseInt(cell.dataset.day, 10), parseInt(cell.dataset.hour, 10));
+            var day = parseInt(cell.dataset.day, 10);
+            var hour = parseInt(cell.dataset.hour, 10);
+            if (App.hasAdminAccess()) {
+                openDialog('create', null, day, hour);
+            } else {
+                openDialog('assign-empty', null, day, hour);
+            }
             return;
         }
 
@@ -175,7 +216,7 @@ var Schedule = (function () {
         pendingHour = hour || null;
         clearDialogFeedback();
 
-        var needsPin = (mode === 'assign' || mode === 'release') && !App.getSession();
+        var needsPin = (mode === 'assign' || mode === 'release' || mode === 'assign-empty') && !App.getSession();
         dialogPinEl.value = '';
         dialogPinEl.classList.toggle('hidden', !needsPin);
 
@@ -193,7 +234,7 @@ var Schedule = (function () {
             dialogBodyEl.textContent = 'Esta franja esta libre. Puedes borrarla para limpiar el horario.';
             dialogSubmitEl.textContent = 'Borrar franja';
             dialogSubmitEl.setAttribute('variant', 'danger');
-        } else if (mode === 'assign') {
+        } else if (mode === 'assign' || mode === 'assign-empty') {
             dialogEl.label = 'Reservar franja';
             dialogModeEl.textContent = 'Franja disponible';
             dialogTitleEl.textContent = 'Reservar tu turno';
@@ -215,7 +256,7 @@ var Schedule = (function () {
             dialogSubmitEl.setAttribute('variant', 'neutral');
         }
 
-        if (mode === 'create') {
+        if (mode === 'create' || mode === 'assign-empty') {
             dialogSummaryEl.textContent = Utils.DAY_NAMES[pendingDay] + ' · ' + pad2(pendingHour) + ':00 - ' + pad2(pendingHour + 1) + ':00';
         } else if (slot) {
             dialogSummaryEl.textContent = buildSlotSummary(slot);
@@ -227,7 +268,7 @@ var Schedule = (function () {
     function submitDialog() {
         if (isSubmitting) return;
 
-        if ((dialogMode === 'assign' || dialogMode === 'release') && !ensureEmployeeSession()) {
+        if ((dialogMode === 'assign' || dialogMode === 'release' || dialogMode === 'assign-empty') && !ensureEmployeeSession()) {
             return;
         }
 
@@ -247,6 +288,8 @@ var Schedule = (function () {
             request = Api.deleteAdminSlot(selectedSlot.id);
         } else if (dialogMode === 'assign') {
             request = Api.assignSlot(selectedSlot.id);
+        } else if (dialogMode === 'assign-empty') {
+            request = Api.createAndAssignSlot(currentYear, currentWeek, pendingDay, pendingHour);
         } else {
             request = Api.releaseSlot(selectedSlot.id);
         }
@@ -254,8 +297,8 @@ var Schedule = (function () {
         request.then(function (res) {
             if (res && res.success) {
                 dialogEl.open = false;
+                invalidateCache();
                 loadWeek();
-                App.showMenu();
                 return;
             }
             showDialogFeedback('danger', (res && res.message) || 'No se pudo completar la accion.');

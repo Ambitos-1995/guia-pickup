@@ -20,6 +20,7 @@ interface RequestBody {
   startTime?: string;
   endTime?: string;
   slotId?: string;
+  hour?: number;
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -57,6 +58,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
         return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
       }
       return await handleAssign(url, serviceRoleKey, auth.session, body);
+    }
+
+    if (action === "create-and-assign") {
+      const auth = await requireSession(req, url, serviceRoleKey, ["respondent", "org_admin"]);
+      if (auth instanceof Response) return auth;
+      if (auth.session.organization_id !== orgId) {
+        return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
+      }
+      return await handleCreateAndAssign(url, serviceRoleKey, auth.session, body);
     }
 
     if (action === "release") {
@@ -425,6 +435,82 @@ async function handleDelete(
   });
 
   return json({ success: true });
+}
+
+async function handleCreateAndAssign(
+  url: string,
+  key: string,
+  session: { id: string; organization_id: string; role: "respondent" | "org_admin"; employee_id: string | null },
+  body: RequestBody,
+): Promise<Response> {
+  if (!session.employee_id) {
+    return json({ success: false, message: "Sesion de empleado requerida" }, 403);
+  }
+
+  const year = Number(body.year);
+  const week = Number(body.week);
+  const dayOfWeek = Number(body.dayOfWeek);
+  const hour = Number(body.hour);
+
+  if (!year || !week || !dayOfWeek || isNaN(hour)) {
+    return json({ success: false, message: "Faltan datos de la franja" }, 400);
+  }
+
+  const startTime = String(hour).padStart(2, "0") + ":00:00";
+  const endTime = String(hour + 1).padStart(2, "0") + ":00:00";
+
+  const insert = await fetchJson<Array<{
+    id: string;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+    employee_id: string | null;
+  }>>(
+    `${url}/rest/v1/kiosk_schedule_slots`,
+    {
+      method: "POST",
+      headers: {
+        ...authHeaders(key),
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        organization_id: session.organization_id,
+        year,
+        week,
+        day_of_week: dayOfWeek,
+        start_time: startTime,
+        end_time: endTime,
+        employee_id: session.employee_id,
+      }),
+    },
+  );
+
+  if (!insert.ok || !insert.data[0]) {
+    return json({ success: false, message: "Error al crear y asignar la franja" }, 500);
+  }
+
+  await logAudit(url, key, {
+    organizationId: session.organization_id,
+    actorSessionId: session.id,
+    actorRole: session.role,
+    employeeId: session.employee_id,
+    slotId: insert.data[0].id,
+    action: "schedule_slot_created_and_assigned",
+    metadata: { year, week, dayOfWeek, startTime, endTime },
+  });
+
+  return json({
+    success: true,
+    data: {
+      id: insert.data[0].id,
+      day_of_week: insert.data[0].day_of_week,
+      start_time: insert.data[0].start_time,
+      end_time: insert.data[0].end_time,
+      assigned_employee_profile_id: session.employee_id,
+      status: "occupied",
+    },
+  });
 }
 
 async function fetchSlot(
