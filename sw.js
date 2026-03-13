@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pickup-tmg-v48';
+var CACHE_NAME = 'pickup-tmg-v49';
 var FILES_TO_CACHE = [
     './',
     './index.html',
@@ -48,11 +48,13 @@ var FILES_TO_CACHE = [
     './img/fotos-con-circulos/11.png'
 ];
 
-// Install: cache all static assets (do NOT skipWaiting — user controls update)
+// Install: cache all static assets, then activate immediately
 self.addEventListener('install', function (e) {
     e.waitUntil(
         caches.open(CACHE_NAME).then(function (cache) {
             return cache.addAll(FILES_TO_CACHE);
+        }).then(function () {
+            return self.skipWaiting();
         })
     );
 });
