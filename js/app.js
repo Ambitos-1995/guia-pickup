@@ -62,6 +62,14 @@ var App = (function () {
         });
 
         Utils.bindPress(document.getElementById('logout-btn'), logout);
+        Utils.bindPress(document.getElementById('menu-admin-shortcut'), function () {
+            if (hasAdminAccess()) {
+                navigate('screen-admin');
+            } else {
+                Pin.openForAdmin();
+                navigate('screen-pin');
+            }
+        });
         Utils.bindPress(document.getElementById('menu-login-btn'), function () {
             Pin.openForEmployee('screen-menu');
             navigate('screen-pin');
@@ -153,6 +161,7 @@ var App = (function () {
         var ficharCard = document.getElementById('card-fichar');
         var paymentCard = document.getElementById('card-payment');
         var adminCard = document.getElementById('card-admin');
+        var adminShortcut = document.getElementById('menu-admin-shortcut');
         var loginBtn = document.getElementById('menu-login-btn');
         var logoutBtn = document.getElementById('logout-btn');
 
@@ -161,7 +170,8 @@ var App = (function () {
             statusEl.textContent = activeSession.currentStatus === 'checked_in' ? 'Entrada registrada' : '';
             ficharCard.classList.remove('hidden');
             paymentCard.classList.remove('hidden');
-            adminCard.classList.remove('hidden');
+            adminCard.classList.add('hidden');
+            adminShortcut.classList.remove('hidden');
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
         } else if (activeSession && activeSession.role === 'org_admin') {
@@ -170,6 +180,7 @@ var App = (function () {
             ficharCard.classList.remove('hidden');
             paymentCard.classList.add('hidden');
             adminCard.classList.remove('hidden');
+            adminShortcut.classList.add('hidden');
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
         } else {
@@ -178,6 +189,7 @@ var App = (function () {
             ficharCard.classList.remove('hidden');
             paymentCard.classList.add('hidden');
             adminCard.classList.remove('hidden');
+            adminShortcut.classList.add('hidden');
             loginBtn.classList.remove('hidden');
             logoutBtn.classList.add('hidden');
         }

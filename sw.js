@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pickup-tmg-v53';
+var CACHE_NAME = 'pickup-tmg-v54';
 var FILES_TO_CACHE = [
     './',
     './index.html',

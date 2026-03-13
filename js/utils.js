@@ -1,11 +1,3 @@
-/* Debug: show JS errors visually on screen */
-window.onerror = function (msg, src, line) {
-    var d = document.createElement('div');
-    d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:red;color:white;padding:8px;font-size:12px;word-break:break-all';
-    d.textContent = 'JS Error: ' + msg + ' (' + src + ':' + line + ')';
-    document.body.appendChild(d);
-};
-
 /* =====================================================
    UTILS - Date helpers, ISO week, formatters
    ===================================================== */
