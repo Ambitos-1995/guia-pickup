@@ -145,40 +145,64 @@ var Utils = (function () {
         return !!(element && (element.disabled || element.getAttribute('aria-disabled') === 'true'));
     }
 
-    // click-only mode: touch-action:manipulation in CSS removes the 300ms delay,
-    // so plain click events work reliably on all kiosk touchscreens and browsers.
-    function isRecentTouchLikePress() {
-        return false;
+    // Timestamp of last touch event handled — shared across all bindPress/delegatePress
+    // to prevent click from double-firing after touch.
+    var lastTouchTime = 0;
+
+    function isRecentTouchLikePress(thresholdMs) {
+        var threshold = typeof thresholdMs === 'number' ? thresholdMs : 500;
+        return Date.now() - lastTouchTime < threshold;
     }
 
     function bindPress(target, handler) {
         if (!target || typeof handler !== 'function') return function () {};
 
-        function handleClick(event) {
+        function onTouch(event) {
             if (isDisabled(target)) return;
+            event.preventDefault();
+            lastTouchTime = Date.now();
             handler.call(target, event);
         }
 
-        target.addEventListener('click', handleClick);
+        function onClick(event) {
+            if (isDisabled(target)) return;
+            if (Date.now() - lastTouchTime < 500) return;
+            handler.call(target, event);
+        }
+
+        target.addEventListener('touchend', onTouch);
+        target.addEventListener('click', onClick);
 
         return function () {
-            target.removeEventListener('click', handleClick);
+            target.removeEventListener('touchend', onTouch);
+            target.removeEventListener('click', onClick);
         };
     }
 
     function delegatePress(container, selector, handler) {
         if (!container || !selector || typeof handler !== 'function') return function () {};
 
-        function handleClick(event) {
+        function onTouch(event) {
             var matched = closest(event.target, selector, container);
             if (!matched || isDisabled(matched)) return;
+            event.preventDefault();
+            lastTouchTime = Date.now();
             handler.call(matched, event, matched);
         }
 
-        container.addEventListener('click', handleClick);
+        function onClick(event) {
+            var matched = closest(event.target, selector, container);
+            if (!matched || isDisabled(matched)) return;
+            if (Date.now() - lastTouchTime < 500) return;
+            handler.call(matched, event, matched);
+        }
+
+        container.addEventListener('touchend', onTouch);
+        container.addEventListener('click', onClick);
 
         return function () {
-            container.removeEventListener('click', handleClick);
+            container.removeEventListener('touchend', onTouch);
+            container.removeEventListener('click', onClick);
         };
     }
 
