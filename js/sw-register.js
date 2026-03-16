@@ -16,6 +16,7 @@ if ("serviceWorker" in navigator) {
         window.addEventListener('load', function () {
             navigator.serviceWorker.register('./sw.js')
                 .then(function (reg) {
+                    reg.update().catch(function () {});
                     setInterval(function () { reg.update(); }, 60000);
 
                     document.addEventListener('visibilitychange', function () {

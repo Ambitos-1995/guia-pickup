@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pickup-tmg-v58';
+var CACHE_NAME = 'pickup-tmg-v59';
 var FILES_TO_CACHE = [
     './',
     './index.html',
@@ -48,6 +48,67 @@ var FILES_TO_CACHE = [
     './img/fotos-con-circulos/11.png'
 ];
 
+function isSameOrigin(url) {
+    return url.origin === self.location.origin;
+}
+
+function isImmutableAsset(pathname) {
+    return pathname.indexOf('/vendor/') === 0 ||
+        pathname.indexOf('/icons/') === 0 ||
+        pathname.indexOf('/img/') === 0 ||
+        pathname.indexOf('/fonts/') === 0;
+}
+
+function isAppShellRequest(requestUrl) {
+    var pathname = requestUrl.pathname;
+    return pathname === '/' ||
+        pathname === '/index.html' ||
+        pathname === '/manifest.json' ||
+        pathname.indexOf('/css/') === 0 ||
+        pathname.indexOf('/js/') === 0;
+}
+
+function cacheFirst(request) {
+    return caches.match(request).then(function (cached) {
+        if (cached) return cached;
+
+        return fetch(request).then(function (response) {
+            if (response && response.status === 200) {
+                var clone = response.clone();
+                caches.open(CACHE_NAME).then(function (cache) {
+                    cache.put(request, clone);
+                });
+            }
+            return response;
+        });
+    });
+}
+
+function networkFirst(request) {
+    return fetch(request).then(function (response) {
+        if (response && response.status === 200) {
+            var clone = response.clone();
+            caches.open(CACHE_NAME).then(function (cache) {
+                cache.put(request, clone);
+            });
+        }
+        return response;
+    }).catch(function () {
+        return caches.match(request).then(function (cached) {
+            if (cached) return cached;
+
+            if (request.mode === 'navigate') {
+                return caches.match('./index.html');
+            }
+
+            return new Response('Sin conexion', {
+                status: 503,
+                statusText: 'Offline'
+            });
+        });
+    });
+}
+
 // Install: cache all static assets, then activate immediately
 self.addEventListener('install', function (e) {
     e.waitUntil(
@@ -82,6 +143,7 @@ self.addEventListener('activate', function (e) {
 
 // Fetch: cache-first for static, network-first for API/external
 self.addEventListener('fetch', function (e) {
+    var requestUrl = new URL(e.request.url);
     var url = e.request.url;
 
     // Skip non-GET, API calls, and external requests (Supabase, etc.)
@@ -98,19 +160,20 @@ self.addEventListener('fetch', function (e) {
         return;
     }
 
-    // Static assets: cache-first
-    e.respondWith(
-        caches.match(e.request).then(function (cached) {
-            return cached || fetch(e.request).then(function (response) {
-                // Cache new static resources on the fly
-                if (response.status === 200) {
-                    var clone = response.clone();
-                    caches.open(CACHE_NAME).then(function (cache) {
-                        cache.put(e.request, clone);
-                    });
-                }
-                return response;
-            });
-        })
-    );
+    if (!isSameOrigin(requestUrl)) {
+        e.respondWith(fetch(e.request));
+        return;
+    }
+
+    if (isImmutableAsset(requestUrl.pathname)) {
+        e.respondWith(cacheFirst(e.request));
+        return;
+    }
+
+    if (isAppShellRequest(requestUrl) || e.request.mode === 'navigate') {
+        e.respondWith(networkFirst(e.request));
+        return;
+    }
+
+    e.respondWith(cacheFirst(e.request));
 });
