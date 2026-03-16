@@ -280,7 +280,7 @@ async function handleCreate(
   );
 
   if (!insert.ok || !insert.data[0]) {
-    return json({ success: false, message: "Error al crear empleado" }, 500);
+    return json({ success: false, message: getRestErrorMessage(insert, "Error al crear empleado") }, 500);
   }
 
   await logAudit(supabaseUrl, key, {
@@ -379,7 +379,7 @@ async function handleUpdate(
   );
 
   if (!update.ok || !update.data[0]) {
-    return json({ success: false, message: "Error al actualizar empleado" }, 500);
+    return json({ success: false, message: getRestErrorMessage(update, "Error al actualizar empleado") }, 500);
   }
 
   await logAudit(supabaseUrl, key, {
@@ -401,4 +401,23 @@ function getHeaders(key: string): Record<string, string> {
     Authorization: `Bearer ${key}`,
     apikey: key,
   };
+}
+
+function getRestErrorMessage(
+  result: { data: unknown },
+  fallback: string,
+): string {
+  if (!result || !result.data || typeof result.data !== "object") {
+    return fallback;
+  }
+
+  const payload = result.data as Record<string, unknown>;
+  const message = typeof payload.message === "string" ? payload.message.trim() : "";
+  const details = typeof payload.details === "string" ? payload.details.trim() : "";
+
+  if (message && details) {
+    return `${message}: ${details}`;
+  }
+
+  return message || details || fallback;
 }
