@@ -59,6 +59,12 @@ var Admin = (function () {
                 if (target) {
                     target.classList.remove('hidden');
                     target.classList.add('active');
+
+                    if (target.id === 'admin-payments') {
+                        loadPayMonth();
+                    } else if (target.id === 'admin-employees') {
+                        loadEmployees();
+                    }
                 }
             });
         });
@@ -340,18 +346,41 @@ var Admin = (function () {
         Api.getEmployees().then(function (res) {
             list.textContent = '';
 
-            if (!res || !res.success || !res.data || res.data.length === 0) {
-                var empty = document.createElement('p');
-                empty.className = 'loading-text';
-                empty.textContent = 'No hay empleados registrados';
-                list.appendChild(empty);
+            if (!res || !res.success) {
+                renderEmployeeState(list, resolveEmployeeLoadError(res), true);
+                return;
+            }
+
+            if (!res.data || res.data.length === 0) {
+                renderEmployeeState(list, 'No hay empleados registrados');
                 return;
             }
 
             res.data.forEach(function (employee) {
                 list.appendChild(renderEmployeeItem(employee));
             });
+        }).catch(function () {
+            list.textContent = '';
+            renderEmployeeState(list, 'No se pudieron cargar los empleados.', true);
         });
+    }
+
+    function renderEmployeeState(list, message, isError) {
+        var state = document.createElement('p');
+        state.className = 'loading-text';
+        state.textContent = message;
+        if (isError) {
+            state.style.color = '#b91c1c';
+        }
+        list.appendChild(state);
+    }
+
+    function resolveEmployeeLoadError(res) {
+        if (res && (res.error === 'AUTH_REQUIRED' || res.error === 'SESSION_EXPIRED' || res.error === 'SESSION_NOT_FOUND' || res.error === 'TOKEN_INVALID')) {
+            return 'La sesion de ajustes ha caducado. Vuelve a entrar.';
+        }
+
+        return (res && res.message) || 'No se pudieron cargar los empleados.';
     }
 
     function renderEmployeeItem(employee) {

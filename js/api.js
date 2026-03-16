@@ -30,7 +30,7 @@ var Api = (function () {
             }).then(function (payload) {
                 payload.httpStatus = res.status;
                 if (opts.requiresAuth && (res.status === 401 || res.status === 403) &&
-                    payload && (payload.error === 'SESSION_EXPIRED' || payload.error === 'TOKEN_INVALID' || payload.error === 'SESSION_NOT_FOUND')) {
+                    payload && (payload.error === 'AUTH_REQUIRED' || payload.error === 'SESSION_EXPIRED' || payload.error === 'TOKEN_INVALID' || payload.error === 'SESSION_NOT_FOUND')) {
                     if (typeof App !== 'undefined' && App.handleAuthFailure) {
                         App.handleAuthFailure(payload.message || 'Tu sesion ha caducado.');
                     }
