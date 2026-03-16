@@ -123,8 +123,8 @@ var Pin = (function () {
             keypad.style.pointerEvents = 'auto';
 
             if (!(res && res.success && res.data)) {
-                showError((res && res.message) || 'PIN incorrecto');
                 clearPin();
+                showError((res && res.message) || 'PIN incorrecto');
                 return;
             }
 
