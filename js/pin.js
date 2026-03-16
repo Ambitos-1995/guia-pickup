@@ -62,6 +62,7 @@ var Pin = (function () {
         pin = '';
         updateDots();
         hideError();
+        document.getElementById('pin-dots').classList.remove('shake');
     }
 
     function setDotCount(count) {
@@ -81,9 +82,15 @@ var Pin = (function () {
         if (toastTimer) clearTimeout(toastTimer);
         toastEl.textContent = message;
         toastEl.classList.add('show');
+
+        var dotsContainer = document.getElementById('pin-dots');
+        dotsContainer.classList.remove('shake');
+        void dotsContainer.offsetWidth;
+        dotsContainer.classList.add('shake');
+
         toastTimer = setTimeout(function () {
             toastEl.classList.remove('show');
-        }, 2500);
+        }, 4000);
     }
 
     function hideError() {
@@ -133,7 +140,7 @@ var Pin = (function () {
 
             clearPin();
             if (mode === 'login') App.navigate(employeeTarget || 'screen-menu');
-            else if (mode === 'admin') App.navigate('screen-admin');
+            else if (mode === 'admin') App.navigate('screen-menu');
             else App.navigate(employeeTarget || 'screen-clock');
         });
     }

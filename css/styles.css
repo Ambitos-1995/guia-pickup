@@ -157,6 +157,17 @@ html.install-banner-active #screen-guia {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-8px); }
+    30% { transform: translateX(8px); }
+    45% { transform: translateX(-6px); }
+    60% { transform: translateX(6px); }
+    75% { transform: translateX(-3px); }
+    90% { transform: translateX(3px); }
+}
+.pin-dots.shake { animation: shake 0.5s ease-in-out; }
+
 /* --- Buttons base --- */
 button {
     font-family: var(--font);
@@ -451,20 +462,22 @@ button:focus-visible {
 
 .menu-admin-shortcut {
     flex-shrink: 0;
-    width: 40px;
     height: 40px;
+    padding: 0 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
-    background: var(--gray-100);
-    color: var(--gray-500);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--red);
+    font-size: 0.9rem;
+    font-weight: 700;
     transition: all var(--transition);
 }
 
 .menu-admin-shortcut:active {
-    background: var(--gray-200);
-    transform: scale(0.92);
+    background: rgba(227, 30, 36, 0.08);
+    transform: scale(0.95);
 }
 
 .menu-clock {

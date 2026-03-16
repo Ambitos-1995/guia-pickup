@@ -192,7 +192,7 @@ var App = (function () {
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
         } else if (activeSession && activeSession.role === 'org_admin') {
-            greetingEl.textContent = 'Ajustes';
+            greetingEl.textContent = 'Administrador';
             statusEl.textContent = '';
             ficharCard.classList.remove('hidden');
             paymentCard.classList.add('hidden');
