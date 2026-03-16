@@ -1,6 +1,6 @@
 {
     "name": "Punto de encuentro inclusivo",
-    "short_name": "Punto inclusivo",
+    "short_name": "Punto de encuentro inclusivo",
     "description": "Fichaje y horarios para el punto pickup SEUR",
     "start_url": "./index.html",
     "scope": "./",

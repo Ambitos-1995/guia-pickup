@@ -35,6 +35,11 @@ var Api = (function () {
                         App.handleAuthFailure(payload.message || 'Tu sesion ha caducado.');
                     }
                 }
+                if (opts.requiresAuth && session && session.accessToken &&
+                    !(res.status === 401 || res.status === 403) &&
+                    typeof App !== 'undefined' && App.touchSession) {
+                    App.touchSession();
+                }
                 return payload;
             });
         }).catch(function () {

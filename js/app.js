@@ -4,6 +4,10 @@
 var App = (function () {
     'use strict';
 
+    var SESSION_STORAGE_KEY = 'pickup-tmg-session-v1';
+    var EMPLOYEE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+    var ADMIN_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
     var session = null;
     var currentScreen = 'screen-menu';
     var menuClockTimer = null;
@@ -19,6 +23,7 @@ var App = (function () {
         Payment.init();
         Admin.init();
         Install.init();
+        restoreSession();
 
         Utils.delegatePress(document.getElementById('menu-grid'), '.menu-card', function (e, card) {
             if (card.id === 'card-admin') {
@@ -135,19 +140,21 @@ var App = (function () {
     }
 
     function setSession(data) {
-        session = data;
+        session = normalizeSession(data);
+        persistSession();
         showMenu();
     }
 
     function clearSession() {
         session = null;
+        persistSession();
         Pin.clearPin();
     }
 
     function getSession() {
         if (!session) return null;
 
-        if (session.expiresAt && new Date(session.expiresAt).getTime() <= Date.now()) {
+        if (isSessionExpired(session)) {
             clearSession();
             if (currentScreen !== 'screen-menu' && currentScreen !== 'screen-pin') {
                 navigate('screen-menu');
@@ -155,6 +162,24 @@ var App = (function () {
             return null;
         }
 
+        return session;
+    }
+
+    function touchSession() {
+        if (!session) return null;
+
+        var idleTimeoutMs = getIdleTimeoutMs(session.role);
+        if (!idleTimeoutMs) return session;
+
+        var absoluteExpiryMs = parseExpiry(session.expiresAt);
+        var nextIdleExpiryMs = Date.now() + idleTimeoutMs;
+
+        if (absoluteExpiryMs) {
+            nextIdleExpiryMs = Math.min(nextIdleExpiryMs, absoluteExpiryMs);
+        }
+
+        session.idleExpiresAt = new Date(nextIdleExpiryMs).toISOString();
+        persistSession();
         return session;
     }
 
@@ -302,6 +327,103 @@ var App = (function () {
         return !!(activeSession && activeSession.role === 'respondent');
     }
 
+    function restoreSession() {
+        var stored = readStoredSession();
+        if (!stored) return;
+
+        session = normalizeSession(stored);
+        if (!session || isSessionExpired(session)) {
+            session = null;
+            persistSession();
+        }
+    }
+
+    function normalizeSession(data) {
+        if (!data || typeof data !== 'object') return null;
+
+        var normalized = {
+            accessToken: typeof data.accessToken === 'string' ? data.accessToken : '',
+            expiresAt: typeof data.expiresAt === 'string' ? data.expiresAt : '',
+            idleExpiresAt: typeof data.idleExpiresAt === 'string' ? data.idleExpiresAt : '',
+            role: data.role === 'org_admin' ? 'org_admin' : 'respondent',
+            employeeId: data.employeeId || null,
+            employeeName: typeof data.employeeName === 'string' ? data.employeeName : '',
+            organizationId: data.organizationId || null,
+            currentStatus: typeof data.currentStatus === 'string' ? data.currentStatus : 'not_checked_in'
+        };
+
+        if (!normalized.accessToken || !normalized.expiresAt) {
+            return null;
+        }
+
+        if (!normalized.idleExpiresAt) {
+            normalized.idleExpiresAt = createIdleExpiry(normalized.role, normalized.expiresAt);
+        }
+
+        return normalized;
+    }
+
+    function isSessionExpired(data) {
+        if (!data) return true;
+
+        var now = Date.now();
+        var absoluteExpiryMs = parseExpiry(data.expiresAt);
+        var idleExpiryMs = parseExpiry(data.idleExpiresAt);
+
+        if (absoluteExpiryMs && absoluteExpiryMs <= now) return true;
+        if (idleExpiryMs && idleExpiryMs <= now) return true;
+        return false;
+    }
+
+    function createIdleExpiry(role, absoluteExpiry) {
+        var idleTimeoutMs = getIdleTimeoutMs(role);
+        if (!idleTimeoutMs) return absoluteExpiry || '';
+
+        var absoluteExpiryMs = parseExpiry(absoluteExpiry);
+        var nextIdleExpiryMs = Date.now() + idleTimeoutMs;
+
+        if (absoluteExpiryMs) {
+            nextIdleExpiryMs = Math.min(nextIdleExpiryMs, absoluteExpiryMs);
+        }
+
+        return new Date(nextIdleExpiryMs).toISOString();
+    }
+
+    function getIdleTimeoutMs(role) {
+        return role === 'org_admin' ? ADMIN_IDLE_TIMEOUT_MS : EMPLOYEE_IDLE_TIMEOUT_MS;
+    }
+
+    function parseExpiry(value) {
+        if (!value) return 0;
+        var timestamp = new Date(value).getTime();
+        return isNaN(timestamp) ? 0 : timestamp;
+    }
+
+    function persistSession() {
+        try {
+            if (!window.localStorage) return;
+
+            if (session) {
+                window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+            } else {
+                window.localStorage.removeItem(SESSION_STORAGE_KEY);
+            }
+        } catch (error) {
+            console.warn('Session persistence unavailable:', error);
+        }
+    }
+
+    function readStoredSession() {
+        try {
+            if (!window.localStorage) return null;
+            var raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch (error) {
+            console.warn('Stored session could not be restored:', error);
+            return null;
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         init();
     });
@@ -312,6 +434,7 @@ var App = (function () {
         setSession: setSession,
         getSession: getSession,
         clearSession: clearSession,
+        touchSession: touchSession,
         logout: logout,
         hasAdminAccess: hasAdminAccess,
         hasEmployeeAccess: hasEmployeeAccess,

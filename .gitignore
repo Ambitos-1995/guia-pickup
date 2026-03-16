@@ -16,6 +16,8 @@ nul
 # Node.js
 node_modules/
 package-lock.json
+playwright-report/
+test-results/
 
 # Scripts de desarrollo (no necesarios en produccion)
 generate-icons.js
