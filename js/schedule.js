@@ -10,7 +10,7 @@ var Schedule = (function () {
 
     var currentYear, currentWeek;
     var gridEl, labelEl, rangeEl, contextEl, dialogEl;
-    var dialogModeEl, dialogTitleEl, dialogSummaryEl, dialogBodyEl, dialogNoteEl;
+    var dialogModeEl, dialogTitleEl, dialogSummaryEl, dialogFocusEl, dialogFocusDayEl, dialogFocusTimeEl, dialogBodyEl, dialogNoteEl;
     var dialogFeedbackEl, dialogSubmitEl, dialogSecondaryEl;
     var dialogAdminPanelEl, dialogEmployeeEl, dialogHelperEl;
 
@@ -36,6 +36,9 @@ var Schedule = (function () {
         dialogModeEl = document.getElementById('schedule-slot-mode');
         dialogTitleEl = document.getElementById('schedule-slot-title');
         dialogSummaryEl = document.getElementById('schedule-slot-summary');
+        dialogFocusEl = document.getElementById('schedule-slot-focus');
+        dialogFocusDayEl = document.getElementById('schedule-slot-focus-day');
+        dialogFocusTimeEl = document.getElementById('schedule-slot-focus-time');
         dialogBodyEl = document.getElementById('schedule-slot-body');
         dialogNoteEl = document.getElementById('schedule-slot-note');
         dialogFeedbackEl = document.getElementById('schedule-slot-feedback');
@@ -298,16 +301,19 @@ var Schedule = (function () {
             key: 'employee-create',
             label: 'Crear y reservar franja',
             badge: 'Hueco disponible',
-            title: 'Crear y reservar tu turno',
-            summary: buildPendingSummary(day, hour),
-            body: 'No existe franja en este hueco. Al confirmar se creara y quedara reservada a tu nombre.',
+            title: 'Crear y reservar franja',
+            summary: '',
+            focusDay: Utils.DAY_NAMES[day],
+            focusTime: buildPendingTimeRange(hour),
+            body: '',
             note: '',
             primaryAction: 'employee-create',
             primaryLabel: 'Crear y reservar',
             primaryVariant: 'brand',
             primaryAppearance: 'accent',
             secondaryAction: '',
-            showAdminPanel: false
+            showAdminPanel: false,
+            compactLayout: true
         }, null, day, hour);
     }
 
@@ -426,10 +432,15 @@ var Schedule = (function () {
         clearDialogFeedback();
 
         dialogEl.label = state.label || 'Gestionar franja';
+        dialogEl.classList.toggle('compact-create', !!state.compactLayout);
         dialogModeEl.textContent = state.badge || '';
         dialogModeEl.classList.toggle('hidden', !state.badge);
         dialogTitleEl.textContent = state.title || 'Gestionar franja';
         dialogSummaryEl.textContent = state.summary || '--';
+        dialogSummaryEl.classList.toggle('hidden', !state.summary);
+        dialogFocusDayEl.textContent = state.focusDay || '';
+        dialogFocusTimeEl.textContent = state.focusTime || '';
+        dialogFocusEl.classList.toggle('hidden', !state.focusDay && !state.focusTime);
         dialogBodyEl.textContent = state.body || '';
         dialogBodyEl.classList.toggle('hidden', !state.body);
         dialogNoteEl.textContent = state.note || '';
@@ -680,10 +691,15 @@ var Schedule = (function () {
         isSubmitting = false;
         dialogToken++;
         dialogEl.label = 'Gestionar franja';
+        dialogEl.classList.remove('compact-create');
         dialogModeEl.classList.remove('hidden');
         dialogModeEl.textContent = 'Turno';
         dialogTitleEl.textContent = 'Gestionar franja';
         dialogSummaryEl.textContent = '--';
+        dialogSummaryEl.classList.remove('hidden');
+        dialogFocusDayEl.textContent = '';
+        dialogFocusTimeEl.textContent = '';
+        dialogFocusEl.classList.add('hidden');
         dialogBodyEl.textContent = '';
         dialogBodyEl.classList.remove('hidden');
         dialogNoteEl.textContent = '';
@@ -779,6 +795,10 @@ var Schedule = (function () {
 
     function buildPendingSummary(day, hour) {
         return Utils.DAY_NAMES[day] + ' - ' + pad2(hour) + ':00 - ' + pad2(hour + 1) + ':00';
+    }
+
+    function buildPendingTimeRange(hour) {
+        return pad2(hour) + ':00 - ' + pad2(hour + 1) + ':00';
     }
 
     function formatMonthLabel(year, week) {

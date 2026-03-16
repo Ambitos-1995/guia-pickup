@@ -1,23 +1,25 @@
 /* =====================================================
-   CLOCK - Fichar entrada con conciliacion posterior
+   CLOCK - Fichar entrada / salida con conciliacion
    ===================================================== */
 var Clock = (function () {
     'use strict';
 
     var clockTimer;
     var timeEl, statusEl, todaySlotEl;
-    var btnIn, feedbackEl, feedbackMsg, feedbackScheduleBtn;
+    var btnIn, btnOut, feedbackEl, feedbackMsg, feedbackScheduleBtn;
 
     function init() {
         timeEl = document.getElementById('clock-time');
         statusEl = document.getElementById('clock-status');
         todaySlotEl = document.getElementById('clock-today-slot');
         btnIn = document.getElementById('btn-check-in');
+        btnOut = document.getElementById('btn-check-out');
         feedbackEl = document.getElementById('clock-feedback');
         feedbackMsg = document.getElementById('feedback-msg');
         feedbackScheduleBtn = document.getElementById('feedback-schedule-btn');
 
         Utils.bindPress(btnIn, doCheckIn);
+        Utils.bindPress(btnOut, doCheckOut);
         Utils.bindPress(feedbackScheduleBtn, function () {
             App.navigate('screen-schedule');
         });
@@ -52,13 +54,20 @@ var Clock = (function () {
         feedbackEl.classList.add('hidden');
 
         if (session.currentStatus === 'checked_in') {
-            statusEl.className = 'clock-status status-done';
+            statusEl.className = 'clock-status status-pending-out';
             statusEl.textContent = 'Entrada registrada hoy';
             btnIn.classList.add('hidden');
+            btnOut.classList.remove('hidden');
+        } else if (session.currentStatus === 'checked_out') {
+            statusEl.className = 'clock-status status-done';
+            statusEl.textContent = 'Turno completado hoy';
+            btnIn.classList.add('hidden');
+            btnOut.classList.add('hidden');
         } else {
             statusEl.className = 'clock-status status-pending-in';
             statusEl.textContent = 'Entrada pendiente';
             btnIn.classList.remove('hidden');
+            btnOut.classList.add('hidden');
         }
     }
 
@@ -121,7 +130,34 @@ var Clock = (function () {
                 return;
             }
 
-            showFeedback('error', (res && res.message) || 'Error al fichar', res && res.message === 'No tienes turno asignado hoy');
+            if (res && res.data && res.data.reason === 'outside_schedule') {
+                showFeedback('error', 'No es tu hora. Tu turno es de ' + res.data.slotStart + ' a ' + res.data.slotEnd, false);
+            } else {
+                showFeedback('error', (res && res.message) || 'Error al fichar', res && res.message === 'No tienes turno asignado hoy');
+            }
+        });
+    }
+
+    function doCheckOut() {
+        var session = App.getSession();
+        if (!session) return;
+
+        btnOut.disabled = true;
+        btnOut.textContent = 'Procesando...';
+
+        Api.checkOut().then(function (res) {
+            btnOut.disabled = false;
+            btnOut.textContent = 'SALIDA';
+
+            if (res && res.success) {
+                session.currentStatus = 'checked_out';
+                App.setSession(session);
+                showFeedback('success', res.message || 'Salida registrada');
+                setTimeout(function () { App.navigate('screen-menu'); }, 1800);
+                return;
+            }
+
+            showFeedback('error', (res && res.message) || 'Error al fichar salida', false);
         });
     }
 
@@ -130,6 +166,7 @@ var Clock = (function () {
         feedbackEl.classList.add('feedback-' + type);
         feedbackMsg.textContent = message;
         btnIn.classList.add('hidden');
+        btnOut.classList.add('hidden');
         if (showScheduleBtn) feedbackScheduleBtn.classList.remove('hidden');
         else feedbackScheduleBtn.classList.add('hidden');
     }

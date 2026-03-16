@@ -116,6 +116,14 @@ var Api = (function () {
         }, { requiresAuth: true });
     }
 
+    function checkOut(clientDate) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-clock', {
+            orgSlug: ORG_SLUG,
+            action: 'check-out',
+            clientDate: clientDate || Utils.today()
+        }, { requiresAuth: true });
+    }
+
     function getWeekSlots(year, week) {
         return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
             action: 'list',
@@ -223,6 +231,7 @@ var Api = (function () {
         verifyPin: verifyPin,
         verifyAdminPin: verifyAdminPin,
         checkIn: checkIn,
+        checkOut: checkOut,
         getWeekSlots: getWeekSlots,
         assignSlot: assignSlot,
         createAndAssignSlot: createAndAssignSlot,

@@ -11,6 +11,7 @@ import {
   json,
   logAudit,
   recordAuthAttempt,
+  resolveEmployeeByPin,
   resolveOrgId,
   verifyAdminPin,
 } from "../_shared/kiosk.ts";
@@ -83,7 +84,45 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const isValid = await verifyAdminPin(url, serviceRoleKey, resolvedOrganizationId, pin);
+
+    // Fallback: check employee admins if org PIN did not match
     if (!isValid) {
+      const adminEmployee = await resolveEmployeeByPin(url, serviceRoleKey, resolvedOrganizationId, pin);
+
+      if (adminEmployee && adminEmployee.role === "admin") {
+        const issued = await issueSession(url, serviceRoleKey, {
+          organizationId: resolvedOrganizationId,
+          role: "org_admin",
+          employeeId: adminEmployee.id,
+          idleTimeoutSeconds: ADMIN_IDLE_TIMEOUT_SECONDS,
+          absoluteTimeoutSeconds: ADMIN_ABSOLUTE_TIMEOUT_SECONDS,
+          ipAddress,
+          userAgent,
+        });
+
+        await recordAuthAttempt(url, serviceRoleKey, resolvedOrganizationId, "admin", ipAddress, true, 0, null);
+        await logAudit(url, serviceRoleKey, {
+          organizationId: resolvedOrganizationId,
+          actorSessionId: issued.session.id,
+          actorRole: "org_admin",
+          action: "admin_login_success",
+          metadata: { ipAddress, employeeId: adminEmployee.id },
+        });
+
+        return json({
+          success: true,
+          data: {
+            accessToken: issued.accessToken,
+            expiresAt: issued.expiresAt,
+            role: "org_admin",
+            employeeId: adminEmployee.id,
+            employeeName: `${adminEmployee.nombre} ${adminEmployee.apellido}`.trim(),
+            currentStatus: "unlocked",
+            organizationId: resolvedOrganizationId,
+          },
+        });
+      }
+
       const nextFailureCount = limiter.failureCount + 1;
       const blockedUntil = nextFailureCount >= ADMIN_FAILURE_LIMIT
         ? new Date(Date.now() + ADMIN_BLOCK_MINUTES * 60 * 1000).toISOString()
@@ -104,10 +143,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         organizationId: resolvedOrganizationId,
         action: "admin_login_failed",
         actorRole: "system",
-        metadata: {
-          ipAddress,
-          blockedUntil,
-        },
+        metadata: { ipAddress, blockedUntil },
       });
 
       return json({
@@ -133,9 +169,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       actorSessionId: issued.session.id,
       actorRole: "org_admin",
       action: "admin_login_success",
-      metadata: {
-        ipAddress,
-      },
+      metadata: { ipAddress },
     });
 
     return json({

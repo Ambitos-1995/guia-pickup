@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import {
   authHeaders,
+  autoCloseStaleCheckIns,
   corsHeaders,
   currentAttendanceStatus,
   fetchJson,
@@ -37,7 +38,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return json({ success: false, message: "Falta la organizacion" }, 400);
     }
 
-    if (!["check-in", "status"].includes(action)) {
+    if (!["check-in", "check-out", "status"].includes(action)) {
       return json({ success: false, message: "Accion no valida" }, 400);
     }
 
@@ -75,21 +76,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return json({ success: false, message: "Empleado desactivado" }, 403);
     }
 
+    // Auto-close stale check-ins (non-fatal)
+    try {
+      await autoCloseStaleCheckIns(url, serviceRoleKey, orgId, clientDate);
+    } catch (e) {
+      console.warn("Auto-close error (non-fatal):", e);
+    }
+
     const currentStatus = await currentAttendanceStatus(url, serviceRoleKey, employee.id, clientDate);
+    const employeeName = `${employee.nombre} ${employee.apellido}`.trim();
+
     if (action === "status") {
       return json({
         success: true,
-        data: {
-          employeeName: `${employee.nombre} ${employee.apellido}`.trim(),
-          currentStatus,
-        },
+        data: { employeeName, currentStatus },
       });
     }
 
-    if (currentStatus === "checked_in") {
-      return json({ success: false, message: "Ya tienes entrada registrada hoy" }, 409);
-    }
-
+    // -- Shared slot lookup for check-in and check-out --
     const { year, week, dayOfWeek } = isoWeekInfo(new Date(`${clientDate}T00:00:00`));
     const slotRes = await fetchJson<Array<{
       id: string;
@@ -101,52 +105,130 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
 
     const slot = slotRes.ok ? slotRes.data[0] : null;
-    if (!slot) {
-      return json({ success: false, message: "No tienes turno asignado hoy" }, 403);
-    }
 
-    const insert = await fetchJson<Array<{ id: string; recorded_at: string }>>(
-      `${url}/rest/v1/kiosk_attendance`,
-      {
-        method: "POST",
-        headers: {
-          ...authHeaders(serviceRoleKey),
-          "Content-Type": "application/json",
-          Prefer: "return=representation",
+    // ======================== CHECK-IN ========================
+    if (action === "check-in") {
+      if (currentStatus === "checked_in") {
+        return json({ success: false, message: "Ya tienes entrada registrada hoy" }, 409);
+      }
+      if (currentStatus === "checked_out") {
+        return json({ success: false, message: "Ya has fichado entrada y salida hoy" }, 409);
+      }
+
+      if (!slot) {
+        return json({ success: false, message: "No tienes turno asignado hoy" }, 403);
+      }
+
+      // Time-window validation (server time, not client)
+      const EARLY_TOLERANCE_MIN = 15;
+      const now = new Date();
+      const [sh, sm] = slot.start_time.split(":").map(Number);
+      const [eh, em] = slot.end_time.split(":").map(Number);
+      const slotStart = new Date(`${clientDate}T${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}:00`);
+      const slotEnd = new Date(`${clientDate}T${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}:00`);
+      const windowStart = new Date(slotStart.getTime() - EARLY_TOLERANCE_MIN * 60000);
+
+      if (now < windowStart || now > slotEnd) {
+        return json({
+          success: false,
+          message: "Fuera de tu horario",
+          data: {
+            reason: "outside_schedule",
+            slotStart: slot.start_time.slice(0, 5),
+            slotEnd: slot.end_time.slice(0, 5),
+          },
+        }, 403);
+      }
+
+      const insert = await fetchJson<Array<{ id: string; recorded_at: string }>>(
+        `${url}/rest/v1/kiosk_attendance`,
+        {
+          method: "POST",
+          headers: {
+            ...authHeaders(serviceRoleKey),
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify({
+            organization_id: orgId,
+            employee_id: employee.id,
+            slot_id: slot.id,
+            action: "check_in",
+            client_date: clientDate,
+          }),
         },
-        body: JSON.stringify({
-          organization_id: orgId,
-          employee_id: employee.id,
-          slot_id: slot.id,
-          action: "check_in",
-          client_date: clientDate,
-        }),
-      },
-    );
+      );
 
-    if (!insert.ok || !insert.data[0]) {
-      return json({ success: false, message: "Error al registrar fichaje" }, 500);
+      if (!insert.ok || !insert.data[0]) {
+        return json({ success: false, message: "Error al registrar fichaje" }, 500);
+      }
+
+      await logAudit(url, serviceRoleKey, {
+        organizationId: orgId,
+        actorSessionId: auth.session.id,
+        actorRole: "respondent",
+        employeeId: employee.id,
+        slotId: slot.id,
+        action: "attendance_check_in",
+      });
+
+      return json({
+        success: true,
+        message: `Entrada registrada. El turno conciliara hasta las ${slot.end_time.slice(0, 5)}.`,
+        data: {
+          employeeName,
+          currentStatus: "checked_in",
+          shiftEndTime: slot.end_time.slice(0, 5),
+        },
+      });
     }
 
-    await logAudit(url, serviceRoleKey, {
-      organizationId: orgId,
-      actorSessionId: auth.session.id,
-      actorRole: "respondent",
-      employeeId: employee.id,
-      slotId: slot.id,
-      action: "attendance_check_in",
-    });
+    // ======================== CHECK-OUT ========================
+    if (action === "check-out") {
+      if (currentStatus !== "checked_in") {
+        return json({ success: false, message: "No tienes entrada registrada hoy" }, 409);
+      }
 
-    const message = `Entrada registrada. El turno conciliara hasta las ${slot.end_time.slice(0, 5)}.`;
-    return json({
-      success: true,
-      message,
-      data: {
-        employeeName: `${employee.nombre} ${employee.apellido}`.trim(),
-        currentStatus: "checked_in",
-        shiftEndTime: slot.end_time.slice(0, 5),
-      },
-    });
+      const insertOut = await fetchJson<Array<{ id: string; recorded_at: string }>>(
+        `${url}/rest/v1/kiosk_attendance`,
+        {
+          method: "POST",
+          headers: {
+            ...authHeaders(serviceRoleKey),
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify({
+            organization_id: orgId,
+            employee_id: employee.id,
+            slot_id: slot ? slot.id : null,
+            action: "check_out",
+            client_date: clientDate,
+          }),
+        },
+      );
+
+      if (!insertOut.ok || !insertOut.data[0]) {
+        return json({ success: false, message: "Error al registrar salida" }, 500);
+      }
+
+      await logAudit(url, serviceRoleKey, {
+        organizationId: orgId,
+        actorSessionId: auth.session.id,
+        actorRole: "respondent",
+        employeeId: employee.id,
+        slotId: slot ? slot.id : null,
+        action: "attendance_check_out",
+      });
+
+      return json({
+        success: true,
+        message: "Salida registrada",
+        data: { employeeName, currentStatus: "checked_out" },
+      });
+    }
+
+    return json({ success: false, message: "Accion no valida" }, 400);
   } catch (error) {
     console.error("kiosk-clock error", error);
     return json({ success: false, message: "Error interno" }, 500);

@@ -474,6 +474,82 @@ export async function currentAttendanceStatus(
   return res.data[0].action === "check_in" ? "checked_in" : "checked_out";
 }
 
+const AUTO_CLOSE_DELAY_MIN = 20;
+
+export async function autoCloseStaleCheckIns(
+  supabaseUrl: string,
+  key: string,
+  orgId: string,
+  clientDate: string,
+): Promise<void> {
+  const [checkInsRes, checkOutsRes] = await Promise.all([
+    fetchJson<Array<{ id: string; employee_id: string; slot_id: string | null; recorded_at: string }>>(
+      `${supabaseUrl}/rest/v1/kiosk_attendance?select=id,employee_id,slot_id,recorded_at&organization_id=eq.${orgId}&client_date=eq.${clientDate}&action=eq.check_in`,
+      { headers: authHeaders(key) },
+    ),
+    fetchJson<Array<{ employee_id: string }>>(
+      `${supabaseUrl}/rest/v1/kiosk_attendance?select=employee_id&organization_id=eq.${orgId}&client_date=eq.${clientDate}&action=eq.check_out`,
+      { headers: authHeaders(key) },
+    ),
+  ]);
+
+  if (!checkInsRes.ok || checkInsRes.data.length === 0) return;
+
+  const checkedOutSet = new Set(
+    checkOutsRes.ok ? checkOutsRes.data.map((r) => r.employee_id) : [],
+  );
+
+  const now = new Date();
+
+  for (const record of checkInsRes.data) {
+    if (checkedOutSet.has(record.employee_id)) continue;
+    if (!record.slot_id) continue;
+
+    const slotRes = await fetchJson<Array<{ end_time: string }>>(
+      `${supabaseUrl}/rest/v1/kiosk_schedule_slots?select=end_time&id=eq.${record.slot_id}&limit=1`,
+      { headers: authHeaders(key) },
+    );
+
+    const slot = slotRes.ok ? slotRes.data[0] : null;
+    if (!slot) continue;
+
+    const [eh, em] = slot.end_time.split(":").map(Number);
+    const slotEnd = new Date(`${clientDate}T${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}:00`);
+    const autoCloseThreshold = new Date(slotEnd.getTime() + AUTO_CLOSE_DELAY_MIN * 60000);
+
+    if (now >= autoCloseThreshold) {
+      await fetchJson<Array<{ id: string }>>(
+        `${supabaseUrl}/rest/v1/kiosk_attendance`,
+        {
+          method: "POST",
+          headers: {
+            ...authHeaders(key),
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify({
+            organization_id: orgId,
+            employee_id: record.employee_id,
+            slot_id: record.slot_id,
+            action: "check_out",
+            client_date: clientDate,
+            recorded_at: slotEnd.toISOString(),
+          }),
+        },
+      );
+
+      await logAudit(supabaseUrl, key, {
+        organizationId: orgId,
+        actorRole: "system",
+        employeeId: record.employee_id,
+        slotId: record.slot_id,
+        action: "attendance_auto_close",
+        metadata: { slotEndTime: slot.end_time, autoCloseDelayMin: AUTO_CLOSE_DELAY_MIN },
+      });
+    }
+  }
+}
+
 export async function fetchJson<T>(url: string, init: RequestInit): Promise<RestResponse<T>> {
   const raw = await fetch(url, init);
   let data = null as T;

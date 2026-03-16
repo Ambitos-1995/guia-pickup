@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, '..', '..');
 const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
 const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+const swRegister = fs.readFileSync(path.join(root, 'js', 'sw-register.js'), 'utf8');
 
 test('manifest icons exist on disk', () => {
   manifest.icons.forEach((icon) => {
@@ -34,6 +35,11 @@ test('core cached assets exist in the project', () => {
 test('service worker uses network-first for app shell requests', () => {
   assert.match(sw, /function isAppShellRequest/);
   assert.match(sw, /e\.respondWith\(networkFirst\(e\.request\)\)/);
+});
+
+test('service worker registration bypasses cache and activates updates silently', () => {
+  assert.match(swRegister, /updateViaCache:\s*'none'/);
+  assert.match(swRegister, /postMessage\(\{\s*type:\s*'SKIP_WAITING'\s*\}\)/);
 });
 
 test('index shell contains the main screen anchors', () => {

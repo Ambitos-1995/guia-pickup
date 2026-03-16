@@ -33,6 +33,7 @@ test('employee login unlocks personal actions and payment summary', async ({ pag
   await expect(page.locator('#greeting')).toHaveText('Ismael Pérez');
   await expect(page.locator('#card-payment')).toBeVisible();
   await expect(page.locator('#menu-admin-shortcut')).toBeHidden();
+  await expect(page.locator('#admin-build-version')).toBeHidden();
 
   await page.getByRole('button', { name: 'Mi Pago' }).click();
   await expect(page.locator('#screen-payment.active')).toBeVisible();
@@ -73,6 +74,7 @@ test('admin can load payments and save a configured amount', async ({ page }) =>
 
   await page.getByRole('button', { name: 'Ajustes' }).click();
   await expect(page.locator('#screen-admin.active')).toBeVisible();
+  await expect(page.locator('#admin-build-version')).toContainText('Version 2026.03.16-r1');
   await expect(page.locator('#admin-pay-summary-status')).toContainText('Sin configurar');
 
   await page.locator('#admin-pay-amount').fill('1250');
@@ -106,4 +108,29 @@ test('admin can create a new employee from ajustes empleados', async ({ page }) 
   await expect.poll(() => state.createCalls.length).toBe(1);
   await expect.poll(() => state.createCalls[0].pin).toBe('4321');
   await expect.poll(() => state.createCalls[0].role).toBe('employee');
+});
+
+test('schedule create dialog is simplified for employee reservations', async ({ page }) => {
+  await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Iniciar sesion' }).click();
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+  await enterPin(page, '1234');
+
+  await page.getByRole('button', { name: 'Mi Horario' }).click();
+  await expect(page.locator('#screen-schedule.active')).toBeVisible();
+
+  await page.locator('.sched-empty[data-day="2"][data-hour="15"]').click();
+
+  await expect(page.locator('#schedule-slot-mode')).toHaveText('Hueco disponible');
+  await expect(page.locator('#schedule-slot-title')).toHaveText('Crear y reservar franja');
+  await expect(page.locator('#schedule-slot-focus-day')).toHaveText('Martes');
+  await expect(page.locator('#schedule-slot-focus-time')).toHaveText('15:00 - 16:00');
+  await expect(page.locator('#schedule-slot-summary')).toBeHidden();
+  await expect(page.locator('#schedule-slot-body')).toBeHidden();
+  await expect(page.locator('#schedule-slot-note')).toBeHidden();
+  await expect(page.locator('#schedule-slot-secondary')).toBeHidden();
+  await expect(page.locator('#schedule-slot-submit')).toHaveText('Crear y reservar');
 });

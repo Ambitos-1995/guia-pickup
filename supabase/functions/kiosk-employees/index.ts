@@ -139,6 +139,10 @@ async function handleVerify(
     return json({ success: false, message: "PIN incorrecto" }, 401);
   }
 
+  if (employee.role === "admin") {
+    return json({ success: false, message: "Los administradores deben usar el engranaje de ajustes" }, 403);
+  }
+
   if (!employee.attendance_enabled) {
     return json({ success: false, message: "Empleado desactivado" }, 403);
   }

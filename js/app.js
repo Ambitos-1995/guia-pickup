@@ -4,6 +4,7 @@
 var App = (function () {
     'use strict';
 
+    var APP_VERSION = '2026.03.16-r1';
     var SESSION_STORAGE_KEY = 'pickup-tmg-session-v1';
     var EMPLOYEE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
     var ADMIN_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
@@ -204,18 +205,24 @@ var App = (function () {
         var paymentCard = document.getElementById('card-payment');
         var adminCard = document.getElementById('card-admin');
         var adminShortcut = document.getElementById('menu-admin-shortcut');
+        var adminBuildVersion = document.getElementById('admin-build-version');
         var loginBtn = document.getElementById('menu-login-btn');
         var logoutBtn = document.getElementById('logout-btn');
 
         if (activeSession && activeSession.role === 'respondent') {
             greetingEl.textContent = activeSession.employeeName || 'Sesion activa';
-            statusEl.textContent = activeSession.currentStatus === 'checked_in' ? 'Entrada registrada' : '';
+            statusEl.textContent = activeSession.currentStatus === 'checked_in'
+                ? 'Entrada registrada'
+                : activeSession.currentStatus === 'checked_out'
+                ? 'Turno completado'
+                : '';
             ficharCard.classList.remove('hidden');
             paymentCard.classList.remove('hidden');
             adminCard.classList.add('hidden');
             adminShortcut.classList.add('hidden');
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
+            if (adminBuildVersion) adminBuildVersion.classList.add('hidden');
         } else if (activeSession && activeSession.role === 'org_admin') {
             greetingEl.textContent = 'Administrador';
             statusEl.textContent = '';
@@ -225,6 +232,10 @@ var App = (function () {
             adminShortcut.classList.remove('hidden');
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
+            if (adminBuildVersion) {
+                adminBuildVersion.textContent = 'Version ' + APP_VERSION;
+                adminBuildVersion.classList.remove('hidden');
+            }
         } else {
             greetingEl.textContent = 'Panel publico';
             statusEl.textContent = '';
@@ -234,6 +245,7 @@ var App = (function () {
             adminShortcut.classList.add('hidden');
             loginBtn.classList.remove('hidden');
             logoutBtn.classList.add('hidden');
+            if (adminBuildVersion) adminBuildVersion.classList.add('hidden');
         }
 
         // Toggle odd-cards class for full-width Ajustes on mobile
@@ -441,6 +453,7 @@ var App = (function () {
         handleAuthFailure: handleAuthFailure,
         confirm: confirm,
         showMenu: showMenu,
-        requestViewportUpdate: requestViewportUpdate
+        requestViewportUpdate: requestViewportUpdate,
+        getVersion: function () { return APP_VERSION; }
     };
 })();

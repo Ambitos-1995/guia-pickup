@@ -6,6 +6,7 @@ if ("serviceWorker" in navigator) {
         'use strict';
 
         var refreshing = false;
+        var updateIntervalId = 0;
 
         navigator.serviceWorker.addEventListener('controllerchange', function () {
             if (refreshing) return;
@@ -14,19 +15,25 @@ if ("serviceWorker" in navigator) {
         });
 
         window.addEventListener('load', function () {
-            navigator.serviceWorker.register('./sw.js')
+            navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
                 .then(function (reg) {
-                    reg.update().catch(function () {});
-                    setInterval(function () { reg.update(); }, 60000);
+                    forceUpdateCheck(reg);
+                    updateIntervalId = setInterval(function () {
+                        forceUpdateCheck(reg);
+                    }, 30000);
 
                     document.addEventListener('visibilitychange', function () {
                         if (document.visibilityState === 'visible') {
-                            reg.update();
+                            forceUpdateCheck(reg);
                         }
                     });
 
+                    window.addEventListener('pageshow', function () {
+                        forceUpdateCheck(reg);
+                    });
+
                     if (reg.waiting) {
-                        showUpdateButton(reg.waiting);
+                        activateWaitingWorker(reg.waiting);
                     }
 
                     reg.addEventListener('updatefound', function () {
@@ -35,7 +42,7 @@ if ("serviceWorker" in navigator) {
 
                         installing.addEventListener('statechange', function () {
                             if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-                                showUpdateButton(installing);
+                                activateWaitingWorker(installing);
                             }
                         });
                     });
@@ -45,25 +52,18 @@ if ("serviceWorker" in navigator) {
                 });
         });
 
-        function showUpdateButton(waitingSW) {
-            var btn = document.getElementById('update-btn');
-            if (!btn) return;
+        function forceUpdateCheck(registration) {
+            if (!registration) return;
 
-            btn._waitingSW = waitingSW;
-            btn.classList.remove('hidden');
-
-            if (btn.dataset.pressBound === 'true') {
-                return;
+            registration.update().catch(function () {});
+            if (registration.waiting) {
+                activateWaitingWorker(registration.waiting);
             }
+        }
 
-            btn.dataset.pressBound = 'true';
-            Utils.bindPress(btn, function () {
-                btn.textContent = 'Actualizando...';
-                btn.disabled = true;
-                if (btn._waitingSW) {
-                    btn._waitingSW.postMessage({ type: 'SKIP_WAITING' });
-                }
-            });
+        function activateWaitingWorker(waitingSW) {
+            if (!waitingSW) return;
+            waitingSW.postMessage({ type: 'SKIP_WAITING' });
         }
     })();
 }

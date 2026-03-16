@@ -202,6 +202,10 @@
                     ENTRADA
                 </button>
 
+                <button class="clock-btn clock-btn-out hidden" id="btn-check-out" aria-label="Fichar salida">
+                    SALIDA
+                </button>
+
                 <div class="clock-feedback hidden" id="clock-feedback" aria-live="polite">
                     <div class="feedback-msg" id="feedback-msg"></div>
                     <button class="feedback-schedule-btn hidden" id="feedback-schedule-btn">Ir a Mi Horario</button>
@@ -321,6 +325,7 @@
             </header>
 
             <div class="admin-container">
+                <div class="admin-build hidden" id="admin-build-version" aria-live="polite"></div>
                 <nav class="admin-tabs" id="admin-tabs">
                     <button class="admin-tab active" data-tab="admin-payments">Pagos</button>
                     <button class="admin-tab" data-tab="admin-employees">Empleados</button>
@@ -490,6 +495,10 @@
                 <div class="slot-dialog-badge" id="schedule-slot-mode">Turno</div>
                 <h3 class="slot-dialog-title" id="schedule-slot-title">Gestionar franja</h3>
                 <p class="slot-dialog-summary" id="schedule-slot-summary">--</p>
+                <div class="slot-dialog-focus hidden" id="schedule-slot-focus">
+                    <div class="slot-dialog-focus-day" id="schedule-slot-focus-day">Martes</div>
+                    <div class="slot-dialog-focus-time" id="schedule-slot-focus-time">15:00 - 16:00</div>
+                </div>
                 <p class="slot-dialog-body" id="schedule-slot-body">Inicia sesion para continuar.</p>
                 <p class="slot-dialog-note hidden" id="schedule-slot-note"></p>
                 <div class="slot-dialog-admin hidden" id="schedule-slot-admin-panel">
