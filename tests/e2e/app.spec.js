@@ -32,6 +32,7 @@ test('employee login unlocks personal actions and payment summary', async ({ pag
   await expect(page.locator('#screen-menu.active')).toBeVisible();
   await expect(page.locator('#greeting')).toHaveText('Ismael Pérez');
   await expect(page.locator('#card-payment')).toBeVisible();
+  await expect(page.locator('#menu-admin-shortcut')).toBeHidden();
 
   await page.getByRole('button', { name: 'Mi Pago' }).click();
   await expect(page.locator('#screen-payment.active')).toBeVisible();
@@ -56,6 +57,7 @@ test('employee session persists after reload while still valid', async ({ page }
   await expect(page.locator('#screen-menu.active')).toBeVisible();
   await expect(page.locator('#greeting')).toContainText('Ismael');
   await expect(page.locator('#card-payment')).toBeVisible();
+  await expect(page.locator('#menu-admin-shortcut')).toBeHidden();
   await expect(page.locator('#menu-login-btn')).toBeHidden();
 });
 
@@ -67,6 +69,7 @@ test('admin can load payments and save a configured amount', async ({ page }) =>
   await page.getByRole('button', { name: 'Ajustes' }).click();
   await enterPin(page, '123456');
   await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#menu-admin-shortcut')).toBeVisible();
 
   await page.getByRole('button', { name: 'Ajustes' }).click();
   await expect(page.locator('#screen-admin.active')).toBeVisible();

@@ -213,7 +213,7 @@ var App = (function () {
             ficharCard.classList.remove('hidden');
             paymentCard.classList.remove('hidden');
             adminCard.classList.add('hidden');
-            adminShortcut.classList.remove('hidden');
+            adminShortcut.classList.add('hidden');
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
         } else if (activeSession && activeSession.role === 'org_admin') {
@@ -222,7 +222,7 @@ var App = (function () {
             ficharCard.classList.remove('hidden');
             paymentCard.classList.add('hidden');
             adminCard.classList.remove('hidden');
-            adminShortcut.classList.add('hidden');
+            adminShortcut.classList.remove('hidden');
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
         } else {
