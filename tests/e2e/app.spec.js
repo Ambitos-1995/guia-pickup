@@ -62,6 +62,23 @@ test('employee session persists after reload while still valid', async ({ page }
   await expect(page.locator('#menu-login-btn')).toBeHidden();
 });
 
+test('admin can sign in from iniciar sesion with a 6-digit PIN', async ({ page }) => {
+  await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Iniciar sesion' }).click();
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+  await expect(page.locator('#pin-prompt')).toHaveText('Introduce tu PIN (4 o 6 digitos)');
+
+  await enterPin(page, '123456');
+
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#menu-admin-shortcut')).toBeVisible();
+  await expect(page.locator('#menu-login-btn')).toBeHidden();
+  await expect(page.locator('#logout-btn')).toBeVisible();
+});
+
 test('admin can load payments and save a configured amount', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');

@@ -77,7 +77,7 @@ var App = (function () {
             }
         });
         Utils.bindPress(document.getElementById('menu-login-btn'), function () {
-            Pin.openForEmployee('screen-menu');
+            Pin.openForLogin('screen-menu');
             navigate('screen-pin');
         });
 
