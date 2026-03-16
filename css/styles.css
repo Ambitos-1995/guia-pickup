@@ -1,5 +1,5 @@
 /* =====================================================
-   PICKUP TMG - STYLES
+   PUNTO DE ENCUENTRO INCLUSIVO - STYLES
    Warm Kiosk: Chunky, tactile, cognitively accessible
    ===================================================== */
 
@@ -226,6 +226,9 @@ button:focus-visible {
 .screen-header h2 {
     font-size: 1.2rem;
     font-weight: 800;
+    min-width: 0;
+    line-height: 1.15;
+    overflow-wrap: break-word;
 }
 
 .back-btn {
@@ -267,6 +270,10 @@ button:focus-visible {
     letter-spacing: -0.03em;
     color: var(--red);
     margin-bottom: 8px;
+    max-width: 14ch;
+    margin-inline: auto;
+    line-height: 1.1;
+    text-wrap: balance;
 }
 
 .pin-clock {
@@ -1031,22 +1038,30 @@ button:focus-visible {
 }
 
 .guia-card-title {
+    display: block;
+    width: 100%;
     font-size: 1.05rem;
     font-weight: 800;
     line-height: 1.2;
     color: var(--text);
     letter-spacing: -0.01em;
     max-width: 100%;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
+    word-break: normal;
+    text-wrap: balance;
 }
 
 .guia-card-desc {
+    display: block;
+    width: 100%;
     font-size: 0.8rem;
     color: var(--gray-600);
     line-height: 1.35;
     font-weight: 500;
     max-width: 100%;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
+    word-break: normal;
+    text-wrap: pretty;
 }
 
 .guia-media-area {
@@ -1439,15 +1454,7 @@ button:focus-visible {
 }
 
 .admin-pay-summary::before {
-    content: '';
-    position: absolute;
-    top: -30%;
-    right: -15%;
-    width: 45%;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    background: rgba(234, 179, 8, 0.12);
-    pointer-events: none;
+    display: none;
 }
 
 .admin-pay-summary-row {
@@ -1506,8 +1513,14 @@ button:focus-visible {
 
 .admin-pay-inline {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     align-items: flex-end;
+}
+
+.admin-pay-inline .form-row {
+    flex: 1 1 260px;
+    min-width: 0;
 }
 
 .admin-pay-inline .btn-compact {
@@ -1557,6 +1570,8 @@ button:focus-visible {
     font-family: var(--font);
     font-size: 1rem;
     font-weight: 600;
+    line-height: 1.2;
+    min-height: 56px;
     border: 2px solid var(--gray-300);
     border-radius: var(--radius-sm);
     background: var(--white);
@@ -1568,6 +1583,21 @@ button:focus-visible {
 .form-row select:focus {
     outline: none;
     border-color: var(--blue);
+}
+
+.form-row select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 44px;
+    line-height: 1.35;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--gray-500) 50%),
+        linear-gradient(135deg, var(--gray-500) 50%, transparent 50%);
+    background-position:
+        calc(100% - 18px) calc(50% - 3px),
+        calc(100% - 12px) calc(50% - 3px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
 }
 
 .input-euro {
@@ -1758,6 +1788,7 @@ button:focus-visible {
 .employee-meta {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 6px;
     margin-top: 2px;
 }
@@ -1767,6 +1798,7 @@ button:focus-visible {
     border-radius: 20px;
     font-size: 0.6rem;
     font-weight: 700;
+    line-height: 1.25;
     text-transform: uppercase;
     letter-spacing: 0.03em;
 }
@@ -1884,6 +1916,8 @@ button:focus-visible {
     padding: 28px 24px;
     max-width: 380px;
     width: 100%;
+    max-height: min(82vh, 720px);
+    overflow-y: auto;
     box-shadow: var(--shadow-lg);
 }
 
@@ -1902,12 +1936,14 @@ button:focus-visible {
 
 .modal-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 12px;
 }
 
 .modal-actions .btn-primary,
 .modal-actions .btn-secondary {
     flex: 1;
+    min-width: 0;
     text-align: center;
 }
 
@@ -2417,6 +2453,23 @@ body {
     }
 }
 
+@media (min-width: 768px) and (max-width: 1023px) {
+    .schedule-board {
+        padding: 12px 14px;
+    }
+
+    .schedule-grid {
+        grid-template-columns: 58px repeat(5, minmax(0, 1fr));
+        column-gap: 10px;
+        row-gap: 12px;
+    }
+
+    .sched-time {
+        padding: 8px 10px 8px 4px;
+        font-size: 0.72rem;
+    }
+}
+
 /* Mobile 2-column: cards fill viewport equally */
 @media (max-width: 833px) {
     .menu-grid {
@@ -2446,6 +2499,15 @@ body {
 
 /* Small phones: compact spacing */
 @media (max-width: 599px) {
+    .screen-header {
+        align-items: flex-start;
+    }
+
+    .screen-header h2 {
+        font-size: 1.05rem;
+        line-height: 1.15;
+    }
+
     .menu-container {
         padding: 16px 14px 14px;
         gap: 12px;
@@ -2578,7 +2640,7 @@ body {
     }
     .guia-home .guia-card {
         justify-content: center;
-        padding: 18px 10px 16px;
+        padding: 18px 12px 18px;
         gap: 10px;
         min-height: 0;
         overflow: hidden;
@@ -2587,11 +2649,47 @@ body {
         font-size: clamp(2.45rem, 5vh, 3.15rem);
     }
     .guia-home .guia-card-title {
-        font-size: clamp(0.9rem, 1.95vh, 1rem);
+        font-size: clamp(0.88rem, 1.95vh, 1rem);
+        line-height: 1.18;
     }
     .guia-home .guia-card-desc {
         font-size: clamp(0.72rem, 1.65vh, 0.8rem);
         line-height: 1.3;
+    }
+
+    .admin-pay-inline {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .admin-pay-inline .btn-compact {
+        width: 100%;
+    }
+
+    .modal {
+        padding: 16px;
+    }
+
+    .modal-card {
+        padding: 22px 18px;
+    }
+
+    .modal-actions {
+        gap: 10px;
+    }
+
+    .modal-actions .btn-primary,
+    .modal-actions .btn-secondary {
+        padding: 15px 18px;
+        font-size: 1rem;
+    }
+
+    #modal-edit-emp .form-row {
+        gap: 5px;
+    }
+
+    #modal-edit-emp .form-row label {
+        font-size: 0.78rem;
     }
     .guia-steps,
     .guia-complete {
@@ -2744,14 +2842,15 @@ body {
         gap: 8px;
     }
     .guia-home .guia-card {
-        padding: 14px 8px 12px;
+        padding: 14px 10px 14px;
         gap: 8px;
     }
     .guia-home .guia-card-icon {
         font-size: clamp(2.05rem, 4.35vh, 2.65rem);
     }
     .guia-home .guia-card-title {
-        font-size: 0.82rem;
+        font-size: 0.8rem;
+        line-height: 1.16;
     }
     .guia-home .guia-card-desc {
         font-size: 0.66rem;
