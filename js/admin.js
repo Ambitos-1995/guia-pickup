@@ -1,12 +1,49 @@
 /* =====================================================
-   ADMIN - Payments and employees
+   ADMIN - Payments and employees (redesigned)
    ===================================================== */
 var Admin = (function () {
     'use strict';
 
-    var editingEmployeeId = null;
+    var editingEmployee = null;
+    var currentYear, currentMonth;
+    var newFormVisible = false;
+
+    var CALC_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="16" y1="18" x2="16" y2="18"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="8" y1="10" x2="16" y2="10"/></svg>';
+    var SPINNER_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
+
+    /* --- Shared feedback helper --- */
+    function showFeedback(elementId, type, message, autoHideMs) {
+        var el = document.getElementById(elementId);
+        el.textContent = message;
+        el.className = 'employee-form-feedback ' + (type === 'success' ? 'feedback-success' : 'feedback-error');
+        if (autoHideMs) {
+            setTimeout(function () { el.className = 'employee-form-feedback hidden'; }, autoHideMs);
+        }
+    }
+
+    function hideFeedback(elementId) {
+        var el = document.getElementById(elementId);
+        el.textContent = '';
+        el.className = 'employee-form-feedback hidden';
+    }
+
+    function formatEuro(amount) {
+        return Number(amount || 0).toFixed(2) + ' \u20AC';
+    }
+
+    function initials(nombre, apellido) {
+        return ((nombre || '').charAt(0) + (apellido || '').charAt(0)).toUpperCase() || '--';
+    }
+
+    function statusLabel(status) {
+        if (status === 'confirmed') return 'Confirmado';
+        if (status === 'calculated') return 'Calculado';
+        if (status === 'review_required') return 'Revision';
+        return 'Pendiente';
+    }
 
     function init() {
+        /* --- Tabs --- */
         var tabs = document.querySelectorAll('.admin-tab');
         Utils.each(tabs, function (tab) {
             Utils.bindPress(tab, function () {
@@ -26,17 +63,62 @@ var Admin = (function () {
             });
         });
 
+        /* --- Payments --- */
+        Utils.bindPress(document.getElementById('admin-pay-prev'), function () { changePayMonth(-1); });
+        Utils.bindPress(document.getElementById('admin-pay-next'), function () { changePayMonth(1); });
         Utils.bindPress(document.getElementById('admin-pay-save'), savePayment);
         Utils.bindPress(document.getElementById('admin-pay-calculate'), calculatePayments);
+
+        var now = new Date();
+        currentYear = now.getFullYear();
+        currentMonth = now.getMonth() + 1;
+
+        /* --- Employees --- */
+        Utils.bindPress(document.getElementById('admin-emp-toggle-form'), toggleNewForm);
         Utils.bindPress(document.getElementById('admin-emp-create'), createEmployee);
         Utils.bindPress(document.getElementById('edit-emp-cancel'), closeEditModal);
         Utils.bindPress(document.getElementById('edit-emp-save'), saveEditEmployee);
 
-        var now = new Date();
-        document.getElementById('admin-pay-year').value = now.getFullYear();
-        document.getElementById('admin-pay-month').value = now.getMonth() + 1;
+        /* Role selector changes PIN label in create form */
+        var roleSelect = document.getElementById('emp-role');
+        if (roleSelect) {
+            roleSelect.addEventListener('change', function () {
+                updatePinLabel(roleSelect.value, 'emp-pin-label', 'emp-pin');
+            });
+        }
+
+        /* Role selector changes PIN label in edit form */
+        var editRoleSelect = document.getElementById('edit-emp-role');
+        if (editRoleSelect) {
+            editRoleSelect.addEventListener('change', function () {
+                updatePinLabel(editRoleSelect.value, 'edit-emp-pin-label', 'edit-emp-pin');
+            });
+        }
+
+        /* Active toggle in edit modal */
+        var toggleBtn = document.getElementById('edit-emp-active');
+        if (toggleBtn) {
+            Utils.bindPress(toggleBtn, function () {
+                toggleBtn.classList.toggle('active');
+                var label = document.getElementById('edit-emp-active-label');
+                if (label) label.textContent = toggleBtn.classList.contains('active') ? 'Activo' : 'Inactivo';
+            });
+        }
     }
 
+    function updatePinLabel(role, labelId, inputId) {
+        var label = document.getElementById(labelId);
+        var input = document.getElementById(inputId);
+        if (role === 'admin') {
+            if (label) label.textContent = 'PIN (6 cifras)';
+            if (input) { input.maxLength = 6; input.placeholder = '123456'; input.pattern = '[0-9]{6}'; }
+        } else {
+            if (label) label.textContent = 'PIN (4 cifras)';
+            if (input) { input.maxLength = 4; input.placeholder = '1234'; input.pattern = '[0-9]{4}'; }
+        }
+    }
+
+    /* ===== SHOW ===== */
     function show() {
         if (!App.hasAdminAccess()) {
             Pin.openForAdmin();
@@ -44,16 +126,61 @@ var Admin = (function () {
             return;
         }
 
+        loadPayMonth();
         loadEmployees();
     }
 
-    function savePayment() {
-        var year = parseInt(document.getElementById('admin-pay-year').value, 10);
-        var month = parseInt(document.getElementById('admin-pay-month').value, 10);
-        var amount = parseFloat(document.getElementById('admin-pay-amount').value);
+    /* =========================================================
+       PAYMENTS TAB
+       ========================================================= */
+    function changePayMonth(delta) {
+        currentMonth += delta;
+        if (currentMonth < 1) { currentYear--; currentMonth = 12; }
+        else if (currentMonth > 12) { currentYear++; currentMonth = 1; }
+        loadPayMonth();
+    }
 
+    function loadPayMonth() {
+        var label = document.getElementById('admin-pay-month-label');
+        label.textContent = Utils.MONTH_NAMES[currentMonth - 1] + ' ' + currentYear;
+
+        var amountEl = document.getElementById('admin-pay-summary-amount');
+        var statusEl = document.getElementById('admin-pay-summary-status');
+        var resultsEl = document.getElementById('admin-pay-results');
+
+        amountEl.textContent = '...';
+        statusEl.textContent = 'Cargando';
+        statusEl.className = 'admin-pay-summary-badge';
+        resultsEl.classList.add('hidden');
+
+        /* Read-only: fetch existing summary without recalculating */
+        Api.getPaymentSummary(currentYear, currentMonth).then(function (res) {
+            if (res && res.success && res.data && res.data.configured) {
+                var data = res.data;
+                amountEl.textContent = formatEuro(data.total_seur_amount || 0);
+                document.getElementById('admin-pay-amount').value = data.total_seur_amount || '';
+
+                if (data.calculations && data.calculations.length > 0) {
+                    statusEl.textContent = 'Calculado';
+                    statusEl.className = 'admin-pay-summary-badge badge-calculated';
+                    showPaymentResults(data);
+                } else {
+                    statusEl.textContent = 'Configurado';
+                    statusEl.className = 'admin-pay-summary-badge badge-configured';
+                }
+            } else {
+                amountEl.textContent = '0.00 \u20AC';
+                statusEl.textContent = 'Sin configurar';
+                statusEl.className = 'admin-pay-summary-badge';
+                document.getElementById('admin-pay-amount').value = '';
+            }
+        });
+    }
+
+    function savePayment() {
+        var amount = parseFloat(document.getElementById('admin-pay-amount').value);
         if (!amount || amount <= 0) {
-            showPayFeedback('error', 'Introduce un importe valido.');
+            showFeedback('admin-pay-feedback', 'error', 'Introduce un importe valido.', 4000);
             return;
         }
 
@@ -61,42 +188,35 @@ var Admin = (function () {
         btn.disabled = true;
         btn.textContent = 'Guardando...';
 
-        Api.setPaymentAmount(year, month, amount).then(function (res) {
+        Api.setPaymentAmount(currentYear, currentMonth, amount).then(function (res) {
             btn.disabled = false;
-            btn.textContent = 'Guardar importe';
+            btn.textContent = 'Guardar';
 
             if (res && res.success) {
-                showPayFeedback('success', 'Importe guardado correctamente.');
+                showFeedback('admin-pay-feedback', 'success', 'Importe guardado.', 4000);
+                loadPayMonth();
             } else {
-                showPayFeedback('error', (res && res.message) || 'No se pudo guardar.');
+                showFeedback('admin-pay-feedback', 'error', (res && res.message) || 'No se pudo guardar.', 4000);
             }
         });
     }
 
     function calculatePayments() {
-        var year = parseInt(document.getElementById('admin-pay-year').value, 10);
-        var month = parseInt(document.getElementById('admin-pay-month').value, 10);
         var btn = document.getElementById('admin-pay-calculate');
-
         btn.disabled = true;
-        btn.textContent = 'Calculando...';
+        btn.innerHTML = SPINNER_ICON + ' Calculando...';
 
-        Api.calculatePayments(year, month).then(function (res) {
+        Api.calculatePayments(currentYear, currentMonth).then(function (res) {
             btn.disabled = false;
-            btn.textContent = 'Calcular pagos';
+            btn.innerHTML = CALC_ICON + ' Calcular pagos';
 
             if (res && res.success) {
                 showPaymentResults(res.data || {});
+                loadPayMonth();
             } else {
-                showPayFeedback('error', (res && res.message) || 'No se pudieron calcular los pagos.');
+                showFeedback('admin-pay-feedback', 'error', (res && res.message) || 'No se pudieron calcular los pagos.', 4000);
             }
         });
-    }
-
-    function showPayFeedback(type, msg) {
-        var el = document.getElementById('admin-pay-feedback');
-        el.textContent = msg;
-        el.className = 'employee-form-feedback ' + (type === 'success' ? 'feedback-success' : 'feedback-error');
     }
 
     function showPaymentResults(data) {
@@ -118,12 +238,12 @@ var Admin = (function () {
             emptyRow.appendChild(emptyCell);
             tbody.appendChild(emptyRow);
         } else {
-            data.calculations.forEach(function (calculation) {
+            data.calculations.forEach(function (calc) {
                 var row = document.createElement('tr');
-                row.appendChild(makeCell(calculation.employee_name || '--'));
-                row.appendChild(makeCell((calculation.hours_worked || 0) + 'h'));
-                row.appendChild(makeCell(statusLabel(calculation.status)));
-                row.appendChild(makeCell(formatEuro(calculation.amount_earned || 0)));
+                row.appendChild(makeCell(calc.employee_name || '--'));
+                row.appendChild(makeCell((calc.hours_worked || 0) + 'h'));
+                row.appendChild(makeCell(statusLabel(calc.status)));
+                row.appendChild(makeCell(formatEuro(calc.amount_earned || 0)));
                 tbody.appendChild(row);
             });
         }
@@ -148,102 +268,48 @@ var Admin = (function () {
         return cell;
     }
 
-    function statusLabel(status) {
-        if (status === 'confirmed') return 'Confirmado';
-        if (status === 'calculated') return 'Calculado';
-        if (status === 'review_required') return 'Revision';
-        return 'Pendiente';
-    }
+    /* =========================================================
+       EMPLOYEES TAB
+       ========================================================= */
+    function toggleNewForm() {
+        newFormVisible = !newFormVisible;
+        var wrap = document.getElementById('admin-emp-form-wrap');
+        var btn = document.getElementById('admin-emp-toggle-form');
 
-    function formatEuro(amount) {
-        return Number(amount || 0).toFixed(2) + ' €';
-    }
-
-    function openEditModal(employee) {
-        editingEmployeeId = employee.id;
-        document.getElementById('edit-emp-name').value = employee.nombre || '';
-        document.getElementById('edit-emp-surname').value = employee.apellido || '';
-        document.getElementById('edit-emp-pin').value = '';
-        hideEditFeedback();
-        document.getElementById('modal-edit-emp').classList.remove('hidden');
-    }
-
-    function closeEditModal() {
-        editingEmployeeId = null;
-        document.getElementById('modal-edit-emp').classList.add('hidden');
-    }
-
-    function showEditFeedback(type, message) {
-        var el = document.getElementById('edit-emp-feedback');
-        el.textContent = message;
-        el.className = 'employee-form-feedback ' + (type === 'success' ? 'feedback-success' : 'feedback-error');
-    }
-
-    function hideEditFeedback() {
-        var el = document.getElementById('edit-emp-feedback');
-        el.textContent = '';
-        el.className = 'employee-form-feedback hidden';
-    }
-
-    function saveEditEmployee() {
-        var nombre = document.getElementById('edit-emp-name').value.trim();
-        var apellido = document.getElementById('edit-emp-surname').value.trim();
-        var pin = document.getElementById('edit-emp-pin').value.trim();
-
-        if (!nombre || !apellido) {
-            showEditFeedback('error', 'Nombre y apellido son obligatorios.');
-            return;
+        if (newFormVisible) {
+            wrap.classList.add('open');
+            btn.classList.add('open');
+        } else {
+            wrap.classList.remove('open');
+            btn.classList.remove('open');
         }
-
-        if (pin && !/^\d{4}$/.test(pin)) {
-            showEditFeedback('error', 'El PIN debe ser exactamente 4 cifras.');
-            return;
-        }
-
-        var btn = document.getElementById('edit-emp-save');
-        btn.disabled = true;
-        btn.textContent = 'Guardando...';
-
-        Api.updateEmployee(editingEmployeeId, nombre, apellido, pin || null).then(function (res) {
-            btn.disabled = false;
-            btn.textContent = 'Guardar';
-
-            if (res && res.success) {
-                closeEditModal();
-                loadEmployees();
-            } else {
-                showEditFeedback('error', (res && res.message) || 'Error al guardar.');
-            }
-        });
     }
 
     function createEmployee() {
         var nameEl = document.getElementById('emp-name');
         var surnameEl = document.getElementById('emp-surname');
         var pinEl = document.getElementById('emp-pin');
+        var roleEl = document.getElementById('emp-role');
         var nombre = nameEl.value.trim();
         var apellido = surnameEl.value.trim();
         var pin = pinEl.value.trim();
+        var role = roleEl ? roleEl.value : 'employee';
 
-        if (!nombre) {
-            showEmpFeedback('error', 'Introduce el nombre del empleado.');
-            return;
-        }
-        if (!apellido) {
-            showEmpFeedback('error', 'Introduce el apellido del empleado.');
-            return;
-        }
-        if (!/^\d{4}$/.test(pin)) {
-            showEmpFeedback('error', 'El PIN debe ser exactamente 4 cifras.');
-            return;
+        if (!nombre) { showFeedback('emp-feedback', 'error', 'Introduce el nombre del empleado.'); return; }
+        if (!apellido) { showFeedback('emp-feedback', 'error', 'Introduce el apellido del empleado.'); return; }
+
+        if (role === 'admin') {
+            if (!/^\d{6}$/.test(pin)) { showFeedback('emp-feedback', 'error', 'El PIN de administrador debe ser 6 cifras.'); return; }
+        } else {
+            if (!/^\d{4}$/.test(pin)) { showFeedback('emp-feedback', 'error', 'El PIN debe ser exactamente 4 cifras.'); return; }
         }
 
         var btn = document.getElementById('admin-emp-create');
         btn.disabled = true;
         btn.textContent = 'Creando...';
-        hideEmpFeedback();
+        hideFeedback('emp-feedback');
 
-        Api.createEmployee(nombre, apellido, pin).then(function (res) {
+        Api.createEmployee(nombre, apellido, pin, role).then(function (res) {
             btn.disabled = false;
             btn.textContent = 'Crear empleado';
 
@@ -251,24 +317,15 @@ var Admin = (function () {
                 nameEl.value = '';
                 surnameEl.value = '';
                 pinEl.value = '';
-                showEmpFeedback('success', 'Empleado creado correctamente.');
+                if (roleEl) roleEl.value = 'employee';
+                updatePinLabel('employee', 'emp-pin-label', 'emp-pin');
+                showFeedback('emp-feedback', 'success', 'Empleado creado correctamente.', 4000);
                 loadEmployees();
+                if (newFormVisible) toggleNewForm();
             } else {
-                showEmpFeedback('error', (res && res.message) || 'No se pudo crear el empleado.');
+                showFeedback('emp-feedback', 'error', (res && res.message) || 'No se pudo crear el empleado.');
             }
         });
-    }
-
-    function showEmpFeedback(type, message) {
-        var el = document.getElementById('emp-feedback');
-        el.textContent = message;
-        el.className = 'employee-form-feedback ' + (type === 'success' ? 'feedback-success' : 'feedback-error');
-    }
-
-    function hideEmpFeedback() {
-        var el = document.getElementById('emp-feedback');
-        el.textContent = '';
-        el.className = 'employee-form-feedback hidden';
     }
 
     function loadEmployees() {
@@ -301,10 +358,12 @@ var Admin = (function () {
         var item = document.createElement('div');
         item.className = 'employee-item';
 
+        /* Avatar */
         var avatar = document.createElement('div');
-        avatar.className = 'employee-avatar';
+        avatar.className = 'employee-avatar' + (employee.role === 'admin' ? ' avatar-admin' : '');
         avatar.textContent = initials(employee.nombre, employee.apellido);
 
+        /* Info */
         var info = document.createElement('div');
         info.className = 'employee-info';
 
@@ -313,27 +372,140 @@ var Admin = (function () {
         name.textContent = ((employee.nombre || '') + ' ' + (employee.apellido || '')).trim();
         info.appendChild(name);
 
-        var badge = document.createElement('span');
-        badge.className = 'employee-badge ' + (employee.attendance_enabled ? 'badge-active' : 'badge-inactive');
-        badge.textContent = employee.attendance_enabled ? 'Activo' : 'Inactivo';
+        var meta = document.createElement('div');
+        meta.className = 'employee-meta';
 
-        var button = document.createElement('button');
-        button.className = 'btn-edit-emp';
-        button.type = 'button';
-        button.textContent = 'Editar';
-        Utils.bindPress(button, function () {
+        var statusBadge = document.createElement('span');
+        statusBadge.className = 'employee-badge ' + (employee.attendance_enabled ? 'badge-active' : 'badge-inactive');
+        statusBadge.textContent = employee.attendance_enabled ? 'Activo' : 'Inactivo';
+        meta.appendChild(statusBadge);
+
+        if (employee.role === 'admin') {
+            var adminBadge = document.createElement('span');
+            adminBadge.className = 'employee-badge badge-admin';
+            adminBadge.textContent = 'Admin';
+            meta.appendChild(adminBadge);
+        }
+
+        info.appendChild(meta);
+
+        /* Actions */
+        var actions = document.createElement('div');
+        actions.className = 'employee-actions';
+
+        var toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'toggle-switch' + (employee.attendance_enabled ? ' active' : '');
+        toggle.setAttribute('aria-label', employee.attendance_enabled ? 'Desactivar empleado' : 'Activar empleado');
+        var knob = document.createElement('span');
+        knob.className = 'toggle-knob';
+        toggle.appendChild(knob);
+        Utils.bindPress(toggle, function () {
+            toggleActive(employee.id, employee.attendance_enabled);
+        });
+        actions.appendChild(toggle);
+
+        var editBtn = document.createElement('button');
+        editBtn.className = 'btn-edit-emp';
+        editBtn.type = 'button';
+        editBtn.setAttribute('aria-label', 'Editar empleado');
+        editBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>';
+        Utils.bindPress(editBtn, function () {
             openEditModal(employee);
         });
+        actions.appendChild(editBtn);
 
         item.appendChild(avatar);
         item.appendChild(info);
-        item.appendChild(badge);
-        item.appendChild(button);
+        item.appendChild(actions);
         return item;
     }
 
-    function initials(nombre, apellido) {
-        return ((nombre || '').charAt(0) + (apellido || '').charAt(0)).toUpperCase() || '--';
+    function toggleActive(employeeId, currentState) {
+        Api.updateEmployee(employeeId, undefined, undefined, null, !currentState, undefined).then(function (res) {
+            if (res && res.success) {
+                loadEmployees();
+            }
+        });
+    }
+
+    /* ===== Edit Modal ===== */
+    function openEditModal(employee) {
+        editingEmployee = employee;
+        document.getElementById('edit-emp-name').value = employee.nombre || '';
+        document.getElementById('edit-emp-surname').value = employee.apellido || '';
+        document.getElementById('edit-emp-pin').value = '';
+
+        var roleSelect = document.getElementById('edit-emp-role');
+        if (roleSelect) roleSelect.value = employee.role || 'employee';
+        updatePinLabel(employee.role || 'employee', 'edit-emp-pin-label', 'edit-emp-pin');
+
+        var toggleBtn = document.getElementById('edit-emp-active');
+        var toggleLabel = document.getElementById('edit-emp-active-label');
+        if (toggleBtn) {
+            toggleBtn.classList.toggle('active', !!employee.attendance_enabled);
+        }
+        if (toggleLabel) toggleLabel.textContent = employee.attendance_enabled ? 'Activo' : 'Inactivo';
+
+        hideFeedback('edit-emp-feedback');
+        document.getElementById('modal-edit-emp').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+        editingEmployee = null;
+        document.getElementById('modal-edit-emp').classList.add('hidden');
+    }
+
+    function saveEditEmployee() {
+        var nombre = document.getElementById('edit-emp-name').value.trim();
+        var apellido = document.getElementById('edit-emp-surname').value.trim();
+        var pin = document.getElementById('edit-emp-pin').value.trim();
+        var roleSelect = document.getElementById('edit-emp-role');
+        var role = roleSelect ? roleSelect.value : undefined;
+        var toggleBtn = document.getElementById('edit-emp-active');
+        var isActive = toggleBtn ? toggleBtn.classList.contains('active') : undefined;
+
+        if (!nombre || !apellido) {
+            showFeedback('edit-emp-feedback', 'error', 'Nombre y apellido son obligatorios.');
+            return;
+        }
+
+        if (pin) {
+            if (role === 'admin' && !/^\d{6}$/.test(pin)) {
+                showFeedback('edit-emp-feedback', 'error', 'El PIN de administrador debe ser 6 cifras.');
+                return;
+            }
+            if (role === 'employee' && !/^\d{4}$/.test(pin)) {
+                showFeedback('edit-emp-feedback', 'error', 'El PIN de empleado debe ser 4 cifras.');
+                return;
+            }
+        }
+
+        if (role === 'admin' && editingEmployee && editingEmployee.role !== 'admin' && !pin) {
+            showFeedback('edit-emp-feedback', 'error', 'Al cambiar a administrador debes establecer un PIN de 6 cifras.');
+            return;
+        }
+
+        if (role === 'employee' && editingEmployee && editingEmployee.role === 'admin' && !pin) {
+            showFeedback('edit-emp-feedback', 'error', 'Al cambiar a empleado debes establecer un PIN de 4 cifras.');
+            return;
+        }
+
+        var btn = document.getElementById('edit-emp-save');
+        btn.disabled = true;
+        btn.textContent = 'Guardando...';
+
+        Api.updateEmployee(editingEmployee.id, nombre, apellido, pin || null, isActive, role).then(function (res) {
+            btn.disabled = false;
+            btn.textContent = 'Guardar';
+
+            if (res && res.success) {
+                closeEditModal();
+                loadEmployees();
+            } else {
+                showFeedback('edit-emp-feedback', 'error', (res && res.message) || 'Error al guardar.');
+            }
+        });
     }
 
     return { init: init, show: show };

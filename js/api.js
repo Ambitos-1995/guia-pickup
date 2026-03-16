@@ -64,22 +64,42 @@ var Api = (function () {
         }, { requiresAuth: true });
     }
 
-    function updateEmployee(employeeId, nombre, apellido, pin) {
+    function updateEmployee(employeeId, nombre, apellido, pin, attendanceEnabled, role) {
         var body = { action: 'update', orgSlug: ORG_SLUG, employeeId: employeeId };
         if (nombre !== undefined) body.nombre = nombre;
         if (apellido !== undefined) body.apellido = apellido;
         if (pin) body.pin = pin;
+        if (attendanceEnabled !== undefined) body.attendance_enabled = attendanceEnabled;
+        if (role !== undefined) body.role = role;
 
         return postJson(FUNCTIONS_BASE + '/kiosk-employees', body, { requiresAuth: true });
     }
 
-    function createEmployee(nombre, apellido, pin) {
-        return postJson(FUNCTIONS_BASE + '/kiosk-employees', {
+    function createEmployee(nombre, apellido, pin, role) {
+        var body = {
             action: 'create',
             orgSlug: ORG_SLUG,
             nombre: nombre,
             apellido: apellido,
             pin: pin
+        };
+        if (role) body.role = role;
+        return postJson(FUNCTIONS_BASE + '/kiosk-employees', body, { requiresAuth: true });
+    }
+
+    function listPaymentMonths() {
+        return postJson(FUNCTIONS_BASE + '/kiosk-payment', {
+            action: 'list-months',
+            orgSlug: ORG_SLUG
+        }, { requiresAuth: true });
+    }
+
+    function getPaymentSummary(year, month) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-payment', {
+            action: 'get-summary',
+            orgSlug: ORG_SLUG,
+            year: year,
+            month: month
         }, { requiresAuth: true });
     }
 
@@ -210,6 +230,8 @@ var Api = (function () {
         calculatePayments: calculatePayments,
         getEmployees: getEmployees,
         createEmployee: createEmployee,
-        updateEmployee: updateEmployee
+        updateEmployee: updateEmployee,
+        listPaymentMonths: listPaymentMonths,
+        getPaymentSummary: getPaymentSummary
     };
 })();

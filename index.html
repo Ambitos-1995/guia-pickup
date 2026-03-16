@@ -317,7 +317,7 @@
                 <button class="back-btn" data-back="screen-menu" aria-label="Volver">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
                 </button>
-                <h2>Admin</h2>
+                <h2>Ajustes</h2>
             </header>
 
             <div class="admin-container">
@@ -328,69 +328,95 @@
 
                 <!-- Admin: Payments -->
                 <div class="admin-section active" id="admin-payments">
+                    <div class="admin-month-nav">
+                        <button class="week-arrow" id="admin-pay-prev" aria-label="Mes anterior">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                        </button>
+                        <div class="week-label" id="admin-pay-month-label">Marzo 2026</div>
+                        <button class="week-arrow" id="admin-pay-next" aria-label="Mes siguiente">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="admin-pay-summary" id="admin-pay-summary">
+                        <div class="admin-pay-summary-row">
+                            <span class="admin-pay-summary-label">Importe SEUR</span>
+                            <span class="admin-pay-summary-value" id="admin-pay-summary-amount">--</span>
+                        </div>
+                        <div class="admin-pay-summary-row">
+                            <span class="admin-pay-summary-label">Estado</span>
+                            <span class="admin-pay-summary-badge" id="admin-pay-summary-status">Sin configurar</span>
+                        </div>
+                    </div>
+
                     <div class="admin-pay-form">
-                        <div class="form-row">
-                            <label for="admin-pay-year">Ano</label>
-                            <input type="number" id="admin-pay-year" min="2020" max="2100" value="2026">
-                        </div>
-                        <div class="form-row">
-                            <label for="admin-pay-month">Mes</label>
-                            <select id="admin-pay-month">
-                                <option value="1">Enero</option><option value="2">Febrero</option>
-                                <option value="3" selected>Marzo</option><option value="4">Abril</option>
-                                <option value="5">Mayo</option><option value="6">Junio</option>
-                                <option value="7">Julio</option><option value="8">Agosto</option>
-                                <option value="9">Septiembre</option><option value="10">Octubre</option>
-                                <option value="11">Noviembre</option><option value="12">Diciembre</option>
-                            </select>
-                        </div>
-                        <div class="form-row">
-                            <label for="admin-pay-amount">Importe total SEUR</label>
-                            <div class="input-euro">
-                                <input type="number" id="admin-pay-amount" min="0" step="0.01" placeholder="0.00">
-                                <span class="euro-sign">&euro;</span>
+                        <div class="admin-pay-inline">
+                            <div class="form-row" style="flex:1">
+                                <label for="admin-pay-amount">Importe total SEUR</label>
+                                <div class="input-euro">
+                                    <input type="number" id="admin-pay-amount" min="0" step="0.01" placeholder="0.00">
+                                    <span class="euro-sign">&euro;</span>
+                                </div>
                             </div>
+                            <button class="btn-primary btn-compact" id="admin-pay-save">Guardar</button>
                         </div>
-                        <button class="btn-primary" id="admin-pay-save">Guardar importe</button>
-                        <button class="btn-secondary" id="admin-pay-calculate">Calcular pagos</button>
+                        <button class="btn-secondary btn-full" id="admin-pay-calculate">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="16" y1="18" x2="16" y2="18"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="8" y1="10" x2="16" y2="10"/></svg>
+                            Calcular pagos
+                        </button>
                         <div class="employee-form-feedback hidden" id="admin-pay-feedback"></div>
                     </div>
 
                     <div class="admin-pay-results hidden" id="admin-pay-results">
-                        <h3>Distribucion</h3>
-                        <table class="pay-table" id="admin-pay-table">
-                            <thead>
-                                <tr>
-                                    <th>Empleado</th>
-                                    <th>Horas</th>
-                                    <th>Estado</th>
-                                    <th>Importe</th>
-                                </tr>
-                            </thead>
-                            <tbody id="admin-pay-tbody"></tbody>
-                            <tfoot id="admin-pay-tfoot"></tfoot>
-                        </table>
+                        <h3 class="admin-section-title">Distribucion</h3>
+                        <div class="admin-pay-table-wrap">
+                            <table class="pay-table" id="admin-pay-table">
+                                <thead>
+                                    <tr>
+                                        <th>Empleado</th>
+                                        <th>Horas</th>
+                                        <th>Estado</th>
+                                        <th>Importe</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-pay-tbody"></tbody>
+                                <tfoot id="admin-pay-tfoot"></tfoot>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Admin: Employees -->
                 <div class="admin-section hidden" id="admin-employees">
-                    <div class="employee-form" id="employee-form">
-                        <h3>Nuevo empleado</h3>
-                        <div class="form-row">
-                            <label for="emp-name">Nombre</label>
-                            <input type="text" id="emp-name" placeholder="Nombre">
+                    <button class="btn-add-emp" id="admin-emp-toggle-form" type="button">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Nuevo empleado
+                    </button>
+
+                    <div class="admin-emp-form-wrap" id="admin-emp-form-wrap">
+                        <div class="employee-form" id="employee-form">
+                            <div class="form-row">
+                                <label for="emp-name">Nombre</label>
+                                <input type="text" id="emp-name" placeholder="Nombre">
+                            </div>
+                            <div class="form-row">
+                                <label for="emp-surname">Apellido</label>
+                                <input type="text" id="emp-surname" placeholder="Apellido">
+                            </div>
+                            <div class="form-row">
+                                <label for="emp-role">Rol</label>
+                                <select id="emp-role">
+                                    <option value="employee" selected>Empleado (PIN 4 cifras)</option>
+                                    <option value="admin">Administrador (PIN 6 cifras)</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label for="emp-pin" id="emp-pin-label">PIN (4 cifras)</label>
+                                <input type="text" id="emp-pin" maxlength="6" inputmode="numeric" placeholder="1234" pattern="[0-9]{4,6}">
+                            </div>
+                            <button class="btn-primary btn-full" id="admin-emp-create">Crear empleado</button>
+                            <div class="employee-form-feedback hidden" id="emp-feedback"></div>
                         </div>
-                        <div class="form-row">
-                            <label for="emp-surname">Apellido</label>
-                            <input type="text" id="emp-surname" placeholder="Apellido">
-                        </div>
-                        <div class="form-row">
-                            <label for="emp-pin">PIN (4 cifras)</label>
-                            <input type="text" id="emp-pin" maxlength="4" inputmode="numeric" placeholder="1234" pattern="[0-9]{4}">
-                        </div>
-                        <button class="btn-primary" id="admin-emp-create">Crear empleado</button>
-                        <div class="employee-form-feedback hidden" id="emp-feedback"></div>
                     </div>
 
                     <div class="employee-list" id="admin-employee-list">
@@ -432,8 +458,24 @@
                     <input type="text" id="edit-emp-surname" placeholder="Apellido">
                 </div>
                 <div class="form-row">
-                    <label for="edit-emp-pin">Nuevo PIN (4 cifras, dejar vacio para no cambiar)</label>
-                    <input type="text" id="edit-emp-pin" maxlength="4" inputmode="numeric" placeholder="1234" pattern="[0-9]{4}">
+                    <label for="edit-emp-role">Rol</label>
+                    <select id="edit-emp-role">
+                        <option value="employee">Empleado (PIN 4 cifras)</option>
+                        <option value="admin">Administrador (PIN 6 cifras)</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label for="edit-emp-pin" id="edit-emp-pin-label">Nuevo PIN (dejar vacio para no cambiar)</label>
+                    <input type="text" id="edit-emp-pin" maxlength="6" inputmode="numeric" placeholder="1234" pattern="[0-9]{4,6}">
+                </div>
+                <div class="form-row edit-emp-toggle-row">
+                    <label>Estado</label>
+                    <div class="toggle-row">
+                        <button type="button" class="toggle-switch" id="edit-emp-active" aria-label="Activar o desactivar empleado">
+                            <span class="toggle-knob"></span>
+                        </button>
+                        <span class="toggle-label" id="edit-emp-active-label">Activo</span>
+                    </div>
                 </div>
                 <div class="employee-form-feedback hidden" id="edit-emp-feedback"></div>
                 <div class="modal-actions">

@@ -112,7 +112,16 @@ var Pin = (function () {
 
         var request;
         if (mode === 'login') {
-            request = pin.length <= 4 ? Api.verifyPin(pin) : Api.verifyAdminPin(pin);
+            if (pin.length <= 4) {
+                request = Api.verifyPin(pin);
+            } else {
+                /* 5-6 digits: try employee verify first (admin-role employees),
+                   fall back to org super-admin PIN */
+                request = Api.verifyPin(pin).then(function (res) {
+                    if (res && res.success) return res;
+                    return Api.verifyAdminPin(pin);
+                });
+            }
         } else {
             request = mode === 'admin' ? Api.verifyAdminPin(pin) : Api.verifyPin(pin);
         }

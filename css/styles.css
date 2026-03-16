@@ -1389,25 +1389,28 @@ button:focus-visible {
 
 .admin-tabs {
     display: flex;
-    background: var(--white);
-    border-bottom: 2px solid var(--gray-200);
-    overflow-x: auto;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--gray-100);
 }
 
 .admin-tab {
     flex: 1;
-    padding: 14px 16px;
+    padding: 12px 16px;
     font-weight: 700;
     font-size: 0.85rem;
     color: var(--gray-500);
-    border-bottom: 3px solid transparent;
+    border-radius: 12px;
+    background: transparent;
     transition: all var(--transition);
     white-space: nowrap;
+    text-align: center;
 }
 
 .admin-tab.active {
-    color: var(--red);
-    border-bottom-color: var(--red);
+    color: var(--white);
+    background: var(--red);
+    box-shadow: 0 2px 8px rgba(227, 30, 36, 0.3);
 }
 
 .admin-section {
@@ -1416,11 +1419,125 @@ button:focus-visible {
 
 .admin-section.hidden { display: none; }
 
+/* --- Admin: Payment Month Navigation --- */
+.admin-month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0 16px;
+}
+
+/* --- Admin: Payment Summary Card --- */
+.admin-pay-summary {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border: 2px solid rgba(234, 179, 8, 0.2);
+    border-radius: 20px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+}
+
+.admin-pay-summary::before {
+    content: '';
+    position: absolute;
+    top: -30%;
+    right: -15%;
+    width: 45%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: rgba(234, 179, 8, 0.12);
+    pointer-events: none;
+}
+
+.admin-pay-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+
+.admin-pay-summary-row + .admin-pay-summary-row {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(234, 179, 8, 0.15);
+}
+
+.admin-pay-summary-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: rgba(146, 112, 0, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.admin-pay-summary-value {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #92400e;
+    letter-spacing: -0.02em;
+}
+
+.admin-pay-summary-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: rgba(234, 179, 8, 0.15);
+    color: #92400e;
+}
+
+.admin-pay-summary-badge.badge-configured {
+    background: rgba(34, 197, 94, 0.12);
+    color: var(--green-dark);
+}
+
+.admin-pay-summary-badge.badge-calculated {
+    background: rgba(59, 130, 246, 0.12);
+    color: var(--blue-dark);
+}
+
+/* --- Admin: Payment Form --- */
 .admin-pay-form {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
 }
+
+.admin-pay-inline {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.admin-pay-inline .btn-compact {
+    padding: 14px 20px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.btn-full { width: 100%; }
+
+.btn-secondary.btn-full {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.admin-section-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+    color: var(--text);
+}
+
+.admin-pay-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.admin-pay-results { margin-top: 20px; }
 
 .form-row {
     display: flex;
@@ -1472,13 +1589,6 @@ button:focus-visible {
     font-size: 1.1rem;
 }
 
-.admin-pay-results { margin-top: 24px; }
-.admin-pay-results h3 {
-    font-size: 1rem;
-    font-weight: 800;
-    margin-bottom: 12px;
-}
-
 .pay-table {
     width: 100%;
     border-collapse: collapse;
@@ -1510,84 +1620,63 @@ button:focus-visible {
 .pay-table tfoot .tfoot-rate td { color: #6b7280; font-weight: 600; border-top: none; padding-top: 8px; }
 .pay-table tfoot .tfoot-org td { color: #2563eb; }
 
-.employee-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.employee-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
-    background: var(--white);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-}
-
-.employee-avatar {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    background: var(--gray-200);
+/* --- Admin: Add Employee Button --- */
+.btn-add-emp {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 800;
+    gap: 8px;
+    width: 100%;
+    padding: 14px 20px;
+    background: var(--white);
+    color: var(--red);
+    border: 2px dashed var(--red);
+    border-radius: var(--radius);
+    font-family: var(--font);
     font-size: 0.9rem;
-    color: var(--gray-600);
-    flex-shrink: 0;
-}
-
-.employee-info { flex: 1; }
-
-.employee-name {
-    font-weight: 700;
-    font-size: 0.9rem;
-}
-
-.employee-code {
-    font-size: 0.7rem;
-    color: var(--gray-500);
-    font-weight: 600;
-}
-
-.employee-badge {
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 0.65rem;
-    font-weight: 700;
-}
-
-.badge-active { background: var(--green-light); color: var(--green-dark); }
-.badge-inactive { background: var(--gray-200); color: var(--gray-500); }
-
-.btn-edit-emp {
-    background: var(--gray-200);
-    color: var(--text);
-    border: none;
-    border-radius: 10px;
-    padding: 6px 14px;
-    font-size: 0.78rem;
     font-weight: 700;
     cursor: pointer;
-    flex-shrink: 0;
+    transition: all var(--transition);
+    margin-bottom: 16px;
 }
 
+.btn-add-emp:active {
+    transform: scale(0.97);
+    background: rgba(227, 30, 36, 0.04);
+}
+
+.btn-add-emp.open {
+    background: var(--red);
+    color: var(--white);
+    border-style: solid;
+}
+
+.btn-add-emp.open svg {
+    transform: rotate(45deg);
+}
+
+.btn-add-emp svg {
+    transition: transform var(--transition);
+}
+
+/* --- Admin: Collapsible New Employee Form --- */
+.admin-emp-form-wrap {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.admin-emp-form-wrap.open {
+    max-height: 600px;
+}
+
+/* --- Employee Form --- */
 .employee-form {
     background: var(--white);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     padding: 20px;
-    margin-bottom: 20px;
-}
-
-.employee-form h3 {
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 800;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
 }
 
 .employee-form .form-row {
@@ -1610,6 +1699,159 @@ button:focus-visible {
 .feedback-error {
     background: rgba(239,68,68,0.1);
     color: #b91c1c;
+}
+
+/* --- Employee List & Cards --- */
+.employee-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.employee-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+    transition: transform var(--transition);
+}
+
+.employee-item:active {
+    transform: scale(0.98);
+}
+
+.employee-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--gray-200);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: var(--gray-600);
+    flex-shrink: 0;
+}
+
+.employee-avatar.avatar-admin {
+    background: rgba(227, 30, 36, 0.1);
+    color: var(--red);
+}
+
+.employee-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.employee-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.employee-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.employee-badge {
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.badge-active { background: var(--green-light); color: var(--green-dark); }
+.badge-inactive { background: var(--gray-200); color: var(--gray-500); }
+.badge-admin { background: rgba(227, 30, 36, 0.1); color: var(--red); }
+
+.employee-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* --- Toggle Switch --- */
+.toggle-switch {
+    position: relative;
+    width: 48px;
+    height: 28px;
+    border-radius: 14px;
+    background: var(--gray-300);
+    border: none;
+    cursor: pointer;
+    transition: background var(--transition);
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.toggle-switch.active {
+    background: var(--green);
+}
+
+.toggle-knob {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--white);
+    top: 3px;
+    left: 3px;
+    transition: transform var(--transition);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    pointer-events: none;
+}
+
+.toggle-switch.active .toggle-knob {
+    transform: translateX(20px);
+}
+
+.toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toggle-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--gray-600);
+}
+
+.edit-emp-toggle-row {
+    padding-top: 4px;
+}
+
+/* --- Edit Employee Icon Button --- */
+.btn-edit-emp {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gray-100);
+    color: var(--gray-600);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all var(--transition);
+}
+
+.btn-edit-emp:active {
+    background: var(--gray-200);
+    transform: scale(0.92);
 }
 
 .loading-text {
