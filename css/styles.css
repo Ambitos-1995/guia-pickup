@@ -482,6 +482,31 @@ button:focus-visible {
     transition: all var(--transition);
 }
 
+.menu-direct-shortcut {
+    flex-shrink: 0;
+    height: 40px;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--gray-900);
+    color: var(--white);
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    box-shadow: 0 10px 20px rgba(17, 24, 39, 0.16);
+    transition: all var(--transition);
+}
+
+.menu-direct-shortcut:hover {
+    background: #0f172a;
+}
+
+.menu-direct-shortcut:active {
+    transform: scale(0.97);
+}
+
 .menu-admin-shortcut:active {
     background: rgba(227, 30, 36, 0.08);
     transform: scale(0.95);

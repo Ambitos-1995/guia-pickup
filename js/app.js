@@ -14,6 +14,7 @@ var App = (function () {
     var menuClockTimer = null;
     var modalCallback = null;
     var viewportRaf = 0;
+    var launchScreen = '';
 
     function init() {
         bindViewportState();
@@ -25,6 +26,7 @@ var App = (function () {
         Admin.init();
         Install.init();
         restoreSession();
+        launchScreen = consumeLaunchScreen();
 
         Utils.delegatePress(document.getElementById('menu-grid'), '.menu-card', function (e, card) {
             if (card.id === 'card-admin') {
@@ -76,6 +78,9 @@ var App = (function () {
                 navigate('screen-pin');
             }
         });
+        Utils.bindPress(document.getElementById('menu-direct-shortcut'), function () {
+            window.location.assign('/direct/');
+        });
         Utils.bindPress(document.getElementById('menu-login-btn'), function () {
             Pin.openForLogin('screen-menu');
             navigate('screen-pin');
@@ -90,7 +95,7 @@ var App = (function () {
 
         var menuEl = document.getElementById('screen-menu');
         if (menuEl) menuEl.classList.add('no-transition');
-        navigate('screen-menu');
+        navigate(resolveInitialScreen());
         requestAnimationFrame(function () {
             if (menuEl) menuEl.classList.remove('no-transition');
         });
@@ -205,6 +210,7 @@ var App = (function () {
         var paymentCard = document.getElementById('card-payment');
         var adminCard = document.getElementById('card-admin');
         var adminShortcut = document.getElementById('menu-admin-shortcut');
+        var directShortcut = document.getElementById('menu-direct-shortcut');
         var adminBuildVersion = document.getElementById('admin-build-version');
         var loginBtn = document.getElementById('menu-login-btn');
         var logoutBtn = document.getElementById('logout-btn');
@@ -220,6 +226,7 @@ var App = (function () {
             paymentCard.classList.remove('hidden');
             adminCard.classList.add('hidden');
             adminShortcut.classList.add('hidden');
+            directShortcut.classList.add('hidden');
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
             if (adminBuildVersion) adminBuildVersion.classList.add('hidden');
@@ -230,6 +237,7 @@ var App = (function () {
             paymentCard.classList.add('hidden');
             adminCard.classList.remove('hidden');
             adminShortcut.classList.remove('hidden');
+            directShortcut.classList.remove('hidden');
             loginBtn.classList.add('hidden');
             logoutBtn.classList.remove('hidden');
             if (adminBuildVersion) {
@@ -243,6 +251,7 @@ var App = (function () {
             paymentCard.classList.add('hidden');
             adminCard.classList.remove('hidden');
             adminShortcut.classList.add('hidden');
+            directShortcut.classList.add('hidden');
             loginBtn.classList.remove('hidden');
             logoutBtn.classList.add('hidden');
             if (adminBuildVersion) adminBuildVersion.classList.add('hidden');
@@ -309,6 +318,35 @@ var App = (function () {
         root.style.setProperty('--visual-viewport-offset-top', viewportOffsetTop + 'px');
         root.style.setProperty('--visual-viewport-offset-bottom', viewportOffsetBottom + 'px');
         root.classList.toggle('keyboard-open', keyboardGap > 120);
+    }
+
+    function resolveInitialScreen() {
+        if (launchScreen === 'admin') {
+            launchScreen = '';
+            if (hasAdminAccess()) {
+                return 'screen-admin';
+            }
+            Pin.openForAdmin('screen-admin');
+            return 'screen-pin';
+        }
+
+        launchScreen = '';
+        return 'screen-menu';
+    }
+
+    function consumeLaunchScreen() {
+        if (typeof window === 'undefined' || !window.location) return '';
+
+        var url = new URL(window.location.href);
+        var screen = String(url.searchParams.get('screen') || '').trim();
+        if (!screen) return '';
+
+        url.searchParams.delete('screen');
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState({}, '', url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '') + url.hash);
+        }
+
+        return screen;
     }
 
     function confirm(title, body, onOk) {

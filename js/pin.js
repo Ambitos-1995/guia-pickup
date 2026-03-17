@@ -9,6 +9,7 @@ var Pin = (function () {
     var pin = '';
     var isVerifying = false;
     var mode = 'admin';
+    var adminTarget = 'screen-menu';
     var employeeTarget = 'screen-clock';
     var toastTimer = null;
     var loginTimer = null;
@@ -149,7 +150,7 @@ var Pin = (function () {
 
             clearPin();
             if (mode === 'login') App.navigate(employeeTarget || 'screen-menu');
-            else if (mode === 'admin') App.navigate('screen-menu');
+            else if (mode === 'admin') App.navigate(adminTarget || 'screen-menu');
             else App.navigate(employeeTarget || 'screen-clock');
         });
     }
@@ -162,8 +163,9 @@ var Pin = (function () {
         if (dateEl) dateEl.textContent = Utils.formatDateLong(now);
     }
 
-    function openForAdmin() {
+    function openForAdmin(targetScreen) {
         mode = 'admin';
+        adminTarget = targetScreen || 'screen-menu';
         setDotCount(6);
         clearPin();
         if (promptEl) promptEl.textContent = 'Introduce el PIN de ajustes';

@@ -81,6 +81,7 @@ test('admin can sign in from iniciar sesion with a 6-digit PIN', async ({ page }
 
   await expect(page.locator('#screen-menu.active')).toBeVisible();
   await expect(page.locator('#menu-admin-shortcut')).toBeVisible();
+  await expect(page.locator('#menu-direct-shortcut')).toBeVisible();
   await expect(page.locator('#menu-login-btn')).toBeHidden();
   await expect(page.locator('#logout-btn')).toBeVisible();
 });
@@ -241,4 +242,24 @@ test('direct route uses panel switcher on mobile without overlapping panels', as
   await expect(page.locator('.direct-panel[data-panel-id="clock"]')).toHaveClass(/is-active/);
   await expect(page.locator('.direct-panel[data-panel-id="schedule"]')).not.toHaveClass(/is-active/);
   await expect(page.locator('#direct-clock-time')).toBeVisible();
+});
+
+test('admin can move between direct mode and admin panel with dedicated buttons', async ({ page }) => {
+  await setupMockApi(page);
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Iniciar sesion' }).click();
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+  await enterPin(page, '123456');
+
+  await expect(page.locator('#menu-direct-shortcut')).toBeVisible();
+  await page.locator('#menu-direct-shortcut').click();
+
+  await expect(page).toHaveURL(/\/direct\/$/);
+  await expect(page.getByRole('link', { name: 'Admin' })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Admin' }).click();
+
+  await expect(page.locator('#screen-admin.active')).toBeVisible();
+  await expect(page.locator('#admin-pay-month-label')).toContainText('2026');
 });
