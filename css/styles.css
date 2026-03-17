@@ -133,7 +133,8 @@ body {
 
 #screen-menu,
 #screen-schedule,
-#screen-guia {
+#screen-guia,
+#screen-admin {
     overflow: hidden;
 }
 
@@ -248,20 +249,23 @@ button:focus-visible {
    PIN SCREEN
    ===================================================== */
 .pin-container {
+    --pin-keypad-gap: clamp(10px, 1.7vh, 12px);
+    --pin-keypad-button-size: clamp(54px, 9.6vh, 72px);
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     min-height: 100%;
-    padding: 24px;
+    padding: clamp(16px, 3.5vh, 24px) clamp(14px, 5vw, 24px);
+    gap: clamp(10px, 2vh, 18px);
     background: linear-gradient(170deg, var(--gray-900) 0%, #2d1b1c 100%);
     color: var(--white);
 }
 
 .pin-header {
     text-align: center;
-    margin-bottom: 24px;
+    margin-bottom: clamp(10px, 2.2vh, 24px);
 }
 
 .pin-logo {
@@ -277,33 +281,35 @@ button:focus-visible {
 }
 
 .pin-clock {
-    font-size: 2.8rem;
+    font-size: clamp(2rem, 7.3vh, 2.8rem);
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1;
 }
 
 .pin-date {
-    font-size: 0.85rem;
+    font-size: clamp(0.74rem, 1.7vh, 0.85rem);
     color: var(--gray-400);
     margin-top: 4px;
     text-transform: capitalize;
 }
 
 .pin-prompt {
-    font-size: 1.1rem;
+    font-size: clamp(0.95rem, 2.3vh, 1.1rem);
     font-weight: 600;
-    margin-bottom: 20px;
+    margin-bottom: clamp(10px, 2vh, 20px);
     color: var(--gray-300);
+    text-align: center;
+    text-wrap: balance;
 }
 
 .pin-dots {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 12px;
+    gap: clamp(10px, 2vw, 12px);
     min-height: 14px;
-    margin-bottom: 16px;
+    margin-bottom: clamp(10px, 2vh, 16px);
 }
 
 .pin-dot {
@@ -351,9 +357,15 @@ button:focus-visible {
 .pin-keypad {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    max-width: 320px;
+    gap: var(--pin-keypad-gap);
+    max-width: min(100%, calc(var(--pin-keypad-button-size) * 3 + var(--pin-keypad-gap) * 2));
     width: 100%;
+}
+
+.pin-keypad .key-btn {
+    min-height: var(--pin-keypad-button-size);
+    aspect-ratio: 1.12;
+    font-size: clamp(1.35rem, 3.6vh, 1.8rem);
 }
 
 .key-btn {
@@ -395,15 +407,15 @@ button:focus-visible {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-top: 20px;
+    margin-top: clamp(10px, 2vh, 20px);
     font-weight: 600;
     color: var(--gray-300);
 }
 
 .pin-back-btn {
     position: absolute;
-    top: 16px;
-    left: 16px;
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
     width: 44px;
     height: 44px;
     border-radius: 50%;
@@ -1453,7 +1465,14 @@ button:focus-visible {
 /* =====================================================
    ADMIN SCREEN
    ===================================================== */
-.admin-container { padding: 0; }
+.admin-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+}
 
 .admin-build {
     margin: 12px 16px 0;
@@ -1472,6 +1491,7 @@ button:focus-visible {
     gap: 8px;
     padding: 12px 16px;
     background: var(--gray-100);
+    flex-shrink: 0;
 }
 
 .admin-tab {
@@ -1494,7 +1514,15 @@ button:focus-visible {
 }
 
 .admin-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
     padding: 16px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .admin-section.hidden { display: none; }
@@ -1505,6 +1533,8 @@ button:focus-visible {
     align-items: center;
     justify-content: space-between;
     padding: 4px 0 16px;
+    gap: 12px;
+    flex-shrink: 0;
 }
 
 /* --- Admin: Payment Summary Card --- */
@@ -1513,9 +1543,9 @@ button:focus-visible {
     border: 2px solid rgba(234, 179, 8, 0.2);
     border-radius: 20px;
     padding: 20px 24px;
-    margin-bottom: 16px;
     position: relative;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
 .admin-pay-summary::before {
@@ -1574,6 +1604,7 @@ button:focus-visible {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    flex-shrink: 0;
 }
 
 .admin-pay-inline {
@@ -1615,7 +1646,10 @@ button:focus-visible {
     -webkit-overflow-scrolling: touch;
 }
 
-.admin-pay-results { margin-top: 20px; }
+.admin-pay-results {
+    margin-top: 4px;
+    flex-shrink: 0;
+}
 
 .form-row {
     display: flex;
@@ -1801,6 +1835,14 @@ button:focus-visible {
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+#admin-employee-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .employee-item {
@@ -2010,6 +2052,17 @@ button:focus-visible {
     flex: 1;
     min-width: 0;
     text-align: center;
+}
+
+#modal-edit-emp .modal-card {
+    display: grid;
+    row-gap: 12px;
+}
+
+#modal-edit-emp .modal-title,
+#modal-edit-emp .employee-form-feedback,
+#modal-edit-emp .modal-actions {
+    margin-bottom: 0;
 }
 
 
@@ -2315,7 +2368,7 @@ body {
 }
 
 .admin-section {
-    padding: 18px 16px 0;
+    padding: 18px 16px 16px;
 }
 
 
@@ -2823,6 +2876,23 @@ body {
     #modal-edit-emp .form-row label {
         font-size: 0.78rem;
     }
+
+    #modal-edit-emp .modal-card {
+        padding: 20px 16px;
+        max-height: calc(100vh - 24px);
+        row-gap: 10px;
+    }
+
+    #modal-edit-emp .form-row input,
+    #modal-edit-emp .form-row select {
+        min-height: 52px;
+        padding: 12px 14px;
+    }
+
+    #modal-edit-emp .modal-actions .btn-primary,
+    #modal-edit-emp .modal-actions .btn-secondary {
+        padding: 14px 16px;
+    }
     .guia-steps,
     .guia-complete {
         padding-left: 14px;
@@ -2863,6 +2933,341 @@ body {
         padding: 14px;
         font-size: clamp(0.88rem, 1.95vh, 1rem);
         line-height: 1.35;
+    }
+
+    .admin-build {
+        margin: 10px 12px 0;
+        padding: 8px 12px;
+        border-radius: 14px;
+        font-size: 0.68rem;
+    }
+
+    .admin-tabs {
+        gap: 6px;
+        padding: 10px 12px;
+    }
+
+    .admin-tab {
+        padding: 10px 12px;
+        font-size: 0.78rem;
+    }
+
+    .admin-section {
+        gap: 12px;
+        padding: 12px;
+    }
+
+    .admin-month-nav {
+        padding-bottom: 10px;
+        gap: 8px;
+    }
+
+    .admin-pay-summary {
+        padding: 14px 16px;
+        border-radius: 18px;
+    }
+
+    .admin-pay-summary-row + .admin-pay-summary-row {
+        margin-top: 8px;
+        padding-top: 8px;
+    }
+
+    .admin-pay-summary-label {
+        font-size: 0.72rem;
+    }
+
+    .admin-pay-summary-value {
+        font-size: 1.3rem;
+    }
+
+    .admin-pay-summary-badge {
+        font-size: 0.68rem;
+        padding: 4px 10px;
+    }
+
+    .admin-pay-inline {
+        gap: 8px;
+    }
+
+    .admin-pay-inline .btn-compact {
+        padding: 12px 16px;
+    }
+
+    .admin-section-title {
+        margin-bottom: 6px;
+    }
+
+    .btn-add-emp {
+        margin-bottom: 12px;
+        padding: 12px 16px;
+    }
+
+    .employee-form {
+        padding: 14px;
+        margin-bottom: 12px;
+    }
+
+    .employee-item {
+        padding: 12px 14px;
+        gap: 10px;
+    }
+
+    .employee-avatar {
+        width: 38px;
+        height: 38px;
+        font-size: 0.8rem;
+    }
+
+    .employee-name {
+        font-size: 0.84rem;
+    }
+
+    .employee-meta {
+        gap: 4px;
+    }
+
+    .btn-edit-emp {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+    }
+}
+
+@media (max-width: 599px) and (max-height: 740px) {
+    .pin-container {
+        --pin-keypad-gap: 8px;
+        --pin-keypad-button-size: clamp(48px, 15vw, 60px);
+        padding: 14px 12px;
+        gap: 8px;
+    }
+
+    .pin-header {
+        margin-bottom: 8px;
+    }
+
+    .pin-logo {
+        font-size: 1.12rem;
+        margin-bottom: 6px;
+    }
+
+    .pin-clock {
+        font-size: clamp(1.85rem, 8vh, 2.35rem);
+    }
+
+    .pin-prompt {
+        margin-bottom: 8px;
+    }
+
+    .pin-dots {
+        margin-bottom: 8px;
+    }
+}
+
+@media (max-width: 399px), (max-height: 660px) {
+    .pin-container {
+        --pin-keypad-gap: 8px;
+        --pin-keypad-button-size: clamp(44px, 15vw, 54px);
+        padding: 12px 10px;
+        gap: 6px;
+    }
+
+    .pin-logo {
+        font-size: 1rem;
+    }
+
+    .pin-clock {
+        font-size: clamp(1.65rem, 7.2vh, 2.05rem);
+    }
+
+    .pin-date {
+        font-size: 0.72rem;
+    }
+
+    .pin-prompt {
+        font-size: 0.9rem;
+    }
+
+    .admin-build {
+        display: none;
+    }
+}
+
+@media (max-height: 480px) and (min-width: 520px) {
+    #screen-admin .screen-header {
+        gap: 10px;
+        padding: 8px 12px;
+    }
+
+    #screen-admin .screen-header h2 {
+        font-size: 1rem;
+    }
+
+    #screen-admin .back-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+    }
+
+    .admin-build {
+        display: none;
+    }
+
+    .admin-tabs {
+        padding: 6px 12px;
+    }
+
+    .admin-tab {
+        padding: 9px 10px;
+        font-size: 0.74rem;
+    }
+
+    #screen-admin .week-arrow {
+        width: 40px;
+        height: 40px;
+        border-radius: 14px;
+    }
+
+    #screen-admin .week-label {
+        font-size: 1rem;
+    }
+
+    #admin-payments {
+        display: grid;
+        grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
+        align-content: start;
+        align-items: start;
+        gap: 10px 12px;
+    }
+
+    #admin-payments .admin-month-nav,
+    #admin-payments .admin-pay-results,
+    #admin-payments #admin-pay-feedback {
+        grid-column: 1 / -1;
+    }
+
+    #admin-payments .admin-pay-summary,
+    #admin-payments .admin-pay-form {
+        min-width: 0;
+    }
+
+    #admin-payments .admin-month-nav {
+        padding-bottom: 8px;
+    }
+
+    #admin-payments .admin-pay-summary {
+        padding: 12px 14px;
+    }
+
+    #admin-payments .admin-pay-summary-label {
+        font-size: 0.68rem;
+    }
+
+    #admin-payments .admin-pay-summary-value {
+        font-size: 1.1rem;
+    }
+
+    #admin-payments .admin-pay-form {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        gap: 8px;
+        align-items: end;
+    }
+
+    #admin-payments .admin-pay-inline {
+        display: contents;
+    }
+
+    #admin-payments .admin-pay-inline .form-row {
+        min-width: 0;
+    }
+
+    #admin-payments .admin-pay-inline .btn-compact,
+    #admin-payments #admin-pay-calculate {
+        width: auto;
+        padding: 10px 12px;
+        white-space: nowrap;
+    }
+
+    #admin-payments #admin-pay-feedback {
+        grid-column: 1 / -1;
+    }
+
+    #admin-employees {
+        display: grid;
+        grid-template-columns: minmax(188px, 220px) minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
+        align-content: start;
+        align-items: start;
+        gap: 10px 12px;
+        overflow: hidden;
+    }
+
+    #admin-employees .btn-add-emp,
+    #admin-employees .admin-emp-form-wrap {
+        grid-column: 1;
+    }
+
+    #admin-employees .btn-add-emp {
+        margin-bottom: 0;
+    }
+
+    #admin-employees #admin-employee-list {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        align-self: stretch;
+        height: 100%;
+        padding-right: 4px;
+    }
+
+    #admin-employees .employee-item {
+        padding: 10px 12px;
+    }
+
+    #admin-employees .employee-avatar {
+        width: 34px;
+        height: 34px;
+        font-size: 0.74rem;
+    }
+
+    #modal-edit-emp {
+        padding: 8px;
+    }
+
+    #modal-edit-emp .modal-card {
+        max-width: min(94vw, 720px);
+        max-height: calc(100vh - 16px);
+        padding: 14px 16px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 12px;
+        row-gap: 8px;
+    }
+
+    #modal-edit-emp .modal-title,
+    #modal-edit-emp .edit-emp-toggle-row,
+    #modal-edit-emp .employee-form-feedback,
+    #modal-edit-emp .modal-actions {
+        grid-column: 1 / -1;
+    }
+
+    #modal-edit-emp .form-row {
+        gap: 4px;
+    }
+
+    #modal-edit-emp .form-row input,
+    #modal-edit-emp .form-row select {
+        min-height: 44px;
+        padding: 10px 12px;
+        font-size: 0.92rem;
+    }
+
+    #modal-edit-emp .modal-actions {
+        gap: 10px;
+    }
+
+    #modal-edit-emp .modal-actions .btn-primary,
+    #modal-edit-emp .modal-actions .btn-secondary {
+        padding: 12px 16px;
+        min-width: 0;
     }
 }
 

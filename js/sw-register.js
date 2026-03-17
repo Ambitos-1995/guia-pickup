@@ -10,7 +10,7 @@ if ("serviceWorker" in navigator) {
         var assetProbeIntervalId = 0;
         var assetCheckInFlight = false;
         var assetFingerprints = {};
-        var swUrl = window.SW_REGISTER_URL || './sw.js';
+        var swUrl = window.SW_REGISTER_URL || '/sw.js';
 
         navigator.serviceWorker.addEventListener('controllerchange', function () {
             if (refreshing) return;
@@ -81,14 +81,26 @@ if ("serviceWorker" in navigator) {
             var urls = [
                 '/css/styles.css',
                 '/js/utils.js',
+                '/js/pin-pad.js',
                 '/js/api.js',
+                '/js/webawesome-init.js',
                 '/js/sw-register.js'
             ];
 
             if (window.location.pathname.indexOf('/direct') === 0) {
                 urls.push('/direct/index.html', '/direct/direct.css', '/direct/direct.js');
             } else {
-                urls.push('/index.html', '/js/app.js', '/js/pin.js', '/js/schedule.js', '/js/clock.js', '/js/admin.js');
+                urls.push(
+                    '/index.html',
+                    '/js/pin.js',
+                    '/js/schedule.js',
+                    '/js/clock.js',
+                    '/js/guia.js',
+                    '/js/payment.js',
+                    '/js/admin.js',
+                    '/js/install.js',
+                    '/js/app.js'
+                );
             }
 
             return urls;

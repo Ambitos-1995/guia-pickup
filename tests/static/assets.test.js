@@ -41,12 +41,26 @@ test('service worker uses network-first for app shell requests', () => {
   assert.match(sw, /pathname === '\/direct' \|\|/);
   assert.match(sw, /return caches\.match\('\/direct\/index\.html'\)/);
   assert.doesNotMatch(sw, /direct\/manifest\.json/);
+  [
+    './js/pin-pad.js',
+    './js/pin.js',
+    './js/schedule.js',
+    './js/clock.js',
+    './js/guia.js',
+    './js/payment.js',
+    './js/admin.js',
+    './js/install.js',
+    './js/app.js'
+  ].forEach((assetPath) => {
+    assert.match(sw, new RegExp(assetPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  });
+  assert.doesNotMatch(sw, /vendor\/supabase\/supabase\.min\.js/);
 });
 
 test('service worker registration bypasses cache and activates updates silently', () => {
   assert.match(swRegister, /updateViaCache:\s*'none'/);
   assert.match(swRegister, /postMessage\(\{\s*type:\s*'SKIP_WAITING'\s*\}\)/);
-  assert.match(swRegister, /window\.SW_REGISTER_URL \|\| '\.\/sw\.js'/);
+  assert.match(swRegister, /window\.SW_REGISTER_URL \|\| '\/sw\.js'/);
 });
 
 test('index shell contains the main screen anchors', () => {

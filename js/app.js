@@ -4,7 +4,7 @@
 var App = (function () {
     'use strict';
 
-    var APP_VERSION = '2026.03.16-r1';
+    var APP_VERSION = '2026.03.17-r2';
     var SESSION_STORAGE_KEY = 'pickup-tmg-session-v1';
     var EMPLOYEE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
     var ADMIN_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
@@ -103,7 +103,6 @@ var App = (function () {
             if (menuEl) menuEl.classList.remove('no-transition');
         });
 
-        try { Realtime.init(); } catch (e) { console.warn('Realtime init failed:', e); }
     }
 
     function navigate(screenId) {
@@ -123,6 +122,9 @@ var App = (function () {
 
         if (currentScreen === 'screen-clock') {
             Clock.hide();
+        }
+        if (currentScreen === 'screen-schedule') {
+            Schedule.hide();
         }
         if (currentScreen === 'screen-menu' && menuClockTimer) {
             clearInterval(menuClockTimer);
@@ -394,7 +396,7 @@ var App = (function () {
 
         var url = new URL(window.location.href);
         var screen = String(url.searchParams.get('screen') || '').trim();
-        launchReturnPath = String(url.searchParams.get('return') || '').trim();
+        launchReturnPath = sanitizeReturnPath(String(url.searchParams.get('return') || '').trim());
         if (!screen) return '';
 
         url.searchParams.delete('screen');
@@ -404,6 +406,19 @@ var App = (function () {
         }
 
         return screen;
+    }
+
+    function sanitizeReturnPath(value) {
+        if (!value || value.charAt(0) !== '/') return '';
+        if (value.indexOf('//') === 0) return '';
+
+        try {
+            var parsed = new URL(value, window.location.origin);
+            if (parsed.origin !== window.location.origin) return '';
+            return parsed.pathname + parsed.search + parsed.hash;
+        } catch (error) {
+            return '';
+        }
     }
 
     function confirm(title, body, onOk) {

@@ -22,6 +22,7 @@ test('direct shell exposes kiosk branding inside the main PWA', () => {
   assert.match(directIndexHtml, /<link rel="manifest" href="\/manifest\.json">/);
   assert.match(directIndexHtml, /<script src="\/js\/pin-pad\.js"><\/script>/);
   assert.doesNotMatch(directIndexHtml, /direct\/manifest\.json/);
+  assert.doesNotMatch(directIndexHtml, /window\.SW_REGISTER_URL/);
 });
 
 test('legacy visible TMG branding is not present in shell files', () => {
@@ -42,8 +43,6 @@ test('critical scripts keep the expected load order', () => {
     'js/payment.js',
     'js/admin.js',
     'js/install.js',
-    'vendor/supabase/supabase.min.js',
-    'js/realtime.js',
     'js/app.js',
     'js/sw-register.js'
   ];
@@ -55,4 +54,7 @@ test('critical scripts keep the expected load order', () => {
     assert.ok(position > lastPosition, `${scriptPath} should load after the previous script`);
     lastPosition = position;
   });
+
+  assert.equal(indexHtml.includes('vendor/supabase/supabase.min.js'), false);
+  assert.equal(indexHtml.includes('js/realtime.js'), false);
 });

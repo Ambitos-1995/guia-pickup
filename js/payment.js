@@ -84,7 +84,7 @@ var Payment = (function () {
 
             if (!(res && res.success && res.data)) {
                 hoursEl.textContent = '0h';
-                totalEl.textContent = '0 €';
+                totalEl.textContent = '0 \u20AC';
                 noteEl.textContent = 'No hay datos para este mes.';
                 return;
             }

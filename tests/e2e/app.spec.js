@@ -30,6 +30,30 @@ test('app boots into the internal PIN screen', async ({ page }) => {
   await expect(page.locator('#pin-public-schedule')).toBeHidden();
 });
 
+test('main PIN layout fits inside a short mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+
+  const metrics = await page.evaluate(() => {
+    const container = document.querySelector('.pin-container');
+    const keypad = document.getElementById('pin-keypad');
+    const scroller = document.scrollingElement || document.documentElement;
+
+    return {
+      viewport: window.innerHeight,
+      containerBottom: Math.ceil(container.getBoundingClientRect().bottom),
+      keypadBottom: Math.ceil(keypad.getBoundingClientRect().bottom),
+      overflow: Math.max(0, scroller.scrollHeight - window.innerHeight)
+    };
+  });
+
+  expect(metrics.containerBottom).toBeLessThanOrEqual(metrics.viewport);
+  expect(metrics.keypadBottom).toBeLessThanOrEqual(metrics.viewport);
+  expect(metrics.overflow).toBeLessThanOrEqual(2);
+});
+
 test('anonymous users cannot reach authenticated screens', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
@@ -140,7 +164,7 @@ test('admin can load payments and save a configured amount', async ({ page }) =>
 
   await page.locator('#menu-admin-shortcut').click();
   await expect(page.locator('#screen-admin.active')).toBeVisible();
-  await expect(page.locator('#admin-build-version')).toContainText('Version 2026.03.16-r1');
+  await expect(page.locator('#admin-build-version')).toContainText(/Version \d{4}\.\d{2}\.\d{2}-r\d+/);
   await expect(page.locator('#admin-pay-summary-status')).toContainText('Sin configurar');
 
   await page.locator('#admin-pay-amount').fill('1250');
@@ -174,6 +198,106 @@ test('admin can create a new employee from ajustes empleados', async ({ page }) 
   await expect.poll(() => state.createCalls.length).toBe(1);
   await expect.poll(() => state.createCalls[0].pin).toBe('4321');
   await expect.poll(() => state.createCalls[0].role).toBe('employee');
+});
+
+test('admin layouts fit inside a short mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+
+  await enterPin(page, '123456');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+
+  await page.locator('#menu-admin-shortcut').click();
+  await expect(page.locator('#screen-admin.active')).toBeVisible();
+
+  const paymentsMetrics = await page.evaluate(() => {
+    const screen = document.querySelector('#screen-admin.active');
+    const section = document.querySelector('#screen-admin.active .admin-section:not(.hidden)');
+    const scroller = document.scrollingElement || document.documentElement;
+
+    return {
+      viewport: window.innerHeight,
+      screenBottom: Math.ceil(screen.getBoundingClientRect().bottom),
+      screenOverflow: Math.max(0, screen.scrollHeight - screen.clientHeight),
+      sectionOverflow: Math.max(0, section.scrollHeight - section.clientHeight),
+      docOverflow: Math.max(0, scroller.scrollHeight - window.innerHeight)
+    };
+  });
+
+  expect(paymentsMetrics.screenBottom).toBeLessThanOrEqual(paymentsMetrics.viewport);
+  expect(paymentsMetrics.screenOverflow).toBeLessThanOrEqual(2);
+  expect(paymentsMetrics.sectionOverflow).toBeLessThanOrEqual(2);
+  expect(paymentsMetrics.docOverflow).toBeLessThanOrEqual(2);
+
+  await page.locator('.admin-tab', { hasText: 'Empleados' }).click();
+  await expect(page.locator('.btn-edit-emp')).toHaveCount(3);
+
+  const employeeMetrics = await page.evaluate(() => {
+    const screen = document.querySelector('#screen-admin.active');
+    const section = document.querySelector('#screen-admin.active .admin-section:not(.hidden)');
+    return {
+      screenOverflow: Math.max(0, screen.scrollHeight - screen.clientHeight),
+      sectionOverflow: Math.max(0, section.scrollHeight - section.clientHeight)
+    };
+  });
+
+  expect(employeeMetrics.screenOverflow).toBeLessThanOrEqual(2);
+  expect(employeeMetrics.sectionOverflow).toBeLessThanOrEqual(2);
+
+  await page.locator('.btn-edit-emp').first().click();
+
+  const modalMetrics = await page.evaluate(() => {
+    const modal = document.querySelector('.modal:not(.hidden) .modal-card');
+    return modal ? Math.max(0, modal.scrollHeight - modal.clientHeight) : Number.POSITIVE_INFINITY;
+  });
+
+  expect(modalMetrics).toBeLessThanOrEqual(2);
+});
+
+test('admin layouts fit inside a short landscape viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 568, height: 320 });
+  await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+
+  await enterPin(page, '123456');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+
+  await page.locator('#menu-admin-shortcut').click();
+  await expect(page.locator('#screen-admin.active')).toBeVisible();
+
+  await page.locator('.admin-tab', { hasText: 'Empleados' }).click();
+  await expect(page.locator('.btn-edit-emp')).toHaveCount(3);
+
+  const employeeMetrics = await page.evaluate(() => {
+    const screen = document.querySelector('#screen-admin.active');
+    const section = document.querySelector('#screen-admin.active .admin-section:not(.hidden)');
+    const scroller = document.scrollingElement || document.documentElement;
+
+    return {
+      viewport: window.innerHeight,
+      screenBottom: Math.ceil(screen.getBoundingClientRect().bottom),
+      screenOverflow: Math.max(0, screen.scrollHeight - screen.clientHeight),
+      sectionOverflow: Math.max(0, section.scrollHeight - section.clientHeight),
+      docOverflow: Math.max(0, scroller.scrollHeight - window.innerHeight)
+    };
+  });
+
+  expect(employeeMetrics.screenBottom).toBeLessThanOrEqual(employeeMetrics.viewport);
+  expect(employeeMetrics.screenOverflow).toBeLessThanOrEqual(2);
+  expect(employeeMetrics.sectionOverflow).toBeLessThanOrEqual(2);
+  expect(employeeMetrics.docOverflow).toBeLessThanOrEqual(2);
+
+  await page.locator('.btn-edit-emp').first().click();
+
+  const modalMetrics = await page.evaluate(() => {
+    const modal = document.querySelector('.modal:not(.hidden) .modal-card');
+    return modal ? Math.max(0, modal.scrollHeight - modal.clientHeight) : Number.POSITIVE_INFINITY;
+  });
+
+  expect(modalMetrics).toBeLessThanOrEqual(2);
 });
 
 test('schedule create dialog is simplified for employee reservations', async ({ page }) => {
@@ -221,6 +345,64 @@ test('direct route allows atomic schedule reservation with pin', async ({ page }
   await expect.poll(() => state.scheduleActionCalls.length).toBe(1);
   await expect.poll(() => state.scheduleActionCalls[0].action).toBe('assign');
   await expect.poll(() => state.scheduleActionCalls[0].auth).toContain('Bearer employee-token-2');
+});
+
+test('direct quick clock layout fits inside a short mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await setupMockApi(page);
+  await page.goto('/direct/');
+
+  await page.locator('#direct-tab-clock').click();
+  await expect(page.locator('.direct-panel[data-panel-id="clock"]')).toHaveClass(/is-active/);
+
+  const metrics = await page.evaluate(() => {
+    const panel = document.querySelector('.direct-panel[data-panel-id="clock"]');
+    const shell = document.getElementById('direct-clock-shell');
+    const keypad = document.getElementById('direct-pin-keypad');
+    const scroller = document.scrollingElement || document.documentElement;
+
+    return {
+      viewport: window.innerHeight,
+      panelBottom: Math.ceil(panel.getBoundingClientRect().bottom),
+      keypadBottom: Math.ceil(keypad.getBoundingClientRect().bottom),
+      shellOverflow: Math.max(0, shell.scrollHeight - shell.clientHeight),
+      docOverflow: Math.max(0, scroller.scrollHeight - window.innerHeight)
+    };
+  });
+
+  expect(metrics.panelBottom).toBeLessThanOrEqual(metrics.viewport);
+  expect(metrics.keypadBottom).toBeLessThanOrEqual(metrics.viewport);
+  expect(metrics.shellOverflow).toBeLessThanOrEqual(2);
+  expect(metrics.docOverflow).toBeLessThanOrEqual(2);
+});
+
+test('direct quick clock layout fits inside a short landscape viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 568, height: 320 });
+  await setupMockApi(page);
+  await page.goto('/direct/');
+
+  await page.locator('#direct-tab-clock').click();
+  await expect(page.locator('.direct-panel[data-panel-id="clock"]')).toHaveClass(/is-active/);
+
+  const metrics = await page.evaluate(() => {
+    const panel = document.querySelector('.direct-panel[data-panel-id="clock"]');
+    const shell = document.getElementById('direct-clock-shell');
+    const keypad = document.getElementById('direct-pin-keypad');
+    const scroller = document.scrollingElement || document.documentElement;
+
+    return {
+      viewport: window.innerHeight,
+      panelBottom: Math.ceil(panel.getBoundingClientRect().bottom),
+      keypadBottom: Math.ceil(keypad.getBoundingClientRect().bottom),
+      shellOverflow: Math.max(0, shell.scrollHeight - shell.clientHeight),
+      docOverflow: Math.max(0, scroller.scrollHeight - window.innerHeight)
+    };
+  });
+
+  expect(metrics.panelBottom).toBeLessThanOrEqual(metrics.viewport);
+  expect(metrics.keypadBottom).toBeLessThanOrEqual(metrics.viewport);
+  expect(metrics.shellOverflow).toBeLessThanOrEqual(2);
+  expect(metrics.docOverflow).toBeLessThanOrEqual(2);
 });
 
 test('direct route mirrors compact create dialog layout from main schedule', async ({ page }) => {

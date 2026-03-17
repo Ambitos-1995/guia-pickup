@@ -1,5 +1,8 @@
 .direct-body {
+    --direct-keypad-gap: clamp(10px, 1.8vmin, 14px);
+    --direct-keypad-button-size: clamp(56px, 10.5vmin, 82px);
     overflow: hidden;
+    overscroll-behavior: none;
     background:
         radial-gradient(circle at top left, rgba(227, 30, 36, 0.12), transparent 24%),
         radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.1), transparent 26%),
@@ -11,8 +14,8 @@
     height: var(--app-height);
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 16px;
+    gap: clamp(10px, 1.8vh, 16px);
+    padding: clamp(10px, 2vw, 16px);
     overflow: hidden;
 }
 
@@ -21,7 +24,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 18px 22px;
+    padding: clamp(14px, 2.4vh, 18px) clamp(16px, 2.6vw, 22px);
     border-radius: 28px;
     background: rgba(255, 255, 255, 0.86);
     border: 1px solid rgba(17, 24, 39, 0.08);
@@ -102,7 +105,7 @@
     min-height: 0;
     display: grid;
     grid-template-columns: minmax(0, 1.48fr) minmax(320px, 0.76fr);
-    gap: 16px;
+    gap: clamp(10px, 1.8vh, 16px);
     overflow: hidden;
 }
 
@@ -245,6 +248,13 @@
     justify-content: center;
     padding: 8px 22px 24px;
     position: relative;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+}
+
+.direct-clock-shell::-webkit-scrollbar {
+    display: none;
 }
 
 .direct-clock-state,
@@ -260,7 +270,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    gap: clamp(18px, 3vh, 30px);
+    gap: clamp(14px, 2.4vh, 26px);
 }
 
 .direct-clock-intro {
@@ -268,13 +278,13 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 14px;
+    gap: clamp(8px, 1.6vh, 14px);
     padding-top: clamp(4px, 1vh, 12px);
 }
 
 .direct-clock-time {
     font-family: var(--font-display);
-    font-size: clamp(3.3rem, 6vw, 4.8rem);
+    font-size: clamp(2.2rem, 7.4vh, 4.8rem);
     font-weight: 850;
     display: inline-flex;
     align-items: flex-end;
@@ -300,9 +310,11 @@
 
 .direct-clock-copy {
     color: rgba(226, 232, 240, 0.86);
-    font-size: 1rem;
+    font-size: clamp(0.9rem, 2vh, 1rem);
     font-weight: 650;
     text-align: center;
+    max-width: 20rem;
+    text-wrap: balance;
 }
 
 .direct-pin-dots {
@@ -319,23 +331,26 @@
 
 .direct-clock-actions {
     width: 100%;
-    max-width: 460px;
+    max-width: min(100%, calc(var(--direct-keypad-button-size) * 3 + var(--direct-keypad-gap) * 2));
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 14px;
+    gap: clamp(10px, 1.6vh, 14px);
     margin-top: auto;
 }
 
 .direct-pin-keypad {
     margin-top: 0;
     width: 100%;
-    max-width: 460px;
+    max-width: min(100%, calc(var(--direct-keypad-button-size) * 3 + var(--direct-keypad-gap) * 2));
     align-content: start;
+    gap: var(--direct-keypad-gap);
 }
 
 .direct-pin-keypad .key-btn {
-    min-height: 82px;
+    min-height: var(--direct-keypad-button-size);
+    aspect-ratio: 1.06;
+    font-size: clamp(1.35rem, 3.4vh, 1.9rem);
     border-radius: 20px;
     background: rgba(255,255,255,0.08);
     border-color: rgba(255,255,255,0.12);
@@ -441,11 +456,15 @@
 
 .direct-dialog-keypad {
     width: 100%;
-    max-width: none;
+    max-width: min(100%, 22rem);
+    align-self: center;
+    gap: clamp(8px, 1.4vmin, 12px);
 }
 
 .direct-dialog-keypad .key-btn {
-    min-height: 72px;
+    min-height: clamp(56px, 9vmin, 72px);
+    aspect-ratio: 1.06;
+    font-size: clamp(1.2rem, 2.9vh, 1.65rem);
     border-radius: 18px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.98));
     border-color: rgba(148, 163, 184, 0.2);
@@ -520,7 +539,7 @@
 
     .direct-clock-state {
         justify-content: space-between;
-        gap: 20px;
+        gap: 16px;
     }
 
     .direct-clock-intro {
@@ -539,6 +558,11 @@
 }
 
 @media (max-width: 767px) {
+    .direct-body {
+        --direct-keypad-gap: clamp(8px, 2.5vw, 12px);
+        --direct-keypad-button-size: clamp(52px, 18vw, 68px);
+    }
+
     .direct-app {
         padding: 10px;
         gap: 10px;
@@ -583,15 +607,16 @@
     .direct-clock-shell {
         padding-top: 6px;
         padding-bottom: 14px;
+        align-items: flex-start;
     }
 
     .direct-clock-state {
         justify-content: center;
-        gap: 14px;
+        gap: 12px;
     }
 
     .direct-clock-intro {
-        gap: 10px;
+        gap: 8px;
         padding-top: 0;
     }
 
@@ -601,7 +626,7 @@
     }
 
     .direct-pin-keypad .key-btn {
-        min-height: 72px;
+        border-radius: 18px;
     }
 
     .direct-dialog-pin-card {
@@ -622,5 +647,260 @@
     .direct-panel-tab {
         min-height: 48px;
         font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 599px) and (max-height: 740px) {
+    .direct-header {
+        padding: 12px 14px;
+        border-radius: 24px;
+    }
+
+    .direct-header-clock {
+        min-width: 82px;
+        padding: 9px 12px;
+        border-radius: 14px;
+        font-size: 1.05rem;
+    }
+
+    .direct-settings-link {
+        min-height: 42px;
+        padding: 0 12px;
+        border-radius: 14px;
+        font-size: 0.92rem;
+    }
+
+    .direct-panel {
+        border-radius: 26px;
+    }
+
+    .direct-panel-head,
+    .direct-clock-panel-head {
+        padding: 16px 16px 8px;
+    }
+
+    .direct-clock-shell {
+        padding: 2px 12px 12px;
+    }
+
+    .direct-clock-time {
+        font-size: clamp(1.95rem, 8.8vw, 3rem);
+    }
+
+    .direct-clock-copy {
+        font-size: 0.88rem;
+    }
+
+    .direct-pin-dots {
+        gap: 10px;
+    }
+
+    .direct-dialog-keypad .key-btn {
+        min-height: clamp(48px, 15vw, 60px);
+    }
+}
+
+@media (max-width: 399px), (max-height: 660px) {
+    .direct-body {
+        --direct-keypad-gap: 8px;
+        --direct-keypad-button-size: clamp(46px, 15vw, 56px);
+    }
+
+    .direct-app {
+        padding: 8px;
+        gap: 8px;
+    }
+
+    .direct-header {
+        padding: 10px 12px;
+        border-radius: 22px;
+    }
+
+    .direct-brand-kicker {
+        font-size: 0.64rem;
+        letter-spacing: 0.1em;
+    }
+
+    .direct-header-tools {
+        gap: 8px;
+    }
+
+    .direct-header-clock {
+        min-width: 74px;
+        padding: 8px 10px;
+        font-size: 0.98rem;
+    }
+
+    .direct-settings-link {
+        min-height: 38px;
+        padding: 0 10px;
+        font-size: 0.82rem;
+    }
+
+    .direct-panel-switch {
+        padding: 4px;
+        border-radius: 18px;
+    }
+
+    .direct-panel-tab {
+        min-height: 44px;
+        font-size: 0.88rem;
+        border-radius: 14px;
+    }
+
+    .direct-panel-head h2,
+    .direct-clock-panel-head h2 {
+        font-size: 1.1rem;
+    }
+
+    .direct-clock-shell {
+        padding: 0 10px 10px;
+    }
+
+    .direct-clock-feedback {
+        padding: 18px 16px;
+        border-radius: 22px;
+    }
+
+    .direct-clock-feedback-name {
+        font-size: 1.35rem;
+    }
+
+    .direct-clock-feedback-time {
+        font-size: 1.8rem;
+    }
+
+    .direct-dialog-pin-card {
+        padding: 12px 14px;
+        border-radius: 18px;
+    }
+}
+
+@media (min-width: 560px) and (max-height: 820px) {
+    .direct-body {
+        --direct-keypad-gap: 4px;
+    }
+
+    .direct-app {
+        position: relative;
+        padding: 6px;
+        gap: 6px;
+    }
+
+    .direct-header {
+        flex-direction: row;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 22px;
+    }
+
+    .direct-brand-kicker {
+        font-size: 0.62rem;
+        letter-spacing: 0.1em;
+    }
+
+    .direct-header-tools {
+        gap: 8px;
+    }
+
+    .direct-header-clock {
+        min-width: 74px;
+        padding: 8px 10px;
+        font-size: 0.98rem;
+    }
+
+    .direct-settings-link {
+        min-height: 38px;
+        padding: 0 10px;
+        font-size: 0.82rem;
+    }
+
+    .direct-panel-switch {
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        z-index: 3;
+        width: clamp(180px, 34vw, 220px);
+        transform: translateX(-50%);
+        padding: 4px;
+        border-radius: 18px;
+    }
+
+    .direct-panel-tab {
+        min-height: 42px;
+        font-size: 0.88rem;
+        border-radius: 14px;
+    }
+
+    .direct-clock-panel-head {
+        padding-bottom: 8px;
+    }
+
+    .direct-clock-shell {
+        padding-top: 0;
+        padding-bottom: 14px;
+    }
+
+    .direct-clock-state {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+        align-items: center;
+        gap: 16px;
+        min-height: 0;
+        align-self: stretch;
+    }
+
+    .direct-clock-intro {
+        align-items: flex-start;
+        justify-content: center;
+        text-align: left;
+        gap: 10px;
+        padding-top: 0;
+    }
+
+    .direct-clock-copy,
+    .direct-clock-error {
+        text-align: left;
+        max-width: 18rem;
+    }
+
+    .direct-pin-dots {
+        justify-content: flex-start;
+    }
+
+    .direct-clock-time {
+        font-size: clamp(1.85rem, 5.8vh, 3rem);
+    }
+
+    .direct-clock-actions {
+        margin-top: 0;
+        width: 100%;
+        max-width: 280px;
+    }
+
+    .direct-pin-keypad {
+        max-width: 280px;
+        gap: var(--direct-keypad-gap);
+        grid-auto-rows: 44px;
+    }
+
+    .direct-pin-keypad .key-btn {
+        height: 44px;
+        min-height: 44px;
+        aspect-ratio: auto;
+        border-radius: 18px;
+        font-size: clamp(1.2rem, 2.8vh, 1.6rem);
+    }
+
+    .direct-clock-feedback {
+        padding: 20px 18px;
+    }
+
+    .direct-clock-feedback-name {
+        font-size: clamp(1.35rem, 3.2vh, 1.8rem);
+    }
+
+    .direct-clock-feedback-time {
+        font-size: clamp(1.7rem, 4.8vh, 2.2rem);
     }
 }

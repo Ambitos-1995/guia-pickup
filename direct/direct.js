@@ -10,6 +10,7 @@ var Direct = (function () {
     var CLOCK_RESET_MS = 3600;
     var CLOCK_ERROR_RESET_MS = 1800;
     var STATUS_RESET_MS = 3200;
+    var REFRESH_INTERVAL_MS = 30000;
 
     var currentYear = 0;
     var currentWeek = 0;
@@ -25,6 +26,7 @@ var Direct = (function () {
     var clockResetTimer = 0;
     var clockErrorTimer = 0;
     var lastRenderedHourCount = DEFAULT_HOURS.length;
+    var scheduleRefreshTimer = 0;
 
     var weekPrevEl, weekNextEl, weekLabelEl, weekRangeEl;
     var scheduleGridEl, scheduleStatusEl;
@@ -38,6 +40,7 @@ var Direct = (function () {
     var quickClockPad = null;
     var dialogPinPad = null;
     var activePanel = 'schedule';
+    var viewportRaf = 0;
 
     function init() {
         weekPrevEl = document.getElementById('direct-week-prev');
@@ -80,6 +83,8 @@ var Direct = (function () {
         quickClockErrorEl = document.getElementById('direct-clock-error');
         quickClockKeypadEl = document.getElementById('direct-pin-keypad');
         quickClockLoadingEl = document.getElementById('direct-clock-loading');
+
+        bindViewportMetrics();
 
         Utils.bindPress(weekPrevEl, function () { changeWeek(-1); });
         Utils.bindPress(weekNextEl, function () { changeWeek(1); });
@@ -134,7 +139,46 @@ var Direct = (function () {
             syncResponsivePanels();
             queueScheduleGridLayout();
         }, { passive: true });
+        document.addEventListener('visibilitychange', handleVisibilityRefresh);
+        window.addEventListener('pageshow', refreshVisibleWeek);
+        startScheduleRefresh();
         loadWeek();
+    }
+
+    function bindViewportMetrics() {
+        requestViewportMetricsUpdate();
+        window.addEventListener('resize', requestViewportMetricsUpdate, { passive: true });
+        window.addEventListener('orientationchange', requestViewportMetricsUpdate, { passive: true });
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', requestViewportMetricsUpdate, { passive: true });
+            window.visualViewport.addEventListener('scroll', requestViewportMetricsUpdate, { passive: true });
+        }
+    }
+
+    function requestViewportMetricsUpdate() {
+        if (viewportRaf) {
+            cancelAnimationFrame(viewportRaf);
+        }
+
+        viewportRaf = requestAnimationFrame(function () {
+            viewportRaf = 0;
+            updateViewportMetrics();
+        });
+    }
+
+    function updateViewportMetrics() {
+        var root = document.documentElement;
+        var layoutHeight = Math.round(window.innerHeight || root.clientHeight || 0);
+        var vv = window.visualViewport;
+        var viewportHeight = vv ? Math.round(vv.height) : layoutHeight;
+        var viewportOffsetTop = vv ? Math.round(vv.offsetTop) : 0;
+        var viewportOffsetBottom = vv ? Math.max(0, Math.round(layoutHeight - (vv.height + vv.offsetTop))) : 0;
+
+        root.style.setProperty('--app-height', layoutHeight + 'px');
+        root.style.setProperty('--visual-viewport-height', viewportHeight + 'px');
+        root.style.setProperty('--visual-viewport-offset-top', viewportOffsetTop + 'px');
+        root.style.setProperty('--visual-viewport-offset-bottom', viewportOffsetBottom + 'px');
     }
 
     function updateClocks() {
@@ -644,6 +688,27 @@ var Direct = (function () {
         quickClockLoadingEl.classList.add('hidden');
         if (quickClockPad) quickClockPad.setBusy(false);
         clockBusy = false;
+    }
+
+    function startScheduleRefresh() {
+        stopScheduleRefresh();
+        scheduleRefreshTimer = setInterval(refreshVisibleWeek, REFRESH_INTERVAL_MS);
+    }
+
+    function stopScheduleRefresh() {
+        if (!scheduleRefreshTimer) return;
+        clearInterval(scheduleRefreshTimer);
+        scheduleRefreshTimer = 0;
+    }
+
+    function handleVisibilityRefresh() {
+        if (document.visibilityState === 'visible') {
+            refreshVisibleWeek();
+        }
+    }
+
+    function refreshVisibleWeek() {
+        fetchWeek(currentYear, currentWeek);
     }
 
     function invalidateCurrentWeek() {

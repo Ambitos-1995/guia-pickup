@@ -4,8 +4,9 @@ import {
   authHeaders,
   autoCloseStaleCheckIns,
   corsHeaders,
-  currentAttendanceStatus,
   fetchJson,
+  getAttendanceDayState,
+  isoWeekInfoFromClientDate,
   json,
   logAudit,
   requireSession,
@@ -92,7 +93,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       console.warn("Auto-close error (non-fatal):", e);
     }
 
-    const currentStatus = await currentAttendanceStatus(url, serviceRoleKey, employee.id, clientDate);
+    const now = new Date();
+    const dayState = await getAttendanceDayState(url, serviceRoleKey, orgId, employee.id, clientDate, now);
+    const currentStatus = dayState.status;
     const employeeName = `${employee.nombre} ${employee.apellido}`.trim();
 
     if (action === "status") {
@@ -103,32 +106,34 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // -- Shared slot lookup for check-in and check-out --
-    const { year, week, dayOfWeek } = isoWeekInfo(new Date(`${clientDate}T00:00:00`));
+    const { year, week, dayOfWeek } = isoWeekInfoFromClientDate(clientDate);
     const slotRes = await fetchJson<Array<ScheduleSlotRow>>(
       `${url}/rest/v1/kiosk_schedule_slots?select=id,year,week,day_of_week,start_time,end_time&organization_id=eq.${orgId}&employee_id=eq.${employee.id}&order=year.asc,week.asc,day_of_week.asc,start_time.asc&limit=128`,
       { headers: authHeaders(serviceRoleKey) },
     );
 
     const employeeSlots = slotRes.ok ? slotRes.data : [];
-    const todaySlots = employeeSlots.filter((item) =>
-      Number(item.year) === year &&
-      Number(item.week) === week &&
-      Number(item.day_of_week) === dayOfWeek
-    );
-    const now = new Date();
+    const todaySlots = dayState.todaySlots.length
+      ? dayState.todaySlots
+      : employeeSlots.filter((item) =>
+        Number(item.year) === year &&
+        Number(item.week) === week &&
+        Number(item.day_of_week) === dayOfWeek
+      );
     const nextScheduledSlot = findNextAssignedSlot(employeeSlots, now);
-    const slot = findActiveCheckInSlot(todaySlots, clientDate, now) || todaySlots[0] || null;
+    const eligibleCheckInSlot = findEligibleCheckInSlot(todaySlots, dayState.slotStates, clientDate, now);
+    const nextAvailableTodaySlot = findNextAvailableTodaySlot(todaySlots, dayState.slotStates, clientDate, now);
 
     // ======================== CHECK-IN ========================
     if (action === "check-in") {
       if (currentStatus === "checked_in") {
         return json({ success: false, message: "Ya tienes entrada registrada hoy" }, 409);
       }
-      if (currentStatus === "checked_out") {
+      if (currentStatus === "checked_out" && !eligibleCheckInSlot) {
         return json({ success: false, message: "Ya has fichado entrada y salida hoy" }, 409);
       }
 
-      if (!slot) {
+      if (!todaySlots.length) {
         return json(
           {
             success: false,
@@ -139,22 +144,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
         );
       }
 
-      // Time-window validation (server time, not client)
-      const EARLY_TOLERANCE_MIN = 15;
-      const [sh, sm] = slot.start_time.split(":").map(Number);
-      const [eh, em] = slot.end_time.split(":").map(Number);
-      const slotStart = new Date(`${clientDate}T${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}:00`);
-      const slotEnd = new Date(`${clientDate}T${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}:00`);
-      const windowStart = new Date(slotStart.getTime() - EARLY_TOLERANCE_MIN * 60000);
-
-      if (now < windowStart || now > slotEnd) {
-        const fallbackNextSlot = now < windowStart
-          ? toScheduledSlotRef(slot)
-          : findNextAssignedSlot(employeeSlots, now);
+      if (!eligibleCheckInSlot) {
+        const fallbackNextSlot = nextAvailableTodaySlot
+          ? toScheduledSlotRef(nextAvailableTodaySlot)
+          : nextScheduledSlot;
+        const referenceSlot = findReferenceTodaySlot(todaySlots, clientDate, now) || todaySlots[todaySlots.length - 1];
+        const isEarly = !!(nextAvailableTodaySlot && isBeforeCheckInWindow(nextAvailableTodaySlot, clientDate, now));
         return json({
           success: false,
-          message: buildOutsideScheduleMessage(fallbackNextSlot, slot, now < windowStart),
-          data: buildNextSlotData(fallbackNextSlot, "outside_schedule", slot),
+          message: buildOutsideScheduleMessage(fallbackNextSlot, referenceSlot, isEarly),
+          data: buildNextSlotData(fallbackNextSlot, "outside_schedule", referenceSlot),
         }, 403);
       }
 
@@ -170,7 +169,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           body: JSON.stringify({
             organization_id: orgId,
             employee_id: employee.id,
-            slot_id: slot.id,
+            slot_id: eligibleCheckInSlot.id,
             action: "check_in",
             client_date: clientDate,
           }),
@@ -186,24 +185,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
         actorSessionId: auth.session.id,
         actorRole: "respondent",
         employeeId: employee.id,
-        slotId: slot.id,
+        slotId: eligibleCheckInSlot.id,
         action: "attendance_check_in",
       });
 
       return json({
         success: true,
-        message: `Entrada registrada. El turno conciliara hasta las ${slot.end_time.slice(0, 5)}.`,
+        message: `Entrada registrada. El turno conciliara hasta las ${eligibleCheckInSlot.end_time.slice(0, 5)}.`,
         data: {
           employeeName,
           currentStatus: "checked_in",
-          shiftEndTime: slot.end_time.slice(0, 5),
+          shiftEndTime: eligibleCheckInSlot.end_time.slice(0, 5),
         },
       });
     }
 
     // ======================== CHECK-OUT ========================
     if (action === "check-out") {
-      if (currentStatus !== "checked_in") {
+      if (currentStatus !== "checked_in" || !dayState.openSlotId) {
         return json({ success: false, message: "No tienes entrada registrada hoy" }, 409);
       }
 
@@ -219,7 +218,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           body: JSON.stringify({
             organization_id: orgId,
             employee_id: employee.id,
-            slot_id: slot ? slot.id : null,
+            slot_id: dayState.openSlotId,
             action: "check_out",
             client_date: clientDate,
           }),
@@ -235,14 +234,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
         actorSessionId: auth.session.id,
         actorRole: "respondent",
         employeeId: employee.id,
-        slotId: slot ? slot.id : null,
+        slotId: dayState.openSlotId,
         action: "attendance_check_out",
       });
+
+      const updatedState = await getAttendanceDayState(url, serviceRoleKey, orgId, employee.id, clientDate, now);
 
       return json({
         success: true,
         message: "Salida registrada",
-        data: { employeeName, currentStatus: "checked_out" },
+        data: { employeeName, currentStatus: updatedState.status },
       });
     }
 
@@ -252,37 +253,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ success: false, message: "Error interno" }, 500);
   }
 });
-
-function isoWeekInfo(date: Date): { year: number; week: number; dayOfWeek: number } {
-  const day = date.getDay();
-  const dayOfWeek = day === 0 ? 7 : day;
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
-  const yearStart = new Date(d.getFullYear(), 0, 4);
-  const week = 1 + Math.round(
-    ((d.getTime() - yearStart.getTime()) / 86400000 - 3 + (yearStart.getDay() + 6) % 7) / 7,
-  );
-  return { year: d.getFullYear(), week, dayOfWeek };
-}
-
-function findActiveCheckInSlot(slots: ScheduleSlotRow[], clientDate: string, now: Date): ScheduleSlotRow | null {
-  const EARLY_TOLERANCE_MIN = 15;
-
-  for (const slot of slots) {
-    const [sh, sm] = slot.start_time.split(":").map(Number);
-    const [eh, em] = slot.end_time.split(":").map(Number);
-    const slotStart = new Date(`${clientDate}T${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}:00`);
-    const slotEnd = new Date(`${clientDate}T${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}:00`);
-    const windowStart = new Date(slotStart.getTime() - EARLY_TOLERANCE_MIN * 60000);
-
-    if (now >= windowStart && now <= slotEnd) {
-      return slot;
-    }
-  }
-
-  return null;
-}
 
 function findNextAssignedSlot(
   slots: ScheduleSlotRow[],
@@ -377,4 +347,75 @@ function toDateIso(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function findEligibleCheckInSlot(
+  slots: ScheduleSlotRow[],
+  slotStates: Record<string, string>,
+  clientDate: string,
+  now: Date,
+): ScheduleSlotRow | null {
+  for (const slot of slots) {
+    if (slotStates[slot.id] === "closed") continue;
+    if (isInsideCheckInWindow(slot, clientDate, now)) {
+      return slot;
+    }
+  }
+
+  return null;
+}
+
+function findNextAvailableTodaySlot(
+  slots: ScheduleSlotRow[],
+  slotStates: Record<string, string>,
+  clientDate: string,
+  now: Date,
+): ScheduleSlotRow | null {
+  for (const slot of slots) {
+    if (slotStates[slot.id] === "closed") continue;
+    if (now <= buildClientDateTime(clientDate, slot.end_time)) {
+      return slot;
+    }
+  }
+
+  return null;
+}
+
+function findReferenceTodaySlot(
+  slots: ScheduleSlotRow[],
+  clientDate: string,
+  now: Date,
+): ScheduleSlotRow | null {
+  let reference: ScheduleSlotRow | null = null;
+
+  for (const slot of slots) {
+    if (now >= buildClientDateTime(clientDate, slot.end_time)) {
+      reference = slot;
+      continue;
+    }
+
+    if (!reference) {
+      reference = slot;
+    }
+    break;
+  }
+
+  return reference;
+}
+
+function isInsideCheckInWindow(slot: ScheduleSlotRow, clientDate: string, now: Date): boolean {
+  const windowStart = new Date(buildClientDateTime(clientDate, slot.start_time).getTime() - 15 * 60000);
+  const slotEnd = buildClientDateTime(clientDate, slot.end_time);
+  return now >= windowStart && now <= slotEnd;
+}
+
+function isBeforeCheckInWindow(slot: ScheduleSlotRow, clientDate: string, now: Date): boolean {
+  const windowStart = new Date(buildClientDateTime(clientDate, slot.start_time).getTime() - 15 * 60000);
+  return now < windowStart;
+}
+
+function buildClientDateTime(clientDate: string, timeValue: string): Date {
+  const [year, month, day] = clientDate.split("-").map(Number);
+  const [hours, minutes, seconds] = String(timeValue || "00:00:00").split(":").map(Number);
+  return new Date(year, (month || 1) - 1, day || 1, hours || 0, minutes || 0, seconds || 0, 0);
 }

@@ -1,8 +1,7 @@
-var CACHE_NAME = 'pickup-tmg-v65';
+var CACHE_NAME = 'pickup-tmg-v66';
 var FILES_TO_CACHE = [
     './index.html',
     './manifest.json',
-    './vendor/supabase/supabase.min.js',
     './vendor/webawesome/dist-cdn/styles/webawesome.css',
     './vendor/webawesome/dist-cdn/styles/layers.css',
     './vendor/webawesome/dist-cdn/styles/native.css',
@@ -25,8 +24,17 @@ var FILES_TO_CACHE = [
     './direct/direct.js',
     './css/styles.css',
     './js/utils.js',
+    './js/pin-pad.js',
     './js/api.js',
     './js/webawesome-init.js',
+    './js/pin.js',
+    './js/schedule.js',
+    './js/clock.js',
+    './js/guia.js',
+    './js/payment.js',
+    './js/admin.js',
+    './js/install.js',
+    './js/app.js',
     './js/sw-register.js',
     './img/fotos-con-circulos/1.png',
     './img/fotos-con-circulos/2.png',

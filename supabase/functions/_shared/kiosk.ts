@@ -60,6 +60,33 @@ export interface EmployeeRow {
   pin_migrated_at?: string | null;
 }
 
+export interface AttendanceSlotRow {
+  id: string;
+  year: number;
+  week: number;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
+type AttendanceSlotLifecycle = "none" | "open" | "closed";
+
+interface AttendanceEventRow {
+  id: string;
+  action: "check_in" | "check_out";
+  slot_id: string | null;
+  recorded_at: string;
+}
+
+export interface AttendanceDayState {
+  status: "not_checked_in" | "checked_in" | "checked_out";
+  openSlotId: string | null;
+  openSlot: AttendanceSlotRow | null;
+  todaySlots: AttendanceSlotRow[];
+  slotStates: Record<string, AttendanceSlotLifecycle>;
+  hasCheckOut: boolean;
+}
+
 export function json(payload: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(payload), {
     status,
@@ -457,21 +484,93 @@ export async function logAudit(
   });
 }
 
+export async function getAttendanceDayState(
+  supabaseUrl: string,
+  key: string,
+  orgId: string,
+  employeeId: string,
+  clientDate: string,
+  referenceNow = new Date(),
+): Promise<AttendanceDayState> {
+  const { year, week, dayOfWeek } = isoWeekInfoFromClientDate(clientDate);
+  const [attendanceRes, slotsRes] = await Promise.all([
+    fetchJson<AttendanceEventRow[]>(
+      `${supabaseUrl}/rest/v1/kiosk_attendance?select=id,action,slot_id,recorded_at&employee_id=eq.${employeeId}&client_date=eq.${clientDate}&order=recorded_at.asc,id.asc`,
+      { headers: authHeaders(key) },
+    ),
+    fetchJson<AttendanceSlotRow[]>(
+      `${supabaseUrl}/rest/v1/kiosk_schedule_slots?select=id,year,week,day_of_week,start_time,end_time&organization_id=eq.${orgId}&employee_id=eq.${employeeId}&year=eq.${year}&week=eq.${week}&day_of_week=eq.${dayOfWeek}&order=start_time.asc`,
+      { headers: authHeaders(key) },
+    ),
+  ]);
+
+  const todaySlots = slotsRes.ok ? slotsRes.data : [];
+  const slotStates: Record<string, AttendanceSlotLifecycle> = {};
+  const openSlotOrder: string[] = [];
+  let hasCheckOut = false;
+
+  for (const slot of todaySlots) {
+    slotStates[slot.id] = "none";
+  }
+
+  if (attendanceRes.ok) {
+    for (const record of attendanceRes.data) {
+      if (record.action === "check_in") {
+        if (!record.slot_id) continue;
+        slotStates[record.slot_id] = "open";
+        pushUnique(openSlotOrder, record.slot_id);
+        continue;
+      }
+
+      hasCheckOut = true;
+
+      if (!record.slot_id) {
+        const lastOpenSlotId = openSlotOrder.pop();
+        if (lastOpenSlotId) {
+          slotStates[lastOpenSlotId] = "closed";
+        }
+        continue;
+      }
+
+      slotStates[record.slot_id] = "closed";
+      removeFromArray(openSlotOrder, record.slot_id);
+    }
+  }
+
+  const openSlotId = openSlotOrder.length ? openSlotOrder[openSlotOrder.length - 1] : null;
+  const status = openSlotId
+    ? "checked_in"
+    : hasCheckOut && !hasRemainingTodaySlot(todaySlots, slotStates, clientDate, referenceNow)
+    ? "checked_out"
+    : "not_checked_in";
+
+  return {
+    status,
+    openSlotId,
+    openSlot: openSlotId ? todaySlots.find((slot) => slot.id === openSlotId) ?? null : null,
+    todaySlots,
+    slotStates,
+    hasCheckOut,
+  };
+}
+
 export async function currentAttendanceStatus(
   supabaseUrl: string,
   key: string,
+  orgId: string,
   employeeId: string,
   clientDate: string,
+  referenceNow = new Date(),
 ): Promise<"not_checked_in" | "checked_in" | "checked_out"> {
-  const res = await fetchJson<Array<{ action: string }>>(
-    `${supabaseUrl}/rest/v1/kiosk_attendance?select=action&employee_id=eq.${employeeId}&client_date=eq.${clientDate}&order=recorded_at.desc&limit=1`,
-    {
-      headers: authHeaders(key),
-    },
+  const state = await getAttendanceDayState(
+    supabaseUrl,
+    key,
+    orgId,
+    employeeId,
+    clientDate,
+    referenceNow,
   );
-
-  if (!res.ok || !res.data[0]) return "not_checked_in";
-  return res.data[0].action === "check_in" ? "checked_in" : "checked_out";
+  return state.status;
 }
 
 const AUTO_CLOSE_DELAY_MIN = 20;
@@ -487,8 +586,8 @@ export async function autoCloseStaleCheckIns(
       `${supabaseUrl}/rest/v1/kiosk_attendance?select=id,employee_id,slot_id,recorded_at&organization_id=eq.${orgId}&client_date=eq.${clientDate}&action=eq.check_in`,
       { headers: authHeaders(key) },
     ),
-    fetchJson<Array<{ employee_id: string }>>(
-      `${supabaseUrl}/rest/v1/kiosk_attendance?select=employee_id&organization_id=eq.${orgId}&client_date=eq.${clientDate}&action=eq.check_out`,
+    fetchJson<Array<{ employee_id: string; slot_id: string | null }>>(
+      `${supabaseUrl}/rest/v1/kiosk_attendance?select=employee_id,slot_id&organization_id=eq.${orgId}&client_date=eq.${clientDate}&action=eq.check_out`,
       { headers: authHeaders(key) },
     ),
   ]);
@@ -496,14 +595,18 @@ export async function autoCloseStaleCheckIns(
   if (!checkInsRes.ok || checkInsRes.data.length === 0) return;
 
   const checkedOutSet = new Set(
-    checkOutsRes.ok ? checkOutsRes.data.map((r) => r.employee_id) : [],
+    checkOutsRes.ok
+      ? checkOutsRes.data
+        .filter((record) => !!record.slot_id)
+        .map((record) => `${record.employee_id}:${record.slot_id}`)
+      : [],
   );
 
   const now = new Date();
 
   for (const record of checkInsRes.data) {
-    if (checkedOutSet.has(record.employee_id)) continue;
     if (!record.slot_id) continue;
+    if (checkedOutSet.has(`${record.employee_id}:${record.slot_id}`)) continue;
 
     const slotRes = await fetchJson<Array<{ end_time: string }>>(
       `${supabaseUrl}/rest/v1/kiosk_schedule_slots?select=end_time&id=eq.${record.slot_id}&limit=1`,
@@ -608,6 +711,62 @@ export function computeWorkedMinutes(slotDate: Date, startTime: string, endTime:
 
   if (effectiveStart >= effectiveEnd) return 0;
   return Math.round((effectiveEnd.getTime() - effectiveStart.getTime()) / 60000);
+}
+
+export function isoWeekInfoFromClientDate(clientDate: string): { year: number; week: number; dayOfWeek: number; date: Date } {
+  const [year, month, day] = clientDate.split("-").map(Number);
+  const date = new Date(year, (month || 1) - 1, day || 1);
+  const dayValue = date.getDay();
+  const dayOfWeek = dayValue === 0 ? 7 : dayValue;
+  const anchor = new Date(date);
+  anchor.setHours(0, 0, 0, 0);
+  anchor.setDate(anchor.getDate() + 3 - (anchor.getDay() + 6) % 7);
+  const yearStart = new Date(anchor.getFullYear(), 0, 4);
+  const week = 1 + Math.round(
+    ((anchor.getTime() - yearStart.getTime()) / 86400000 - 3 + (yearStart.getDay() + 6) % 7) / 7,
+  );
+
+  return {
+    year: anchor.getFullYear(),
+    week,
+    dayOfWeek,
+    date,
+  };
+}
+
+function hasRemainingTodaySlot(
+  slots: AttendanceSlotRow[],
+  slotStates: Record<string, AttendanceSlotLifecycle>,
+  clientDate: string,
+  referenceNow: Date,
+): boolean {
+  for (const slot of slots) {
+    if (slotStates[slot.id] === "closed") continue;
+    if (referenceNow <= buildClientDateTime(clientDate, slot.end_time)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function buildClientDateTime(clientDate: string, timeValue: string): Date {
+  const [year, month, day] = clientDate.split("-").map(Number);
+  const [hours, minutes, seconds] = String(timeValue || "00:00:00").split(":").map(Number);
+  return new Date(year, (month || 1) - 1, day || 1, hours || 0, minutes || 0, seconds || 0, 0);
+}
+
+function pushUnique(collection: string[], value: string): void {
+  if (!collection.includes(value)) {
+    collection.push(value);
+  }
+}
+
+function removeFromArray(collection: string[], value: string): void {
+  const index = collection.indexOf(value);
+  if (index >= 0) {
+    collection.splice(index, 1);
+  }
 }
 
 function bytesToHex(bytes: Uint8Array): string {

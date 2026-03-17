@@ -7,6 +7,7 @@ var Schedule = (function () {
     var DEFAULT_HOURS = [15, 16, 17, 18, 19, 20];
     var AUTH_REDIRECT_MS = 3000;
     var CACHE_TTL = 60000;
+    var REFRESH_INTERVAL_MS = 30000;
 
     var currentYear, currentWeek;
     var gridEl, labelEl, rangeEl, contextEl, dialogEl;
@@ -22,6 +23,7 @@ var Schedule = (function () {
     var isSubmitting = false;
     var authRedirectTimer = 0;
     var dialogToken = 0;
+    var refreshIntervalId = 0;
 
     var cache = {};
     var employeesCache = null;
@@ -73,10 +75,19 @@ var Schedule = (function () {
         currentYear = info.year;
         currentWeek = info.week;
         updateAccessMode();
+        startAutoRefresh();
         if (App.hasAdminAccess()) {
             loadAdminEmployees(true).catch(function () {});
         }
         loadWeek();
+    }
+
+    function hide() {
+        stopAutoRefresh();
+        if (dialogEl && dialogEl.open) {
+            dialogEl.open = false;
+        }
+        cancelAuthRedirect();
     }
 
     function updateAccessMode() {
@@ -842,9 +853,23 @@ var Schedule = (function () {
         }
     }
 
+    function startAutoRefresh() {
+        stopAutoRefresh();
+        refreshIntervalId = setInterval(function () {
+            refreshIfVisible();
+        }, REFRESH_INTERVAL_MS);
+    }
+
+    function stopAutoRefresh() {
+        if (!refreshIntervalId) return;
+        clearInterval(refreshIntervalId);
+        refreshIntervalId = 0;
+    }
+
     return {
         init: init,
         show: show,
+        hide: hide,
         invalidateCache: invalidateCache,
         refreshIfVisible: refreshIfVisible
     };

@@ -21,8 +21,6 @@ import {
 } from "../_shared/kiosk.ts";
 
 const EMPLOYEE_PIN_REGEX = /^[0-9]{4,6}$/;
-const ADMIN_IDLE_TIMEOUT_SECONDS = 5 * 60;
-const ADMIN_ABSOLUTE_TIMEOUT_SECONDS = 15 * 60;
 const EMPLOYEE_IDLE_TIMEOUT_SECONDS = 10 * 60;
 const EMPLOYEE_ABSOLUTE_TIMEOUT_SECONDS = 30 * 60;
 const EMPLOYEE_FAILURE_LIMIT = 8;
@@ -149,12 +147,11 @@ async function handleVerify(
 
   const userAgent = getUserAgent(req);
   const today = new Date().toISOString().slice(0, 10);
-  const currentStatus = await currentAttendanceStatus(supabaseUrl, key, employee.id, today);
+  const currentStatus = await currentAttendanceStatus(supabaseUrl, key, orgId, employee.id, today);
 
-  const isAdmin = employee.role === "admin";
-  const sessionRole = isAdmin ? "org_admin" : "respondent";
-  const idleTimeout = isAdmin ? ADMIN_IDLE_TIMEOUT_SECONDS : EMPLOYEE_IDLE_TIMEOUT_SECONDS;
-  const absoluteTimeout = isAdmin ? ADMIN_ABSOLUTE_TIMEOUT_SECONDS : EMPLOYEE_ABSOLUTE_TIMEOUT_SECONDS;
+  const sessionRole = "respondent";
+  const idleTimeout = EMPLOYEE_IDLE_TIMEOUT_SECONDS;
+  const absoluteTimeout = EMPLOYEE_ABSOLUTE_TIMEOUT_SECONDS;
 
   const issued = await issueSession(supabaseUrl, key, {
     organizationId: orgId,
@@ -333,17 +330,41 @@ async function handleUpdate(
     return json({ success: false, message: "El PIN debe ser entre 4 y 6 cifras" }, 400);
   }
 
-  if (pin && role === "admin" && pin.length < 6) {
+  const existingEmployee = await fetchJson<Array<{
+    id: string;
+    role: string;
+  }>>(
+    `${supabaseUrl}/rest/v1/kiosk_employees?select=id,role&id=eq.${encodeURIComponent(employeeId)}&organization_id=eq.${orgId}&limit=1`,
+    { headers: getHeaders(key) },
+  );
+
+  const currentEmployee = existingEmployee.ok ? existingEmployee.data[0] : null;
+  if (!currentEmployee) {
+    return json({ success: false, message: "Empleado no encontrado" }, 404);
+  }
+
+  const effectiveRole = role || currentEmployee.role;
+  const roleChanged = effectiveRole !== currentEmployee.role;
+
+  if (effectiveRole !== "employee" && effectiveRole !== "admin") {
+    return json({ success: false, message: "Rol invalido" }, 400);
+  }
+
+  if (roleChanged && !pin) {
+    return json({ success: false, message: "Al cambiar el rol debes definir un PIN nuevo compatible" }, 400);
+  }
+
+  if (pin && effectiveRole === "admin" && pin.length < 6) {
     return json({ success: false, message: "Los administradores deben tener un PIN de 6 cifras" }, 400);
   }
 
-  if (pin && role === "employee" && pin.length !== 4) {
+  if (pin && effectiveRole === "employee" && pin.length !== 4) {
     return json({ success: false, message: "Los empleados deben tener un PIN de 4 cifras" }, 400);
   }
 
   const updates: Record<string, unknown> = {};
-  if (nombre) updates.nombre = nombre;
-  if (apellido) updates.apellido = apellido;
+  if (nombre !== undefined) updates.nombre = nombre;
+  if (apellido !== undefined) updates.apellido = apellido;
   if (typeof attendanceEnabled === "boolean") updates.attendance_enabled = attendanceEnabled;
   if (role === "employee" || role === "admin") updates.role = role;
 

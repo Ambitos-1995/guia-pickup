@@ -213,6 +213,10 @@ var Pin = (function () {
 
     function goBack() {
         if (!backTarget) return;
+        if (!/^\/(?!\/)/.test(backTarget)) {
+            App.navigate('screen-menu');
+            return;
+        }
         window.location.assign(backTarget);
     }
 

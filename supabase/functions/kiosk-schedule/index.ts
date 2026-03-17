@@ -31,6 +31,8 @@ type ScheduleSession = {
   employee_id: string | null;
 };
 
+const TIME_REGEX = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
+
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -117,7 +119,7 @@ async function handleList(
   const year = Number(body.year);
   const week = Number(body.week);
 
-  if (!year || !week) {
+  if (!isValidScheduleYear(year) || !isValidScheduleWeek(week)) {
     return json({ success: false, message: "Falta year o week" }, 400);
   }
 
@@ -305,11 +307,19 @@ async function handleCreate(
   const year = Number(body.year);
   const week = Number(body.week);
   const dayOfWeek = Number(body.dayOfWeek);
-  const startTime = String(body.startTime || "").trim();
-  const endTime = String(body.endTime || "").trim();
+  const startTime = normalizeTimeValue(String(body.startTime || "").trim());
+  const endTime = normalizeTimeValue(String(body.endTime || "").trim());
 
-  if (!year || !week || !dayOfWeek || !startTime || !endTime) {
+  if (!isValidScheduleYear(year) || !isValidScheduleWeek(week) || !isValidScheduleDay(dayOfWeek) || !startTime || !endTime) {
     return json({ success: false, message: "Faltan datos de la franja" }, 400);
+  }
+
+  if (!isValidSlotTimeRange(startTime, endTime)) {
+    return json({ success: false, message: "La franja debe tener horas validas y una hora de fin posterior al inicio" }, 400);
+  }
+
+  if (await slotExists(url, key, session.organization_id, year, week, dayOfWeek, startTime)) {
+    return json({ success: false, message: "Ya existe una franja en ese dia y hora" }, 409);
   }
 
   const insert = await fetchJson<Array<{
@@ -340,7 +350,7 @@ async function handleCreate(
   );
 
   if (!insert.ok || !insert.data[0]) {
-    return json({ success: false, message: "Error al crear la franja" }, 500);
+    return json({ success: false, message: getRestErrorMessage(insert, "Error al crear la franja") }, getFailureStatus(insert.raw.status));
   }
 
   await logAudit(url, key, {
@@ -372,11 +382,27 @@ async function handleUpdate(
   body: RequestBody,
 ): Promise<Response> {
   const slotId = String(body.slotId || "").trim();
-  const startTime = String(body.startTime || "").trim();
-  const endTime = String(body.endTime || "").trim();
+  const startTime = normalizeTimeValue(String(body.startTime || "").trim());
+  const endTime = normalizeTimeValue(String(body.endTime || "").trim());
 
   if (!slotId || !startTime || !endTime) {
     return json({ success: false, message: "Faltan datos para actualizar la franja" }, 400);
+  }
+
+  if (!isValidSlotTimeRange(startTime, endTime)) {
+    return json({ success: false, message: "La franja debe tener horas validas y una hora de fin posterior al inicio" }, 400);
+  }
+
+  const existingSlot = await fetchSlot(url, key, session.organization_id, slotId);
+  if (!existingSlot) {
+    return json({ success: false, message: "Franja no encontrada" }, 404);
+  }
+
+  if (
+    startTime !== existingSlot.start_time &&
+    await slotExists(url, key, session.organization_id, existingSlot.year, existingSlot.week, existingSlot.day_of_week, startTime, slotId)
+  ) {
+    return json({ success: false, message: "Ya existe una franja en ese dia y hora" }, 409);
   }
 
   const update = await fetchJson<Array<{ id: string; day_of_week: number; start_time: string; end_time: string }>>(
@@ -396,7 +422,7 @@ async function handleUpdate(
   );
 
   if (!update.ok || !update.data[0]) {
-    return json({ success: false, message: "Error al actualizar la franja" }, 500);
+    return json({ success: false, message: getRestErrorMessage(update, "Error al actualizar la franja") }, getFailureStatus(update.raw.status));
   }
 
   await logAudit(url, key, {
@@ -465,12 +491,17 @@ async function handleCreateAndAssign(
   const dayOfWeek = Number(body.dayOfWeek);
   const hour = Number(body.hour);
 
-  if (!year || !week || !dayOfWeek || isNaN(hour)) {
+  if (!isValidScheduleYear(year) || !isValidScheduleWeek(week) || !isValidScheduleDay(dayOfWeek) || !Number.isInteger(hour) || hour < 0 || hour > 22) {
     return json({ success: false, message: "Faltan datos de la franja" }, 400);
   }
 
   const startTime = String(hour).padStart(2, "0") + ":00:00";
   const endTime = String(hour + 1).padStart(2, "0") + ":00:00";
+
+  if (await slotExists(url, key, session.organization_id, year, week, dayOfWeek, startTime)) {
+    return json({ success: false, message: "Ya existe una franja en ese dia y hora" }, 409);
+  }
+
   const target = await resolveAssignmentEmployee(url, key, session, body);
   if (target instanceof Response) {
     return target;
@@ -504,7 +535,7 @@ async function handleCreateAndAssign(
   );
 
   if (!insert.ok || !insert.data[0]) {
-    return json({ success: false, message: "Error al crear y asignar la franja" }, 500);
+    return json({ success: false, message: getRestErrorMessage(insert, "Error al crear y asignar la franja") }, getFailureStatus(insert.raw.status));
   }
 
   await logAudit(url, key, {
@@ -548,9 +579,19 @@ async function resolveAssignmentEmployee(
     if (!session.employee_id) {
       return json({ success: false, message: "Sesion de empleado requerida" }, 403);
     }
+
+    const employee = await fetchEmployee(url, key, session.organization_id, session.employee_id);
+    if (!employee) {
+      return json({ success: false, message: "Empleado no encontrado" }, 404);
+    }
+
+    if (!employee.attendance_enabled) {
+      return json({ success: false, message: "Empleado desactivado" }, 403);
+    }
+
     return {
       employeeId: session.employee_id,
-      employeeName: "",
+      employeeName: `${employee.nombre} ${employee.apellido}`.trim(),
     };
   }
 
@@ -562,6 +603,10 @@ async function resolveAssignmentEmployee(
   const employee = await fetchEmployee(url, key, session.organization_id, employeeId);
   if (!employee) {
     return json({ success: false, message: "Empleado invalido o fuera de la organizacion" }, 404);
+  }
+
+  if (!employee.attendance_enabled) {
+    return json({ success: false, message: "No puedes asignar franjas a un empleado desactivado" }, 409);
   }
 
   return {
@@ -582,13 +627,14 @@ async function fetchEmployee(
   key: string,
   orgId: string,
   employeeId: string,
-): Promise<{ id: string; nombre: string; apellido: string } | null> {
+): Promise<{ id: string; nombre: string; apellido: string; attendance_enabled: boolean } | null> {
   const employee = await fetchJson<Array<{
     id: string;
     nombre: string;
     apellido: string;
+    attendance_enabled: boolean;
   }>>(
-    `${url}/rest/v1/kiosk_employees?select=id,nombre,apellido&id=eq.${encodeURIComponent(employeeId)}&organization_id=eq.${orgId}&limit=1`,
+    `${url}/rest/v1/kiosk_employees?select=id,nombre,apellido,attendance_enabled&id=eq.${encodeURIComponent(employeeId)}&organization_id=eq.${orgId}&limit=1`,
     { headers: authHeaders(key) },
   );
 
@@ -600,17 +646,93 @@ async function fetchSlot(
   key: string,
   orgId: string,
   slotId: string,
-): Promise<{ id: string; day_of_week: number; start_time: string; end_time: string; employee_id: string | null } | null> {
+): Promise<{
+  id: string;
+  year: number;
+  week: number;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  employee_id: string | null;
+} | null> {
   const slot = await fetchJson<Array<{
     id: string;
+    year: number;
+    week: number;
     day_of_week: number;
     start_time: string;
     end_time: string;
     employee_id: string | null;
   }>>(
-    `${url}/rest/v1/kiosk_schedule_slots?select=id,day_of_week,start_time,end_time,employee_id&id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${orgId}&limit=1`,
+    `${url}/rest/v1/kiosk_schedule_slots?select=id,year,week,day_of_week,start_time,end_time,employee_id&id=eq.${encodeURIComponent(slotId)}&organization_id=eq.${orgId}&limit=1`,
     { headers: authHeaders(key) },
   );
 
   return slot.ok ? slot.data[0] || null : null;
+}
+
+async function slotExists(
+  url: string,
+  key: string,
+  orgId: string,
+  year: number,
+  week: number,
+  dayOfWeek: number,
+  startTime: string,
+  excludeSlotId?: string,
+): Promise<boolean> {
+  const exclusion = excludeSlotId ? `&id=neq.${encodeURIComponent(excludeSlotId)}` : "";
+  const existing = await fetchJson<Array<{ id: string }>>(
+    `${url}/rest/v1/kiosk_schedule_slots?select=id&organization_id=eq.${orgId}&year=eq.${year}&week=eq.${week}&day_of_week=eq.${dayOfWeek}&start_time=eq.${encodeURIComponent(startTime)}${exclusion}&limit=1`,
+    { headers: authHeaders(key) },
+  );
+
+  return !!(existing.ok && existing.data[0]);
+}
+
+function normalizeTimeValue(value: string): string {
+  if (!value || !TIME_REGEX.test(value)) return "";
+  return value.length === 5 ? `${value}:00` : value;
+}
+
+function isValidSlotTimeRange(startTime: string, endTime: string): boolean {
+  if (!startTime || !endTime || !TIME_REGEX.test(startTime) || !TIME_REGEX.test(endTime)) {
+    return false;
+  }
+  return startTime < endTime;
+}
+
+function isValidScheduleYear(year: number): boolean {
+  return Number.isInteger(year) && year >= 2000 && year <= 2100;
+}
+
+function isValidScheduleWeek(week: number): boolean {
+  return Number.isInteger(week) && week >= 1 && week <= 53;
+}
+
+function isValidScheduleDay(dayOfWeek: number): boolean {
+  return Number.isInteger(dayOfWeek) && dayOfWeek >= 1 && dayOfWeek <= 5;
+}
+
+function getFailureStatus(status: number): number {
+  return status >= 400 && status < 500 ? status : 500;
+}
+
+function getRestErrorMessage(
+  result: { data: unknown },
+  fallback: string,
+): string {
+  if (!result || !result.data || typeof result.data !== "object") {
+    return fallback;
+  }
+
+  const payload = result.data as Record<string, unknown>;
+  const message = typeof payload.message === "string" ? payload.message.trim() : "";
+  const details = typeof payload.details === "string" ? payload.details.trim() : "";
+
+  if (message && details) {
+    return `${message}: ${details}`;
+  }
+
+  return message || details || fallback;
 }
