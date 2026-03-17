@@ -266,7 +266,7 @@ var App = (function () {
             scheduleCard.classList.remove('hidden');
             guiaCard.classList.remove('hidden');
             paymentCard.classList.remove('hidden');
-            adminCard.classList.remove('hidden');
+            adminCard.classList.add('hidden');
             adminShortcut.classList.remove('hidden');
             directShortcut.classList.remove('hidden');
             loginBtn.classList.add('hidden');
@@ -292,7 +292,7 @@ var App = (function () {
             if (adminBuildVersion) adminBuildVersion.classList.add('hidden');
         }
 
-        // Toggle odd-cards class for full-width Ajustes on mobile
+        // Toggle odd-card layout for the remaining visible shortcuts on mobile
         var menuGrid = document.getElementById('menu-grid');
         var visibleCards = document.querySelectorAll('#menu-grid > .menu-card:not(.hidden)');
         menuGrid.classList.toggle('odd-cards', visibleCards.length % 2 === 1);

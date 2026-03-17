@@ -108,7 +108,7 @@ test('admin can sign in from the PIN-first entry flow', async ({ page }) => {
   await expect(page.locator('#card-schedule')).toBeVisible();
   await expect(page.locator('#card-guia')).toBeVisible();
   await expect(page.locator('#card-payment')).toBeVisible();
-  await expect(page.locator('#card-admin')).toBeVisible();
+  await expect(page.locator('#card-admin')).toBeHidden();
   await expect(page.locator('#menu-admin-shortcut')).toBeVisible();
   await expect(page.locator('#menu-direct-shortcut')).toBeVisible();
   await expect(page.locator('#logout-btn')).toBeVisible();
@@ -138,7 +138,7 @@ test('admin can load payments and save a configured amount', async ({ page }) =>
   await enterPin(page, '123456');
   await expect(page.locator('#screen-menu.active')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Ajustes' }).click();
+  await page.locator('#menu-admin-shortcut').click();
   await expect(page.locator('#screen-admin.active')).toBeVisible();
   await expect(page.locator('#admin-build-version')).toContainText('Version 2026.03.16-r1');
   await expect(page.locator('#admin-pay-summary-status')).toContainText('Sin configurar');
@@ -158,7 +158,7 @@ test('admin can create a new employee from ajustes empleados', async ({ page }) 
 
   await enterPin(page, '123456');
   await expect(page.locator('#screen-menu.active')).toBeVisible();
-  await page.getByRole('button', { name: 'Ajustes' }).click();
+  await page.locator('#menu-admin-shortcut').click();
 
   await page.locator('.admin-tab', { hasText: 'Empleados' }).click();
   await expect(page.locator('#admin-employee-list')).toContainText('Ismael Pérez');

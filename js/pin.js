@@ -5,7 +5,7 @@ var Pin = (function () {
     'use strict';
 
     var MAX_PIN_LENGTH = 6;
-    var LOGIN_AUTO_VERIFY_DELAY_MS = 1800;
+    var LOGIN_AUTO_VERIFY_DELAY_MS = 1000;
     var currentMaxLength = 6;
     var pin = '';
     var isVerifying = false;
