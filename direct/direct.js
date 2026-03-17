@@ -27,11 +27,13 @@ var Direct = (function () {
 
     var weekPrevEl, weekNextEl, weekLabelEl, weekRangeEl;
     var scheduleGridEl, scheduleStatusEl;
-    var dialogEl, dialogModeEl, dialogTitleEl, dialogSummaryEl, dialogBodyEl;
+    var dialogEl, dialogModeEl, dialogTitleEl, dialogSummaryEl, dialogFocusEl, dialogFocusDayEl, dialogFocusTimeEl, dialogBodyEl;
     var dialogPinPanelEl, dialogPinEl, dialogHelperEl, dialogFeedbackEl, dialogSubmitEl;
     var headerClockEl, quickClockEl, quickClockStateEl, quickClockFeedbackEl;
     var quickClockFeedbackBadgeEl, quickClockFeedbackNameEl, quickClockFeedbackMessageEl, quickClockFeedbackTimeEl;
     var quickClockDotsEl, quickClockDots, quickClockErrorEl, quickClockKeypadEl, quickClockLoadingEl;
+    var panelSwitchEl, panelTabs, panelSections;
+    var activePanel = 'schedule';
 
     function init() {
         weekPrevEl = document.getElementById('direct-week-prev');
@@ -45,12 +47,18 @@ var Direct = (function () {
         dialogModeEl = document.getElementById('direct-dialog-mode');
         dialogTitleEl = document.getElementById('direct-dialog-title');
         dialogSummaryEl = document.getElementById('direct-dialog-summary');
+        dialogFocusEl = document.getElementById('direct-dialog-focus');
+        dialogFocusDayEl = document.getElementById('direct-dialog-focus-day');
+        dialogFocusTimeEl = document.getElementById('direct-dialog-focus-time');
         dialogBodyEl = document.getElementById('direct-dialog-body');
         dialogPinPanelEl = document.getElementById('direct-dialog-pin-panel');
         dialogPinEl = document.getElementById('direct-dialog-pin');
         dialogHelperEl = document.getElementById('direct-dialog-helper');
         dialogFeedbackEl = document.getElementById('direct-dialog-feedback');
         dialogSubmitEl = document.getElementById('direct-dialog-submit');
+        panelSwitchEl = document.getElementById('direct-panel-switch');
+        panelTabs = document.querySelectorAll('.direct-panel-tab');
+        panelSections = document.querySelectorAll('.direct-panel[data-panel-id]');
 
         headerClockEl = document.getElementById('direct-header-clock');
         quickClockEl = document.getElementById('direct-clock-time');
@@ -75,6 +83,11 @@ var Direct = (function () {
             dialogPinEl.value = normalizePin(dialogPinEl.value, 4);
             clearScheduleFeedback();
         });
+        Utils.each(panelTabs, function (tab) {
+            Utils.bindPress(tab, function () {
+                setActivePanel(tab.getAttribute('data-panel-target') || 'schedule');
+            });
+        });
 
         Utils.delegatePress(quickClockKeypadEl, '.key-btn', function (event, button) {
             if (clockBusy) return;
@@ -93,8 +106,10 @@ var Direct = (function () {
         var info = Utils.currentWeekInfo();
         currentYear = info.year;
         currentWeek = info.week;
+        syncResponsivePanels();
         updateClocks();
         setInterval(updateClocks, 1000);
+        window.addEventListener('resize', syncResponsivePanels, { passive: true });
         loadWeek();
     }
 
@@ -117,8 +132,29 @@ var Direct = (function () {
 
     function updateClocks() {
         var now = new Date();
-        if (headerClockEl) headerClockEl.textContent = Utils.formatTime(now);
-        if (quickClockEl) quickClockEl.textContent = Utils.formatTimeFull(now);
+        var shortTime = Utils.formatTime(now);
+        var fullTime = Utils.formatTimeFull(now);
+        if (headerClockEl) headerClockEl.textContent = shortTime;
+        if (quickClockEl) renderQuickClock(fullTime);
+    }
+
+    function renderQuickClock(value) {
+        var parts;
+        if (!quickClockEl) return;
+
+        parts = String(value || '').split(':');
+        if (parts.length !== 3) {
+            quickClockEl.textContent = String(value || '--:--:--');
+            return;
+        }
+
+        quickClockEl.innerHTML = '' +
+            '<span class="direct-clock-part">' + escapeHtml(parts[0]) + '</span>' +
+            '<span class="direct-clock-separator" aria-hidden="true">:</span>' +
+            '<span class="direct-clock-part">' + escapeHtml(parts[1]) + '</span>' +
+            '<span class="direct-clock-separator" aria-hidden="true">:</span>' +
+            '<span class="direct-clock-part">' + escapeHtml(parts[2]) + '</span>';
+        quickClockEl.setAttribute('aria-label', String(value || '--:--:--'));
     }
 
     function changeWeek(delta) {
@@ -238,11 +274,14 @@ var Direct = (function () {
                 key: 'create',
                 badge: 'Hueco disponible',
                 title: 'Crear y reservar franja',
-                summary: buildPendingSummary(parseInt(cell.dataset.day, 10), parseInt(cell.dataset.hour, 10)),
-                body: 'Introduce tu PIN de 4 cifras para crear esta franja y reservarla a tu nombre.',
+                summary: '',
+                focusDay: Utils.DAY_NAMES[parseInt(cell.dataset.day, 10)],
+                focusTime: buildPendingTimeRange(parseInt(cell.dataset.hour, 10)),
+                body: '',
                 requiresPin: true,
                 action: 'create',
-                primaryLabel: 'Crear y reservar'
+                primaryLabel: 'Crear y reservar',
+                compactLayout: true
             }, null, parseInt(cell.dataset.day, 10), parseInt(cell.dataset.hour, 10));
             return;
         }
@@ -277,6 +316,7 @@ var Direct = (function () {
     }
 
     function openScheduleDialog(state, slot, day, hour) {
+        setActivePanel('schedule');
         scheduleDialogState = state;
         selectedSlot = slot || null;
         pendingDay = day || null;
@@ -289,10 +329,16 @@ var Direct = (function () {
 
     function applyScheduleDialogState() {
         var state = scheduleDialogState || {};
+        dialogEl.classList.toggle('compact-create', !!state.compactLayout);
         dialogModeEl.textContent = state.badge || 'Turno';
         dialogTitleEl.textContent = state.title || 'Gestionar franja';
         dialogSummaryEl.textContent = state.summary || '--';
+        dialogSummaryEl.classList.toggle('hidden', !state.summary);
+        dialogFocusDayEl.textContent = state.focusDay || '';
+        dialogFocusTimeEl.textContent = state.focusTime || '';
+        dialogFocusEl.classList.toggle('hidden', !state.focusDay && !state.focusTime);
         dialogBodyEl.textContent = state.body || '';
+        dialogBodyEl.classList.toggle('hidden', !state.body);
         dialogPinPanelEl.classList.toggle('hidden', !state.requiresPin);
         dialogSubmitEl.textContent = state.primaryLabel || 'Continuar';
         dialogSubmitEl.disabled = false;
@@ -318,10 +364,13 @@ var Direct = (function () {
                 badge: 'Liberar franja',
                 title: 'Liberar franja',
                 summary: selectedSlot ? buildSlotSummary(selectedSlot) : '--',
+                focusDay: '',
+                focusTime: '',
                 body: 'Introduce tu PIN de 4 cifras para liberar esta franja si realmente te pertenece.',
                 requiresPin: true,
                 action: 'release',
-                primaryLabel: 'Liberar franja'
+                primaryLabel: 'Liberar franja',
+                compactLayout: false
             };
             applyScheduleDialogState();
             return;
@@ -397,10 +446,16 @@ var Direct = (function () {
         pendingDay = null;
         pendingHour = null;
         scheduleBusy = false;
+        dialogEl.classList.remove('compact-create');
         dialogModeEl.textContent = 'Turno';
         dialogTitleEl.textContent = 'Gestionar franja';
         dialogSummaryEl.textContent = '--';
+        dialogSummaryEl.classList.remove('hidden');
+        dialogFocusDayEl.textContent = '';
+        dialogFocusTimeEl.textContent = '';
+        dialogFocusEl.classList.add('hidden');
         dialogBodyEl.textContent = '';
+        dialogBodyEl.classList.remove('hidden');
         dialogPinEl.value = '';
         dialogHelperEl.textContent = 'Tu PIN solo se usa para esta accion y no se guarda.';
         dialogPinPanelEl.classList.add('hidden');
@@ -538,6 +593,7 @@ var Direct = (function () {
     }
 
     function showQuickClockResult(kind, badge, employeeName, message) {
+        setActivePanel('clock');
         if (clockResetTimer) {
             clearTimeout(clockResetTimer);
         }
@@ -632,6 +688,10 @@ var Direct = (function () {
         return Utils.DAY_NAMES[day] + ' - ' + pad2(hour) + ':00 - ' + pad2(hour + 1) + ':00';
     }
 
+    function buildPendingTimeRange(hour) {
+        return pad2(hour) + ':00 - ' + pad2(hour + 1) + ':00';
+    }
+
     function formatMonthLabel(year, week) {
         var dates = Utils.getWeekDates(year, week);
         var first = dates[0];
@@ -644,6 +704,45 @@ var Direct = (function () {
 
     function normalizePin(value, maxLength) {
         return String(value || '').replace(/\D/g, '').slice(0, maxLength || 4);
+    }
+
+    function syncResponsivePanels() {
+        if (window.innerWidth > 1100) {
+            panelSwitchEl.classList.remove('is-compact');
+            Utils.each(panelSections, function (section) {
+                section.classList.add('is-active');
+            });
+            Utils.each(panelTabs, function (tab) {
+                tab.classList.toggle('is-active', tab.getAttribute('data-panel-target') === activePanel);
+                tab.setAttribute('aria-pressed', tab.getAttribute('data-panel-target') === activePanel ? 'true' : 'false');
+            });
+            return;
+        }
+
+        panelSwitchEl.classList.add('is-compact');
+        setActivePanel(activePanel);
+    }
+
+    function setActivePanel(panelId) {
+        activePanel = panelId === 'clock' ? 'clock' : 'schedule';
+
+        Utils.each(panelTabs, function (tab) {
+            var isActive = tab.getAttribute('data-panel-target') === activePanel;
+            tab.classList.toggle('is-active', isActive);
+            tab.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+
+        if (window.innerWidth > 1100) {
+            Utils.each(panelSections, function (section) {
+                section.classList.add('is-active');
+            });
+            return;
+        }
+
+        Utils.each(panelSections, function (section) {
+            var isActive = section.getAttribute('data-panel-id') === activePanel;
+            section.classList.toggle('is-active', isActive);
+        });
     }
 
     function isEditableTarget(target) {

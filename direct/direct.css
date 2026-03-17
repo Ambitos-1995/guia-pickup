@@ -103,6 +103,39 @@
     gap: 16px;
 }
 
+.direct-panel-switch {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 6px;
+    border-radius: 22px;
+    background: rgba(255,255,255,0.72);
+    border: 1px solid rgba(17,24,39,0.08);
+    box-shadow: 0 18px 30px rgba(15, 23, 42, 0.08);
+}
+
+.direct-panel-tab {
+    flex: 1;
+    min-height: 52px;
+    padding: 0 18px;
+    border-radius: 18px;
+    color: var(--gray-600);
+    font-weight: 800;
+    font-size: 1rem;
+    background: transparent;
+    transition: background var(--transition), color var(--transition), transform var(--transition);
+}
+
+.direct-panel-tab.is-active {
+    background: #111827;
+    color: var(--white);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2);
+}
+
+.direct-panel-tab:active {
+    transform: scale(0.98);
+}
+
 .direct-panel {
     min-height: 0;
     display: flex;
@@ -203,9 +236,26 @@
     font-family: var(--font-display);
     font-size: clamp(3.3rem, 6vw, 4.8rem);
     font-weight: 850;
-    letter-spacing: -0.08em;
+    display: inline-flex;
+    align-items: flex-end;
+    justify-content: center;
     line-height: 0.95;
     color: var(--white);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+}
+
+.direct-clock-part {
+    min-width: 2ch;
+    text-align: center;
+    letter-spacing: -0.08em;
+}
+
+.direct-clock-separator {
+    margin: 0 0.14em 0 0.12em;
+    letter-spacing: 0;
+    opacity: 0.92;
+    transform: translateY(-0.03em);
 }
 
 .direct-clock-copy {
@@ -311,9 +361,17 @@
 }
 
 @media (max-width: 1100px) {
+    .direct-app {
+        overflow: auto;
+    }
+
+    .direct-panel-switch {
+        display: flex;
+    }
+
     .direct-main {
-        grid-template-columns: 1fr;
-        grid-auto-rows: minmax(0, auto);
+        display: block;
+        min-height: auto;
     }
 
     .direct-panel-schedule {
@@ -322,6 +380,14 @@
 
     .direct-panel-clock {
         min-height: 460px;
+    }
+
+    .direct-panel {
+        display: none;
+    }
+
+    .direct-panel.is-active {
+        display: flex;
     }
 }
 
@@ -368,5 +434,10 @@
 
     .direct-pin-keypad .key-btn {
         min-height: 72px;
+    }
+
+    .direct-panel-tab {
+        min-height: 48px;
+        font-size: 0.95rem;
     }
 }

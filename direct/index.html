@@ -29,8 +29,6 @@
         <header class="direct-header">
             <div class="direct-brand">
                 <span class="direct-brand-kicker">Punto de encuentro inclusivo</span>
-                <h1>Punto directo</h1>
-                <p>Horario semanal y fichaje rapido para tablet compartida</p>
             </div>
 
             <div class="direct-header-tools">
@@ -39,11 +37,19 @@
             </div>
         </header>
 
+        <nav class="direct-panel-switch" id="direct-panel-switch" aria-label="Cambiar panel">
+            <button class="direct-panel-tab is-active" id="direct-tab-schedule" data-panel-target="schedule" type="button" aria-pressed="true">
+                Horario
+            </button>
+            <button class="direct-panel-tab" id="direct-tab-clock" data-panel-target="clock" type="button" aria-pressed="false">
+                Fichaje
+            </button>
+        </nav>
+
         <main class="direct-main">
-            <section class="direct-panel direct-panel-schedule" aria-labelledby="direct-schedule-title">
+            <section class="direct-panel direct-panel-schedule" data-panel-id="schedule" aria-labelledby="direct-schedule-title">
                 <div class="direct-panel-head">
                     <div>
-                        <span class="direct-panel-kicker">Panel izquierdo</span>
                         <h2 id="direct-schedule-title">Horario semanal</h2>
                     </div>
 
@@ -62,10 +68,6 @@
                 </div>
 
                 <div class="schedule-shell direct-schedule-shell">
-                    <p class="schedule-context direct-schedule-context" id="direct-schedule-context">
-                        Consulta el horario. Para reservar, crear o liberar una franja, introduce tu PIN de 4 cifras solo en el momento de la accion.
-                    </p>
-
                     <wa-callout id="direct-schedule-status" variant="neutral" appearance="filled-outlined" class="hidden direct-inline-callout"></wa-callout>
 
                     <div class="schedule-board direct-schedule-board">
@@ -82,12 +84,10 @@
                 </div>
             </section>
 
-            <section class="direct-panel direct-panel-clock" aria-labelledby="direct-clock-title">
+            <section class="direct-panel direct-panel-clock" data-panel-id="clock" aria-labelledby="direct-clock-title">
                 <div class="direct-clock-panel-head">
                     <div>
-                        <span class="direct-panel-kicker direct-panel-kicker-dark">Panel derecho</span>
                         <h2 id="direct-clock-title">Fichaje rapido</h2>
-                        <p>Introduce tu PIN y el sistema registra entrada o salida sin guardar sesion.</p>
                     </div>
                 </div>
 
@@ -144,6 +144,10 @@
             <div class="slot-dialog-badge" id="direct-dialog-mode">Turno</div>
             <h3 class="slot-dialog-title" id="direct-dialog-title">Gestionar franja</h3>
             <p class="slot-dialog-summary" id="direct-dialog-summary">--</p>
+            <div class="slot-dialog-focus hidden" id="direct-dialog-focus">
+                <div class="slot-dialog-focus-day" id="direct-dialog-focus-day">Martes</div>
+                <div class="slot-dialog-focus-time" id="direct-dialog-focus-time">15:00 - 16:00</div>
+            </div>
             <p class="slot-dialog-body" id="direct-dialog-body"></p>
 
             <div class="slot-dialog-admin hidden direct-dialog-pin-panel" id="direct-dialog-pin-panel">
