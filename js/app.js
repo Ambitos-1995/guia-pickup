@@ -85,7 +85,7 @@ var App = (function () {
             window.location.assign('/direct/');
         });
         Utils.bindPress(document.getElementById('menu-login-btn'), function () {
-            Pin.openForLogin('screen-clock', 'screen-menu');
+            Pin.openForLogin('screen-menu', 'screen-menu');
             navigate('screen-pin');
         });
 
@@ -110,7 +110,7 @@ var App = (function () {
         if (!canAccessScreen(screenId)) {
             if (!hasAuthenticatedAccess()) {
                 if (screenId !== 'screen-menu' && screenId !== 'screen-pin') {
-                    Pin.openForLogin('screen-clock', 'screen-menu');
+                    Pin.openForLogin('screen-menu', 'screen-menu');
                 }
                 screenId = 'screen-pin';
             } else {
@@ -177,7 +177,7 @@ var App = (function () {
         if (isSessionExpired(session)) {
             clearSession();
             if (currentScreen !== 'screen-pin') {
-                Pin.openForLogin('screen-clock', 'screen-menu');
+                Pin.openForLogin('screen-menu', 'screen-menu');
                 navigate('screen-pin');
             }
             return null;
@@ -206,13 +206,13 @@ var App = (function () {
 
     function logout() {
         clearSession();
-        Pin.openForLogin('screen-clock', 'screen-menu');
+        Pin.openForLogin('screen-menu', 'screen-menu');
         navigate('screen-pin');
     }
 
     function handleAuthFailure(message) {
         clearSession();
-        Pin.openForLogin('screen-clock', 'screen-menu');
+        Pin.openForLogin('screen-menu', 'screen-menu');
         navigate('screen-pin');
         if (message) {
             confirm('Sesion caducada', message, null);
@@ -377,10 +377,10 @@ var App = (function () {
             return 'screen-menu';
         }
         if (hasEmployeeAccess()) {
-            return 'screen-clock';
+            return 'screen-menu';
         }
 
-        Pin.openForLogin('screen-clock', 'screen-menu');
+        Pin.openForLogin('screen-menu', 'screen-menu');
         launchScreen = '';
         return 'screen-pin';
     }

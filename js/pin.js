@@ -5,12 +5,13 @@ var Pin = (function () {
     'use strict';
 
     var MAX_PIN_LENGTH = 6;
+    var LOGIN_AUTO_VERIFY_DELAY_MS = 1800;
     var currentMaxLength = 6;
     var pin = '';
     var isVerifying = false;
     var mode = 'admin';
     var adminTarget = 'screen-menu';
-    var employeeTarget = 'screen-clock';
+    var employeeTarget = 'screen-menu';
     var loginAdminTarget = 'screen-menu';
     var backTarget = '';
     var toastTimer = null;
@@ -55,7 +56,7 @@ var Pin = (function () {
         updateDots();
         hideError();
         if (mode === 'login' && pin.length === 4) {
-            loginTimer = setTimeout(function () { loginTimer = null; verify(); }, 500);
+            loginTimer = setTimeout(function () { loginTimer = null; verify(); }, LOGIN_AUTO_VERIFY_DELAY_MS);
         } else if (pin.length === currentMaxLength) {
             setTimeout(verify, 150);
         }
@@ -156,11 +157,11 @@ var Pin = (function () {
                 if ((res.data.role || 'respondent') === 'org_admin') {
                     App.navigate(loginAdminTarget || 'screen-menu');
                 } else {
-                    App.navigate(employeeTarget || 'screen-clock');
+                    App.navigate(employeeTarget || 'screen-menu');
                 }
             }
             else if (mode === 'admin') App.navigate(adminTarget || 'screen-menu');
-            else App.navigate(employeeTarget || 'screen-clock');
+            else App.navigate(employeeTarget || 'screen-menu');
         });
     }
 
@@ -184,7 +185,7 @@ var Pin = (function () {
 
     function openForEmployee(targetScreen) {
         mode = 'employee';
-        employeeTarget = targetScreen || 'screen-clock';
+        employeeTarget = targetScreen || 'screen-menu';
         backTarget = '';
         setDotCount(4);
         clearPin();
@@ -194,13 +195,13 @@ var Pin = (function () {
 
     function openForLogin(targetScreen, adminScreen, returnTarget) {
         mode = 'login';
-        employeeTarget = targetScreen || 'screen-clock';
+        employeeTarget = targetScreen || 'screen-menu';
         loginAdminTarget = adminScreen || 'screen-menu';
         backTarget = returnTarget || '';
         setDotCount(6);
         clearPin();
         syncBackButton();
-        if (promptEl) promptEl.textContent = 'Introduce tu PIN';
+        if (promptEl) promptEl.textContent = 'Introduce tu PIN de 4 o 6 cifras';
     }
 
     function syncBackButton() {

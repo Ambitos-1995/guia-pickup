@@ -19,7 +19,7 @@ test('app boots into the internal PIN screen', async ({ page }) => {
   await expect(page.locator('#screen-pin.active')).toBeVisible();
 
   await expect(page).toHaveTitle('Punto de encuentro inclusivo');
-  await expect(page.locator('#pin-prompt')).toHaveText('Introduce tu PIN');
+  await expect(page.locator('#pin-prompt')).toHaveText('Introduce tu PIN de 4 o 6 cifras');
   await expect(page.locator('body')).not.toContainText('Pickup TMG');
   await expect(page.locator('#pin-public-schedule')).toBeHidden();
 });
@@ -42,15 +42,12 @@ test('anonymous users cannot reach authenticated screens', async ({ page }) => {
   await expect(page.locator('#screen-admin.active')).toHaveCount(0);
 });
 
-test('employee login opens clock first and unlocks personal menu actions', async ({ page }) => {
+test('employee login opens the main menu and unlocks personal actions', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
   await expect(page.locator('#screen-pin.active')).toBeVisible();
 
   await enterPin(page, '1234');
-
-  await expect(page.locator('#screen-clock.active')).toBeVisible();
-  await page.locator('#screen-clock.active .back-btn').click();
 
   await expect(page.locator('#screen-menu.active')).toBeVisible();
   await expect(page.locator('#greeting')).toHaveText('Ismael Pérez');
@@ -69,12 +66,10 @@ test('employee session persists after reload while still valid', async ({ page }
   await expect(page.locator('#screen-pin.active')).toBeVisible();
 
   await enterPin(page, '1234');
-  await expect(page.locator('#screen-clock.active')).toBeVisible();
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
 
   await page.reload();
 
-  await expect(page.locator('#screen-clock.active')).toBeVisible();
-  await page.locator('#screen-clock.active .back-btn').click();
   await expect(page.locator('#screen-menu.active')).toBeVisible();
   await expect(page.locator('#greeting')).toContainText('Ismael');
   await expect(page.locator('#card-payment')).toBeVisible();
@@ -86,19 +81,18 @@ test('logout returns to the PIN-first home', async ({ page }) => {
   await page.goto('/');
   await enterPin(page, '1234');
 
-  await page.locator('#screen-clock.active .back-btn').click();
   await expect(page.locator('#screen-menu.active')).toBeVisible();
 
   await page.locator('#logout-btn').click();
   await expect(page.locator('#screen-pin.active')).toBeVisible();
-  await expect(page.locator('#pin-prompt')).toHaveText('Introduce tu PIN');
+  await expect(page.locator('#pin-prompt')).toHaveText('Introduce tu PIN de 4 o 6 cifras');
 });
 
 test('admin can sign in from the PIN-first entry flow', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
   await expect(page.locator('#screen-pin.active')).toBeVisible();
-  await expect(page.locator('#pin-prompt')).toHaveText('Introduce tu PIN');
+  await expect(page.locator('#pin-prompt')).toHaveText('Introduce tu PIN de 4 o 6 cifras');
 
   await enterPin(page, '123456');
 
@@ -166,8 +160,6 @@ test('schedule create dialog is simplified for employee reservations', async ({ 
   await expect(page.locator('#screen-pin.active')).toBeVisible();
   await enterPin(page, '1234');
 
-  await expect(page.locator('#screen-clock.active')).toBeVisible();
-  await page.locator('#screen-clock.active .back-btn').click();
   await expect(page.locator('#screen-menu.active')).toBeVisible();
   await page.getByRole('button', { name: 'Mi Horario' }).click();
   await expect(page.locator('#screen-schedule.active')).toBeVisible();

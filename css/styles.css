@@ -300,22 +300,27 @@ button:focus-visible {
 .pin-dots {
     display: flex;
     justify-content: center;
-    gap: 16px;
+    align-items: center;
+    gap: 12px;
+    min-height: 14px;
     margin-bottom: 16px;
 }
 
 .pin-dot {
-    width: 20px;
-    height: 20px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
-    border: 3px solid var(--gray-500);
-    transition: all 0.15s ease;
+    border: none;
+    background: var(--red);
+    opacity: 0;
+    transform: scale(0.2);
+    transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
 .pin-dot.filled {
     background: var(--red);
-    border-color: var(--red);
-    transform: scale(1.15);
+    opacity: 1;
+    transform: scale(1);
 }
 
 .pin-toast {
