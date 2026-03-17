@@ -16,31 +16,52 @@ var Pin = (function () {
     var backTarget = '';
     var toastTimer = null;
     var loginTimer = null;
+    var pinPad = null;
 
-    var dots, toastEl, loadingEl, keypad, promptEl, backBtnEl;
+    var toastEl, loadingEl, keypad, promptEl, backBtnEl;
 
     function init() {
-        dots = document.querySelectorAll('.pin-dot');
         toastEl = document.getElementById('pin-toast');
         loadingEl = document.getElementById('pin-loading');
         keypad = document.getElementById('pin-keypad');
         promptEl = document.getElementById('pin-prompt');
         backBtnEl = document.getElementById('pin-public-schedule');
-
-        Utils.delegatePress(keypad, '.key-btn', function (e, btn) {
-            if (isVerifying) return;
-            var key = btn.dataset.key;
-            if (key === 'clear') clearPin();
-            else if (key && pin.length < currentMaxLength) addDigit(key);
+        pinPad = PinPad.create({
+            dotsEl: document.getElementById('pin-dots'),
+            keypadEl: keypad,
+            maxLength: currentMaxLength,
+            allowKeyboard: true,
+            captureWhen: function () {
+                return App.isScreen('screen-pin');
+            },
+            onChange: function (value) {
+                pin = value;
+                if (loginTimer) { clearTimeout(loginTimer); loginTimer = null; }
+                hideError();
+                if (mode === 'login' && pin.length === 4) {
+                    loginTimer = setTimeout(function () {
+                        loginTimer = null;
+                        verify();
+                    }, LOGIN_AUTO_VERIFY_DELAY_MS);
+                }
+            },
+            onComplete: function () {
+                if (mode !== 'login' || currentMaxLength !== MAX_PIN_LENGTH) {
+                    setTimeout(verify, 150);
+                    return;
+                }
+                setTimeout(verify, 150);
+            },
+            onClear: function () {
+                var dotsContainer = document.getElementById('pin-dots');
+                hideError();
+                if (dotsContainer) dotsContainer.classList.remove('shake');
+            }
         });
 
         document.addEventListener('keydown', function (e) {
             if (!App.isScreen('screen-pin') || isVerifying) return;
-            if (e.key >= '0' && e.key <= '9') addDigit(e.key);
-            else if (e.key === 'Backspace' && pin.length > 0) {
-                pin = pin.slice(0, -1);
-                updateDots();
-            } else if (e.key === 'Enter') {
+            if (e.key === 'Enter') {
                 verify();
             }
         });
@@ -49,49 +70,26 @@ var Pin = (function () {
         setInterval(updateClock, 1000);
     }
 
-    function addDigit(digit) {
-        if (pin.length >= currentMaxLength) return;
-        if (loginTimer) { clearTimeout(loginTimer); loginTimer = null; }
-        pin += digit;
-        updateDots();
-        hideError();
-        if (mode === 'login' && pin.length === 4) {
-            loginTimer = setTimeout(function () { loginTimer = null; verify(); }, LOGIN_AUTO_VERIFY_DELAY_MS);
-        } else if (pin.length === currentMaxLength) {
-            setTimeout(verify, 150);
-        }
-    }
-
     function clearPin() {
         if (loginTimer) { clearTimeout(loginTimer); loginTimer = null; }
         pin = '';
-        updateDots();
+        if (pinPad) {
+            pinPad.clear();
+            return;
+        }
         hideError();
-        document.getElementById('pin-dots').classList.remove('shake');
     }
 
     function setDotCount(count) {
         currentMaxLength = count;
-        Utils.each(dots, function (dot, index) {
-            dot.style.display = index < count ? '' : 'none';
-        });
-    }
-
-    function updateDots() {
-        Utils.each(dots, function (dot, index) {
-            dot.classList.toggle('filled', index < pin.length);
-        });
+        if (pinPad) pinPad.setMaxLength(count);
     }
 
     function showError(message) {
         if (toastTimer) clearTimeout(toastTimer);
         toastEl.textContent = message;
         toastEl.classList.add('show');
-
-        var dotsContainer = document.getElementById('pin-dots');
-        dotsContainer.classList.remove('shake');
-        void dotsContainer.offsetWidth;
-        dotsContainer.classList.add('shake');
+        if (pinPad) pinPad.shake();
 
         toastTimer = setTimeout(function () {
             toastEl.classList.remove('show');
@@ -112,8 +110,7 @@ var Pin = (function () {
 
         isVerifying = true;
         loadingEl.classList.remove('hidden');
-        keypad.style.opacity = '0.5';
-        keypad.style.pointerEvents = 'none';
+        if (pinPad) pinPad.setBusy(true);
 
         var request;
         if (mode === 'login') {
@@ -133,8 +130,7 @@ var Pin = (function () {
         request.then(function (res) {
             isVerifying = false;
             loadingEl.classList.add('hidden');
-            keypad.style.opacity = '1';
-            keypad.style.pointerEvents = 'auto';
+            if (pinPad) pinPad.setBusy(false);
 
             if (!(res && res.success && res.data)) {
                 clearPin();
@@ -162,6 +158,12 @@ var Pin = (function () {
             }
             else if (mode === 'admin') App.navigate(adminTarget || 'screen-menu');
             else App.navigate(employeeTarget || 'screen-menu');
+        }).catch(function () {
+            isVerifying = false;
+            loadingEl.classList.add('hidden');
+            if (pinPad) pinPad.setBusy(false);
+            clearPin();
+            showError('No se pudo verificar el PIN');
         });
     }
 

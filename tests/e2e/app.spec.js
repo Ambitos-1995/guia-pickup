@@ -213,8 +213,6 @@ test('direct route allows atomic schedule reservation with pin', async ({ page }
   await expect(page.locator('#direct-dialog-summary')).toHaveText('Martes - 16:00 - 17:00');
   await expect(page.locator('#direct-dialog-focus-day')).toHaveText('Martes');
   await expect(page.locator('#direct-dialog-focus-time')).toHaveText('16:00 - 17:00');
-  await expect(page.locator('#direct-dialog-pin-day')).toHaveText('Martes');
-  await expect(page.locator('#direct-dialog-pin-time')).toHaveText('16:00 - 17:00');
   await expect(page.locator('#direct-dialog-body')).toHaveText('Introduce tu PIN de 4 cifras para reservar esta franja.');
   await enterDirectDialogPin(page, '4321');
   await page.locator('#direct-dialog-submit').click();
@@ -238,8 +236,6 @@ test('direct route mirrors compact create dialog layout from main schedule', asy
   await expect(page.locator('#direct-dialog-summary')).toBeHidden();
   await expect(page.locator('#direct-dialog-focus-day')).toHaveText('Martes');
   await expect(page.locator('#direct-dialog-focus-time')).toHaveText('15:00 - 16:00');
-  await expect(page.locator('#direct-dialog-pin-day')).toHaveText('Martes');
-  await expect(page.locator('#direct-dialog-pin-time')).toHaveText('15:00 - 16:00');
   await expect(page.locator('#direct-dialog-body')).toBeHidden();
   await expect(page.locator('#direct-dialog-submit')).toHaveText('Crear y reservar');
 
@@ -250,6 +246,28 @@ test('direct route mirrors compact create dialog layout from main schedule', asy
   await expect.poll(() => state.scheduleActionCalls.length).toBe(1);
   await expect.poll(() => state.scheduleActionCalls[0].action).toBe('create-and-assign');
   await expect.poll(() => state.scheduleActionCalls[0].auth).toContain('Bearer employee-token-2');
+});
+
+test('direct schedule dialog captures physical keyboard without leaking to quick clock', async ({ page }) => {
+  const state = await setupMockApi(page);
+  await page.goto('/direct/');
+
+  await page.locator('#direct-schedule-grid .sched-cell[data-slot-id="slot-2"]').click();
+  await expect(page.locator('#direct-schedule-dialog')).toHaveJSProperty('open', true);
+
+  await page.keyboard.type('43');
+  await expect(page.locator('#direct-dialog-pin-dots .pin-dot.filled')).toHaveCount(2);
+  await expect(page.locator('#direct-pin-dots .pin-dot.filled')).toHaveCount(0);
+
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('#direct-dialog-pin-dots .pin-dot.filled')).toHaveCount(1);
+
+  await page.keyboard.type('321');
+  await expect(page.locator('#direct-dialog-pin-dots .pin-dot.filled')).toHaveCount(4);
+  await page.locator('#direct-dialog-submit').click();
+
+  await expect(page.locator('#direct-schedule-status')).toContainText('Franja reservada correctamente.');
+  await expect.poll(() => state.scheduleActionCalls.length).toBe(1);
 });
 
 test('direct route performs quick clocking without persisting session', async ({ page }) => {

@@ -20,6 +20,7 @@ test('direct shell exposes kiosk branding inside the main PWA', () => {
   assert.match(directIndexHtml, /Horario semanal/);
   assert.match(directIndexHtml, /Fichaje rapido/);
   assert.match(directIndexHtml, /<link rel="manifest" href="\/manifest\.json">/);
+  assert.match(directIndexHtml, /<script src="\/js\/pin-pad\.js"><\/script>/);
   assert.doesNotMatch(directIndexHtml, /direct\/manifest\.json/);
 });
 
@@ -32,6 +33,7 @@ test('legacy visible TMG branding is not present in shell files', () => {
 test('critical scripts keep the expected load order', () => {
   const scriptOrder = [
     'js/utils.js',
+    'js/pin-pad.js',
     'js/api.js',
     'js/pin.js',
     'js/schedule.js',

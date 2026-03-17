@@ -19,10 +19,8 @@ var Direct = (function () {
     var selectedSlot = null;
     var pendingDay = null;
     var pendingHour = null;
-    var schedulePin = '';
     var scheduleBusy = false;
     var scheduleStatusTimer = 0;
-    var clockPin = '';
     var clockBusy = false;
     var clockResetTimer = 0;
     var clockErrorTimer = 0;
@@ -31,12 +29,14 @@ var Direct = (function () {
     var weekPrevEl, weekNextEl, weekLabelEl, weekRangeEl;
     var scheduleGridEl, scheduleStatusEl;
     var dialogEl, dialogModeEl, dialogTitleEl, dialogSummaryEl, dialogFocusEl, dialogFocusDayEl, dialogFocusTimeEl, dialogBodyEl;
-    var dialogPinPanelEl, dialogPinKickerEl, dialogPinDayEl, dialogPinTimeEl, dialogPinDotsEl, dialogPinDots, dialogPinKeypadEl;
+    var dialogPinPanelEl, dialogPinKickerEl, dialogPinDotsEl, dialogPinDots, dialogPinKeypadEl;
     var dialogHelperEl, dialogFeedbackEl, dialogSubmitEl;
     var headerClockEl, quickClockEl, quickClockStateEl, quickClockFeedbackEl;
     var quickClockFeedbackBadgeEl, quickClockFeedbackNameEl, quickClockFeedbackMessageEl, quickClockFeedbackTimeEl;
     var quickClockDotsEl, quickClockDots, quickClockErrorEl, quickClockKeypadEl, quickClockLoadingEl;
     var panelSwitchEl, panelTabs, panelSections;
+    var quickClockPad = null;
+    var dialogPinPad = null;
     var activePanel = 'schedule';
 
     function init() {
@@ -57,8 +57,6 @@ var Direct = (function () {
         dialogBodyEl = document.getElementById('direct-dialog-body');
         dialogPinPanelEl = document.getElementById('direct-dialog-pin-panel');
         dialogPinKickerEl = document.getElementById('direct-dialog-pin-kicker');
-        dialogPinDayEl = document.getElementById('direct-dialog-pin-day');
-        dialogPinTimeEl = document.getElementById('direct-dialog-pin-time');
         dialogPinDotsEl = document.getElementById('direct-dialog-pin-dots');
         dialogPinDots = dialogPinDotsEl ? dialogPinDotsEl.querySelectorAll('.pin-dot') : [];
         dialogPinKeypadEl = document.getElementById('direct-dialog-keypad');
@@ -88,16 +86,16 @@ var Direct = (function () {
         Utils.delegatePress(scheduleGridEl, '.sched-cell', handleScheduleCellPress);
         Utils.bindPress(dialogSubmitEl, handleScheduleDialogSubmit);
         dialogEl.addEventListener('wa-after-hide', resetScheduleDialog);
-        Utils.delegatePress(dialogPinKeypadEl, '.key-btn', function (event, button) {
-            if (scheduleBusy || button.disabled) return;
-
-            if (button.dataset.key === 'clear') {
-                clearSchedulePin();
-                return;
-            }
-
-            if (button.dataset.key) {
-                addScheduleDigit(button.dataset.key);
+        dialogPinPad = PinPad.create({
+            dotsEl: dialogPinDotsEl,
+            keypadEl: dialogPinKeypadEl,
+            maxLength: 4,
+            allowKeyboard: true,
+            captureWhen: function () {
+                return isScheduleDialogCapturingPin();
+            },
+            onChange: function () {
+                clearScheduleFeedback();
             }
         });
         Utils.each(panelTabs, function (tab) {
@@ -106,19 +104,25 @@ var Direct = (function () {
             });
         });
 
-        Utils.delegatePress(quickClockKeypadEl, '.key-btn', function (event, button) {
-            if (clockBusy) return;
-            var key = button.dataset.key;
-            if (key === 'clear') {
-                clearClockPin();
-                return;
-            }
-            if (key && clockPin.length < 4) {
-                addClockDigit(key);
+        quickClockPad = PinPad.create({
+            dotsEl: quickClockDotsEl,
+            keypadEl: quickClockKeypadEl,
+            maxLength: 4,
+            allowKeyboard: true,
+            captureWhen: function () {
+                return !clockBusy && !isScheduleDialogCapturingPin() && (window.innerWidth > 1100 || activePanel === 'clock');
+            },
+            onChange: function () {
+                if (clockResetTimer) {
+                    clearTimeout(clockResetTimer);
+                    clockResetTimer = 0;
+                }
+                hideClockError();
+            },
+            onComplete: function () {
+                setTimeout(processQuickClockPin, 140);
             }
         });
-
-        document.addEventListener('keydown', handleKeydown);
 
         var info = Utils.currentWeekInfo();
         currentYear = info.year;
@@ -131,43 +135,6 @@ var Direct = (function () {
             queueScheduleGridLayout();
         }, { passive: true });
         loadWeek();
-    }
-
-    function handleKeydown(event) {
-        if (isEditableTarget(event.target)) {
-            return;
-        }
-
-        if (isScheduleDialogCapturingPin()) {
-            if (event.key >= '0' && event.key <= '9' && schedulePin.length < 4 && !scheduleBusy) {
-                addScheduleDigit(event.key);
-                event.preventDefault();
-                return;
-            }
-
-            if (event.key === 'Backspace' && schedulePin.length > 0 && !scheduleBusy) {
-                schedulePin = schedulePin.slice(0, -1);
-                updateSchedulePinDots();
-                clearScheduleFeedback();
-                event.preventDefault();
-                return;
-            }
-        }
-
-        if (dialogEl && dialogEl.open) {
-            return;
-        }
-
-        if (event.key >= '0' && event.key <= '9' && clockPin.length < 4 && !clockBusy) {
-            addClockDigit(event.key);
-            return;
-        }
-
-        if (event.key === 'Backspace' && clockPin.length > 0 && !clockBusy) {
-            clockPin = clockPin.slice(0, -1);
-            updateClockDots();
-            hideClockError();
-        }
     }
 
     function updateClocks() {
@@ -409,15 +376,13 @@ var Direct = (function () {
         dialogSubmitEl.textContent = state.primaryLabel || 'Continuar';
         dialogSubmitEl.disabled = false;
         dialogPinKickerEl.textContent = state.pinKicker || 'Reserva seleccionada';
-        dialogPinDayEl.textContent = state.focusDay || summaryDay(state.summary);
-        dialogPinTimeEl.textContent = state.focusTime || summaryTime(state.summary);
         dialogHelperEl.textContent = state.requiresPin
             ? 'Tu PIN solo se usa para esta accion y no se guarda.'
             : 'Puedes cerrar este cuadro si solo estabas consultando la informacion.';
         clearScheduleFeedback();
 
         if (state.requiresPin) {
-            clearSchedulePin();
+            if (dialogPinPad) dialogPinPad.clear();
         }
     }
 
@@ -447,18 +412,17 @@ var Direct = (function () {
     }
 
     function runScheduleProtectedAction() {
-        var pin = normalizePin(schedulePin, 4);
+        var pin = normalizePin(dialogPinPad ? dialogPinPad.getValue() : '', 4);
         if (!/^\d{4}$/.test(pin)) {
             showScheduleFeedback('warning', 'Introduce un PIN valido de 4 cifras.');
-            shakeSchedulePinDots();
+            if (dialogPinPad) dialogPinPad.shake();
             return;
         }
 
         scheduleBusy = true;
         dialogSubmitEl.disabled = true;
         clearScheduleFeedback();
-        dialogPinKeypadEl.style.opacity = '0.5';
-        dialogPinKeypadEl.style.pointerEvents = 'none';
+        if (dialogPinPad) dialogPinPad.setBusy(true);
 
         Api.verifyPin(pin).then(function (verifyRes) {
             if (!verifyRes || !verifyRes.success || !verifyRes.data || !verifyRes.data.accessToken) {
@@ -485,14 +449,13 @@ var Direct = (function () {
         }).catch(function (error) {
             showScheduleFeedback('danger', error && error.message ? error.message : 'No se pudo completar la accion.');
             if (error && error.message === 'PIN incorrecto') {
-                shakeSchedulePinDots();
-                clearSchedulePin();
+                if (dialogPinPad) dialogPinPad.shake();
+                if (dialogPinPad) dialogPinPad.clear();
             }
         }).then(function () {
             scheduleBusy = false;
             dialogSubmitEl.disabled = false;
-            dialogPinKeypadEl.style.opacity = '1';
-            dialogPinKeypadEl.style.pointerEvents = 'auto';
+            if (dialogPinPad) dialogPinPad.setBusy(false);
         });
     }
 
@@ -521,7 +484,6 @@ var Direct = (function () {
         selectedSlot = null;
         pendingDay = null;
         pendingHour = null;
-        schedulePin = '';
         scheduleBusy = false;
         dialogEl.classList.remove('compact-create');
         dialogModeEl.textContent = 'Turno';
@@ -534,13 +496,10 @@ var Direct = (function () {
         dialogBodyEl.textContent = '';
         dialogBodyEl.classList.remove('hidden');
         dialogPinKickerEl.textContent = 'Reserva seleccionada';
-        dialogPinDayEl.textContent = '';
-        dialogPinTimeEl.textContent = '';
-        updateSchedulePinDots();
+        if (dialogPinPad) dialogPinPad.clear();
         dialogHelperEl.textContent = 'Tu PIN solo se usa para esta accion y no se guarda.';
         dialogPinPanelEl.classList.add('hidden');
-        dialogPinKeypadEl.style.opacity = '1';
-        dialogPinKeypadEl.style.pointerEvents = 'auto';
+        if (dialogPinPad) dialogPinPad.setBusy(false);
         clearScheduleFeedback();
     }
 
@@ -572,72 +531,23 @@ var Direct = (function () {
         }, STATUS_RESET_MS);
     }
 
-    function addClockDigit(digit) {
-        if (clockPin.length >= 4) return;
-        if (clockResetTimer) {
-            clearTimeout(clockResetTimer);
-            clockResetTimer = 0;
-        }
-        clockPin += digit;
-        updateClockDots();
-        hideClockError();
-
-        if (clockPin.length === 4) {
-            setTimeout(processQuickClockPin, 140);
-        }
-    }
-
     function clearClockPin() {
-        clockPin = '';
-        updateClockDots();
-        hideClockError();
+        if (quickClockPad) quickClockPad.clear();
         if (clockErrorTimer) {
             clearTimeout(clockErrorTimer);
             clockErrorTimer = 0;
         }
     }
 
-    function updateClockDots() {
-        Utils.each(quickClockDots, function (dot, index) {
-            dot.classList.toggle('filled', index < clockPin.length);
-        });
-    }
-
-    function addScheduleDigit(digit) {
-        if (schedulePin.length >= 4) return;
-        schedulePin += digit;
-        updateSchedulePinDots();
-        clearScheduleFeedback();
-    }
-
-    function clearSchedulePin() {
-        schedulePin = '';
-        updateSchedulePinDots();
-        clearScheduleFeedback();
-    }
-
-    function updateSchedulePinDots() {
-        Utils.each(dialogPinDots, function (dot, index) {
-            dot.classList.toggle('filled', index < schedulePin.length);
-        });
-    }
-
-    function shakeSchedulePinDots() {
-        if (!dialogPinDotsEl) return;
-        dialogPinDotsEl.classList.remove('shake');
-        void dialogPinDotsEl.offsetWidth;
-        dialogPinDotsEl.classList.add('shake');
-    }
-
     function processQuickClockPin() {
-        if (clockBusy || clockPin.length !== 4) return;
+        var currentPin = quickClockPad ? quickClockPad.getValue() : '';
+        if (clockBusy || currentPin.length !== 4) return;
 
         clockBusy = true;
         quickClockLoadingEl.classList.remove('hidden');
-        quickClockKeypadEl.style.opacity = '0.5';
-        quickClockKeypadEl.style.pointerEvents = 'none';
+        if (quickClockPad) quickClockPad.setBusy(true);
 
-        Api.verifyPin(clockPin).then(function (verifyRes) {
+        Api.verifyPin(currentPin).then(function (verifyRes) {
             if (!verifyRes || !verifyRes.success || !verifyRes.data || !verifyRes.data.accessToken) {
                 throw createActionError((verifyRes && verifyRes.message) || 'PIN incorrecto');
             }
@@ -677,8 +587,7 @@ var Direct = (function () {
         }).then(function () {
             clockBusy = false;
             quickClockLoadingEl.classList.add('hidden');
-            quickClockKeypadEl.style.opacity = '1';
-            quickClockKeypadEl.style.pointerEvents = 'auto';
+            if (quickClockPad) quickClockPad.setBusy(false);
         });
     }
 
@@ -686,9 +595,7 @@ var Direct = (function () {
         clearClockPin();
         quickClockErrorEl.textContent = message;
         quickClockErrorEl.classList.remove('hidden');
-        quickClockDotsEl.classList.remove('shake');
-        void quickClockDotsEl.offsetWidth;
-        quickClockDotsEl.classList.add('shake');
+        if (quickClockPad) quickClockPad.shake();
 
         if (clockErrorTimer) {
             clearTimeout(clockErrorTimer);
@@ -735,8 +642,7 @@ var Direct = (function () {
         quickClockFeedbackEl.classList.remove('is-success', 'is-error', 'is-neutral');
         quickClockStateEl.classList.remove('hidden');
         quickClockLoadingEl.classList.add('hidden');
-        quickClockKeypadEl.style.opacity = '1';
-        quickClockKeypadEl.style.pointerEvents = 'auto';
+        if (quickClockPad) quickClockPad.setBusy(false);
         clockBusy = false;
     }
 
@@ -907,30 +813,8 @@ var Direct = (function () {
         }
     }
 
-    function isEditableTarget(target) {
-        var element = target && target.nodeType === 1 ? target : null;
-        if (!element) return false;
-
-        var tagName = String(element.tagName || '').toLowerCase();
-        if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
-            return true;
-        }
-
-        return !!element.isContentEditable;
-    }
-
     function isScheduleDialogCapturingPin() {
         return !!(dialogEl && dialogEl.open && scheduleDialogState && scheduleDialogState.requiresPin);
-    }
-
-    function summaryDay(summary) {
-        return String(summary || '').split(' - ')[0] || '';
-    }
-
-    function summaryTime(summary) {
-        var parts = String(summary || '').split(' - ');
-        if (parts.length < 3) return '';
-        return parts[1] + ' - ' + parts[2];
     }
 
     function stripSeconds(time) {
