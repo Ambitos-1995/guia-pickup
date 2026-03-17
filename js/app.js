@@ -104,6 +104,13 @@ var App = (function () {
     }
 
     function navigate(screenId) {
+        if (requiresAuthenticatedAccess(screenId) && !hasAuthenticatedAccess()) {
+            if (currentScreen !== 'screen-menu') {
+                confirm('Acceso restringido', 'Inicia sesion para acceder a esta pantalla.', null);
+            }
+            screenId = 'screen-menu';
+        }
+
         var isBack = (screenId === 'screen-menu');
         var leavingEl = currentScreen ? document.getElementById(currentScreen) : null;
 
@@ -206,6 +213,8 @@ var App = (function () {
         var activeSession = getSession();
         var greetingEl = document.getElementById('greeting');
         var statusEl = document.getElementById('fichar-status');
+        var scheduleCard = document.getElementById('card-schedule');
+        var guiaCard = document.getElementById('card-guia');
         var ficharCard = document.getElementById('card-fichar');
         var paymentCard = document.getElementById('card-payment');
         var adminCard = document.getElementById('card-admin');
@@ -214,6 +223,10 @@ var App = (function () {
         var adminBuildVersion = document.getElementById('admin-build-version');
         var loginBtn = document.getElementById('menu-login-btn');
         var logoutBtn = document.getElementById('logout-btn');
+        var canAccessPersonalScreens = !!activeSession;
+
+        setMenuCardLocked(scheduleCard, !canAccessPersonalScreens);
+        setMenuCardLocked(guiaCard, !canAccessPersonalScreens);
 
         if (activeSession && activeSession.role === 'respondent') {
             greetingEl.textContent = activeSession.employeeName || 'Sesion activa';
@@ -386,6 +399,21 @@ var App = (function () {
         return !!(activeSession && activeSession.role === 'respondent');
     }
 
+    function hasAuthenticatedAccess() {
+        return !!getSession();
+    }
+
+    function requiresAuthenticatedAccess(screenId) {
+        return screenId === 'screen-schedule' || screenId === 'screen-guia';
+    }
+
+    function setMenuCardLocked(card, locked) {
+        if (!card) return;
+        card.disabled = !!locked;
+        card.setAttribute('aria-disabled', locked ? 'true' : 'false');
+        card.classList.toggle('is-locked', !!locked);
+    }
+
     function restoreSession() {
         var stored = readStoredSession();
         if (!stored) return;
@@ -497,6 +525,7 @@ var App = (function () {
         logout: logout,
         hasAdminAccess: hasAdminAccess,
         hasEmployeeAccess: hasEmployeeAccess,
+        hasAuthenticatedAccess: hasAuthenticatedAccess,
         handleAuthFailure: handleAuthFailure,
         confirm: confirm,
         showMenu: showMenu,

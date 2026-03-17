@@ -16,6 +16,14 @@ function buildState(overrides = {}) {
         attendance_enabled: true,
         role: 'admin',
         created_at: '2026-03-16T10:05:00.000Z'
+      },
+      {
+        id: 'emp-4',
+        nombre: 'Nora',
+        apellido: 'Diaz',
+        attendance_enabled: true,
+        role: 'employee',
+        created_at: '2026-03-16T10:10:00.000Z'
       }
     ],
     paymentSummary: {
@@ -127,6 +135,21 @@ async function setupMockApi(page, overrides = {}) {
           });
         }
 
+        if (body.pin === '5555') {
+          return fulfillJson(route, {
+            success: true,
+            data: {
+              accessToken: 'employee-token-4',
+              expiresAt: '2099-12-31T23:59:59.000Z',
+              role: 'respondent',
+              employeeId: 'emp-4',
+              employeeName: 'Nora Diaz',
+              organizationId: 'org-1',
+              currentStatus: 'not_checked_in'
+            }
+          });
+        }
+
         return fulfillJson(route, { success: false, message: 'PIN incorrecto' }, 401);
       }
 
@@ -227,6 +250,20 @@ async function setupMockApi(page, overrides = {}) {
 
     if (url.pathname.endsWith('/kiosk-clock')) {
       state.clockActionCalls.push({ action: body.action, auth: request.headers()['authorization'] || '' });
+      if ((request.headers()['authorization'] || '').includes('employee-token-4')) {
+        return fulfillJson(route, {
+          success: false,
+          message: 'Ahora no tienes turno. Tu proximo horario es jueves 19 de marzo de 17:00 a 18:00.',
+          data: {
+            reason: 'outside_schedule',
+            nextSlotStart: '17:00',
+            nextSlotEnd: '18:00',
+            nextSlotDate: '2026-03-19',
+            nextSlotLabel: 'jueves 19 de marzo de 17:00 a 18:00'
+          }
+        }, 403);
+      }
+
       if (body.action === 'check-out') {
         return fulfillJson(route, {
           success: true,

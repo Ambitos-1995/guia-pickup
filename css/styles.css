@@ -495,7 +495,7 @@ button:focus-visible {
     font-size: 0.82rem;
     font-weight: 800;
     letter-spacing: 0.01em;
-    box-shadow: 0 10px 20px rgba(17, 24, 39, 0.16);
+    box-shadow: none;
     transition: all var(--transition);
 }
 
@@ -563,6 +563,29 @@ button:focus-visible {
 }
 .menu-card:active::before { opacity: 1; }
 .menu-card:active { transform: scale(0.94) translateY(1px); transition: transform 0.1s cubic-bezier(0.22, 1, 0.36, 1); }
+
+.menu-card.is-locked,
+.menu-card[aria-disabled="true"] {
+    opacity: 0.52;
+    cursor: default;
+    box-shadow: none;
+}
+
+.menu-card.is-locked::before,
+.menu-card[aria-disabled="true"]::before {
+    opacity: 0;
+}
+
+.menu-card.is-locked:hover,
+.menu-card[aria-disabled="true"]:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.menu-card.is-locked:active,
+.menu-card[aria-disabled="true"]:active {
+    transform: none;
+}
 
 .card-icon {
     display: flex;
@@ -2600,10 +2623,26 @@ body {
         gap: 12px;
     }
     .menu-header {
+        flex-wrap: wrap;
+        justify-content: center;
         gap: 10px;
     }
     .greeting {
         font-size: 1.42rem;
+        flex-basis: 100%;
+        text-align: center;
+    }
+    .menu-direct-shortcut {
+        order: 2;
+        min-width: 108px;
+        margin-inline: auto;
+        border-radius: 16px;
+        padding: 0 18px;
+    }
+    .menu-admin-shortcut,
+    .menu-login-btn,
+    .menu-clock {
+        order: 3;
     }
     .menu-login-btn {
         padding: 9px 12px;
@@ -2652,7 +2691,8 @@ body {
     }
     .schedule-grid {
         grid-template-columns: 38px repeat(5, minmax(0, 1fr));
-        gap: 4px;
+        gap: 5px;
+        padding-top: 2px;
     }
     .sched-header,
     .sched-time {

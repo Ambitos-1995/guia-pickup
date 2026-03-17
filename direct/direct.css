@@ -220,6 +220,7 @@
 .direct-schedule-board .schedule-grid {
     height: 100%;
     min-height: 0;
+    padding-top: 2px;
 }
 
 .direct-schedule-board .sched-header,
@@ -518,6 +519,7 @@
     .direct-schedule-board .schedule-grid {
         height: 100%;
         min-height: 0;
+        row-gap: 5px;
     }
 
     .direct-clock-shell {
@@ -526,8 +528,8 @@
     }
 
     .direct-clock-state {
-        justify-content: flex-start;
-        gap: 18px;
+        justify-content: center;
+        gap: 14px;
     }
 
     .direct-clock-intro {
@@ -536,7 +538,7 @@
     }
 
     .direct-clock-actions {
-        margin-top: auto;
+        margin-top: 4px;
         gap: 12px;
     }
 

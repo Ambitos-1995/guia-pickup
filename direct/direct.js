@@ -570,7 +570,9 @@ var Direct = (function () {
             if (verifyRes.data.currentStatus === 'checked_in') {
                 return Api.checkOut({ accessToken: verifyRes.data.accessToken }).then(function (clockRes) {
                     if (!clockRes || !clockRes.success) {
-                        throw createActionError((clockRes && clockRes.message) || 'No se pudo registrar la salida.');
+                        throw createActionError((clockRes && clockRes.message) || 'No se pudo registrar la salida.', {
+                            employeeName: verifyRes.data.employeeName || 'Empleado'
+                        });
                     }
                     showQuickClockResult('success', 'SALIDA', (clockRes.data && clockRes.data.employeeName) || verifyRes.data.employeeName || 'Empleado', (clockRes && clockRes.message) || 'Salida registrada.');
                     return null;
@@ -579,7 +581,9 @@ var Direct = (function () {
 
             return Api.checkIn({ accessToken: verifyRes.data.accessToken }).then(function (clockRes) {
                 if (!clockRes || !clockRes.success) {
-                    throw createActionError((clockRes && clockRes.message) || 'No se pudo registrar la entrada.');
+                    throw createActionError((clockRes && clockRes.message) || 'No se pudo registrar la entrada.', {
+                        employeeName: verifyRes.data.employeeName || 'Empleado'
+                    });
                 }
                 showQuickClockResult('success', 'ENTRADA', (clockRes.data && clockRes.data.employeeName) || verifyRes.data.employeeName || 'Empleado', (clockRes && clockRes.message) || 'Entrada registrada.');
                 return null;
@@ -589,7 +593,7 @@ var Direct = (function () {
                 showQuickClockError(error.message);
                 return;
             }
-            showQuickClockResult('error', 'Aviso', '', error && error.message ? error.message : 'No se pudo completar el fichaje.');
+            showQuickClockResult('error', 'Aviso', error && error.employeeName ? error.employeeName : '', error && error.message ? error.message : 'No se pudo completar el fichaje.');
         }).then(function () {
             clockBusy = false;
             quickClockLoadingEl.classList.add('hidden');
@@ -852,9 +856,12 @@ var Direct = (function () {
             .replace(/'/g, '&#39;');
     }
 
-    function createActionError(message) {
+    function createActionError(message, details) {
         var error = new Error(message || 'Error');
         error.isActionError = true;
+        if (details && details.employeeName) {
+            error.employeeName = details.employeeName;
+        }
         return error;
     }
 

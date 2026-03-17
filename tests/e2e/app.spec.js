@@ -25,6 +25,23 @@ test('public shell loads with updated branding and menu actions', async ({ page 
   await expect(page.locator('#menu-login-btn')).toBeVisible();
 });
 
+test('public shell keeps mi horario and guia pickup locked until login', async ({ page }) => {
+  await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+
+  await expect(page.locator('#card-schedule')).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.locator('#card-guia')).toHaveAttribute('aria-disabled', 'true');
+
+  await page.locator('#card-schedule').click({ force: true });
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#screen-schedule.active')).toHaveCount(0);
+
+  await page.locator('#card-guia').click({ force: true });
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#screen-guia.active')).toHaveCount(0);
+});
+
 test('employee login unlocks personal actions and payment summary', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
@@ -38,6 +55,8 @@ test('employee login unlocks personal actions and payment summary', async ({ pag
   await expect(page.locator('#screen-menu.active')).toBeVisible();
   await expect(page.locator('#greeting')).toHaveText('Ismael Pérez');
   await expect(page.locator('#card-payment')).toBeVisible();
+  await expect(page.locator('#card-schedule')).toHaveAttribute('aria-disabled', 'false');
+  await expect(page.locator('#card-guia')).toHaveAttribute('aria-disabled', 'false');
   await expect(page.locator('#menu-admin-shortcut')).toBeHidden();
   await expect(page.locator('#admin-build-version')).toBeHidden();
 
@@ -225,6 +244,22 @@ test('direct route performs quick clocking without persisting session', async ({
   await expect.poll(() => state.clockActionCalls[0].action).toBe('check-in');
   await expect.poll(() => state.clockActionCalls[0].auth).toContain('Bearer employee-token-2');
   await expect(page.locator('#menu-login-btn')).toHaveCount(0);
+});
+
+test('direct route shows the next assigned schedule when check-in is outside any shift', async ({ page }) => {
+  await setupMockApi(page);
+  await page.goto('/direct/');
+
+  const clockPanel = page.locator('.direct-panel[data-panel-id="clock"]');
+  if (!(await clockPanel.evaluate((node) => window.getComputedStyle(node).display !== 'none'))) {
+    await page.locator('#direct-tab-clock').click();
+  }
+
+  await enterPin(page, '5555');
+
+  await expect(page.locator('#direct-clock-feedback')).toContainText('Nora Diaz');
+  await expect(page.locator('#direct-clock-feedback')).toContainText('jueves 19 de marzo');
+  await expect(page.locator('#direct-clock-feedback')).toContainText('17:00 a 18:00');
 });
 
 test('direct route uses panel switcher on mobile without overlapping panels', async ({ page, isMobile }) => {

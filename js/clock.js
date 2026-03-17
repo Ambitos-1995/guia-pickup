@@ -131,7 +131,7 @@ var Clock = (function () {
             }
 
             if (res && res.data && res.data.reason === 'outside_schedule') {
-                showFeedback('error', 'No es tu hora. Tu turno es de ' + res.data.slotStart + ' a ' + res.data.slotEnd, false);
+                showFeedback('error', buildClockScheduleMessage(res), false);
             } else {
                 showFeedback('error', (res && res.message) || 'Error al fichar', res && res.message === 'No tienes turno asignado hoy');
             }
@@ -169,6 +169,22 @@ var Clock = (function () {
         btnOut.classList.add('hidden');
         if (showScheduleBtn) feedbackScheduleBtn.classList.remove('hidden');
         else feedbackScheduleBtn.classList.add('hidden');
+    }
+
+    function buildClockScheduleMessage(res) {
+        if (res && typeof res.message === 'string' && res.message) {
+            return res.message;
+        }
+
+        if (res && res.data && res.data.nextSlotLabel) {
+            return 'Ahora no tienes turno. Tu proximo horario es ' + res.data.nextSlotLabel + '.';
+        }
+
+        if (res && res.data && res.data.slotStart && res.data.slotEnd) {
+            return 'No es tu hora. Tu turno es de ' + res.data.slotStart + ' a ' + res.data.slotEnd;
+        }
+
+        return 'Error al fichar';
     }
 
     return { init: init, show: show, hide: hide };
