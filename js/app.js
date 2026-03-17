@@ -10,11 +10,12 @@ var App = (function () {
     var ADMIN_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 
     var session = null;
-    var currentScreen = 'screen-menu';
+    var currentScreen = 'screen-pin';
     var menuClockTimer = null;
     var modalCallback = null;
     var viewportRaf = 0;
     var launchScreen = '';
+    var launchReturnPath = '';
 
     function init() {
         bindViewportState();
@@ -60,7 +61,9 @@ var App = (function () {
         });
 
         Utils.bindPress(document.getElementById('pin-public-schedule'), function () {
-            navigate('screen-menu');
+            if (window.Pin && typeof window.Pin.goBack === 'function') {
+                Pin.goBack();
+            }
         });
 
         Utils.each(document.querySelectorAll('.back-btn[data-back]'), function (btn) {
@@ -82,7 +85,7 @@ var App = (function () {
             window.location.assign('/direct/');
         });
         Utils.bindPress(document.getElementById('menu-login-btn'), function () {
-            Pin.openForLogin('screen-menu');
+            Pin.openForLogin('screen-clock', 'screen-menu');
             navigate('screen-pin');
         });
 
@@ -104,11 +107,15 @@ var App = (function () {
     }
 
     function navigate(screenId) {
-        if (requiresAuthenticatedAccess(screenId) && !hasAuthenticatedAccess()) {
-            if (currentScreen !== 'screen-menu') {
-                confirm('Acceso restringido', 'Inicia sesion para acceder a esta pantalla.', null);
+        if (!canAccessScreen(screenId)) {
+            if (!hasAuthenticatedAccess()) {
+                if (screenId !== 'screen-menu' && screenId !== 'screen-pin') {
+                    Pin.openForLogin('screen-clock', 'screen-menu');
+                }
+                screenId = 'screen-pin';
+            } else {
+                screenId = 'screen-menu';
             }
-            screenId = 'screen-menu';
         }
 
         var isBack = (screenId === 'screen-menu');
@@ -169,8 +176,9 @@ var App = (function () {
 
         if (isSessionExpired(session)) {
             clearSession();
-            if (currentScreen !== 'screen-menu' && currentScreen !== 'screen-pin') {
-                navigate('screen-menu');
+            if (currentScreen !== 'screen-pin') {
+                Pin.openForLogin('screen-clock', 'screen-menu');
+                navigate('screen-pin');
             }
             return null;
         }
@@ -198,12 +206,14 @@ var App = (function () {
 
     function logout() {
         clearSession();
-        navigate('screen-menu');
+        Pin.openForLogin('screen-clock', 'screen-menu');
+        navigate('screen-pin');
     }
 
     function handleAuthFailure(message) {
         clearSession();
-        navigate('screen-menu');
+        Pin.openForLogin('screen-clock', 'screen-menu');
+        navigate('screen-pin');
         if (message) {
             confirm('Sesion caducada', message, null);
         }
@@ -225,8 +235,8 @@ var App = (function () {
         var logoutBtn = document.getElementById('logout-btn');
         var canAccessPersonalScreens = !!activeSession;
 
-        setMenuCardLocked(scheduleCard, !canAccessPersonalScreens);
-        setMenuCardLocked(guiaCard, !canAccessPersonalScreens);
+        setMenuCardLocked(scheduleCard, false);
+        setMenuCardLocked(guiaCard, false);
 
         if (activeSession && activeSession.role === 'respondent') {
             greetingEl.textContent = activeSession.employeeName || 'Sesion activa';
@@ -236,6 +246,8 @@ var App = (function () {
                 ? 'Turno completado'
                 : '';
             ficharCard.classList.remove('hidden');
+            scheduleCard.classList.remove('hidden');
+            guiaCard.classList.remove('hidden');
             paymentCard.classList.remove('hidden');
             adminCard.classList.add('hidden');
             adminShortcut.classList.add('hidden');
@@ -246,7 +258,9 @@ var App = (function () {
         } else if (activeSession && activeSession.role === 'org_admin') {
             greetingEl.textContent = 'Administrador';
             statusEl.textContent = '';
-            ficharCard.classList.remove('hidden');
+            ficharCard.classList.add('hidden');
+            scheduleCard.classList.add('hidden');
+            guiaCard.classList.add('hidden');
             paymentCard.classList.add('hidden');
             adminCard.classList.remove('hidden');
             adminShortcut.classList.remove('hidden');
@@ -258,14 +272,18 @@ var App = (function () {
                 adminBuildVersion.classList.remove('hidden');
             }
         } else {
-            greetingEl.textContent = 'Panel publico';
+            greetingEl.textContent = 'Acceso interno';
             statusEl.textContent = '';
-            ficharCard.classList.remove('hidden');
+            setMenuCardLocked(scheduleCard, !canAccessPersonalScreens);
+            setMenuCardLocked(guiaCard, !canAccessPersonalScreens);
+            ficharCard.classList.add('hidden');
+            scheduleCard.classList.add('hidden');
+            guiaCard.classList.add('hidden');
             paymentCard.classList.add('hidden');
-            adminCard.classList.remove('hidden');
+            adminCard.classList.add('hidden');
             adminShortcut.classList.add('hidden');
             directShortcut.classList.add('hidden');
-            loginBtn.classList.remove('hidden');
+            loginBtn.classList.add('hidden');
             logoutBtn.classList.add('hidden');
             if (adminBuildVersion) adminBuildVersion.classList.add('hidden');
         }
@@ -339,7 +357,8 @@ var App = (function () {
             if (hasAdminAccess()) {
                 return 'screen-admin';
             }
-            Pin.openForAdmin('screen-admin');
+            Pin.openForAdmin('screen-admin', launchReturnPath);
+            launchReturnPath = '';
             return 'screen-pin';
         }
 
@@ -348,12 +367,22 @@ var App = (function () {
             if (hasAdminAccess()) {
                 return 'screen-menu';
             }
-            Pin.openForAdmin('screen-menu');
+            Pin.openForAdmin('screen-menu', launchReturnPath);
+            launchReturnPath = '';
             return 'screen-pin';
         }
 
+        launchReturnPath = '';
+        if (hasAdminAccess()) {
+            return 'screen-menu';
+        }
+        if (hasEmployeeAccess()) {
+            return 'screen-clock';
+        }
+
+        Pin.openForLogin('screen-clock', 'screen-menu');
         launchScreen = '';
-        return 'screen-menu';
+        return 'screen-pin';
     }
 
     function consumeLaunchScreen() {
@@ -361,9 +390,11 @@ var App = (function () {
 
         var url = new URL(window.location.href);
         var screen = String(url.searchParams.get('screen') || '').trim();
+        launchReturnPath = String(url.searchParams.get('return') || '').trim();
         if (!screen) return '';
 
         url.searchParams.delete('screen');
+        url.searchParams.delete('return');
         if (window.history && window.history.replaceState) {
             window.history.replaceState({}, '', url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '') + url.hash);
         }
@@ -403,8 +434,13 @@ var App = (function () {
         return !!getSession();
     }
 
-    function requiresAuthenticatedAccess(screenId) {
-        return screenId === 'screen-schedule' || screenId === 'screen-guia';
+    function canAccessScreen(screenId) {
+        if (screenId === 'screen-pin') return true;
+        if (screenId === 'screen-menu') return hasAuthenticatedAccess();
+        if (screenId === 'screen-schedule' || screenId === 'screen-guia') return hasAuthenticatedAccess();
+        if (screenId === 'screen-clock' || screenId === 'screen-payment') return hasEmployeeAccess();
+        if (screenId === 'screen-admin') return hasAdminAccess();
+        return true;
     }
 
     function setMenuCardLocked(card, locked) {

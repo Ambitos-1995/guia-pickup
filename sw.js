@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pickup-tmg-v64';
+var CACHE_NAME = 'pickup-tmg-v65';
 var FILES_TO_CACHE = [
     './index.html',
     './manifest.json',
@@ -21,7 +21,6 @@ var FILES_TO_CACHE = [
     './icons/icon.svg',
     './fonts/Lexend-Variable.ttf',
     './direct/index.html',
-    './direct/manifest.json',
     './direct/direct.css',
     './direct/direct.js',
     './css/styles.css',
@@ -61,7 +60,6 @@ function isAppShellRequest(requestUrl) {
         pathname === '/direct/' ||
         pathname === '/direct/index.html' ||
         pathname === '/manifest.json' ||
-        pathname === '/direct/manifest.json' ||
         pathname.indexOf('/css/') === 0 ||
         pathname.indexOf('/js/') === 0 ||
         pathname.indexOf('/direct/') === 0;

@@ -11,10 +11,12 @@ var Pin = (function () {
     var mode = 'admin';
     var adminTarget = 'screen-menu';
     var employeeTarget = 'screen-clock';
+    var loginAdminTarget = 'screen-menu';
+    var backTarget = '';
     var toastTimer = null;
     var loginTimer = null;
 
-    var dots, toastEl, loadingEl, keypad, promptEl;
+    var dots, toastEl, loadingEl, keypad, promptEl, backBtnEl;
 
     function init() {
         dots = document.querySelectorAll('.pin-dot');
@@ -22,6 +24,7 @@ var Pin = (function () {
         loadingEl = document.getElementById('pin-loading');
         keypad = document.getElementById('pin-keypad');
         promptEl = document.getElementById('pin-prompt');
+        backBtnEl = document.getElementById('pin-public-schedule');
 
         Utils.delegatePress(keypad, '.key-btn', function (e, btn) {
             if (isVerifying) return;
@@ -149,7 +152,13 @@ var Pin = (function () {
             });
 
             clearPin();
-            if (mode === 'login') App.navigate(employeeTarget || 'screen-menu');
+            if (mode === 'login') {
+                if ((res.data.role || 'respondent') === 'org_admin') {
+                    App.navigate(loginAdminTarget || 'screen-menu');
+                } else {
+                    App.navigate(employeeTarget || 'screen-clock');
+                }
+            }
             else if (mode === 'admin') App.navigate(adminTarget || 'screen-menu');
             else App.navigate(employeeTarget || 'screen-clock');
         });
@@ -163,28 +172,45 @@ var Pin = (function () {
         if (dateEl) dateEl.textContent = Utils.formatDateLong(now);
     }
 
-    function openForAdmin(targetScreen) {
+    function openForAdmin(targetScreen, returnTarget) {
         mode = 'admin';
         adminTarget = targetScreen || 'screen-menu';
+        backTarget = returnTarget || '';
         setDotCount(6);
         clearPin();
+        syncBackButton();
         if (promptEl) promptEl.textContent = 'Introduce el PIN de ajustes';
     }
 
     function openForEmployee(targetScreen) {
         mode = 'employee';
         employeeTarget = targetScreen || 'screen-clock';
+        backTarget = '';
         setDotCount(4);
         clearPin();
+        syncBackButton();
         if (promptEl) promptEl.textContent = 'Introduce tu PIN de empleado';
     }
 
-    function openForLogin(targetScreen) {
+    function openForLogin(targetScreen, adminScreen, returnTarget) {
         mode = 'login';
-        employeeTarget = targetScreen || 'screen-menu';
+        employeeTarget = targetScreen || 'screen-clock';
+        loginAdminTarget = adminScreen || 'screen-menu';
+        backTarget = returnTarget || '';
         setDotCount(6);
         clearPin();
-        if (promptEl) promptEl.textContent = 'Introduce tu PIN (4 o 6 digitos)';
+        syncBackButton();
+        if (promptEl) promptEl.textContent = 'Introduce tu PIN';
+    }
+
+    function syncBackButton() {
+        if (!backBtnEl) return;
+        backBtnEl.classList.toggle('hidden', !backTarget);
+    }
+
+    function goBack() {
+        if (!backTarget) return;
+        window.location.assign(backTarget);
     }
 
     return {
@@ -192,6 +218,7 @@ var Pin = (function () {
         clearPin: clearPin,
         openForAdmin: openForAdmin,
         openForEmployee: openForEmployee,
-        openForLogin: openForLogin
+        openForLogin: openForLogin,
+        goBack: goBack
     };
 })();

@@ -39,9 +39,9 @@
         <!-- ============================================ -->
         <!-- SCREEN: PIN ENTRY                            -->
         <!-- ============================================ -->
-        <div id="screen-pin" class="screen">
+        <div id="screen-pin" class="screen active">
             <div class="pin-container">
-                <button class="pin-back-btn" id="pin-public-schedule" type="button" aria-label="Volver al inicio">
+                <button class="pin-back-btn hidden" id="pin-public-schedule" type="button" aria-label="Volver">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
                 </button>
 
@@ -51,7 +51,7 @@
                     <div class="pin-date" id="pin-date"></div>
                 </div>
 
-                <p class="pin-prompt" id="pin-prompt">Introduce el PIN de ajustes</p>
+                <p class="pin-prompt" id="pin-prompt">Introduce tu PIN</p>
 
                 <div class="pin-dots" id="pin-dots" aria-label="PIN introducido">
                     <span class="pin-dot" data-index="0"></span>
@@ -89,17 +89,17 @@
         <!-- ============================================ -->
         <!-- SCREEN: MAIN MENU                            -->
         <!-- ============================================ -->
-        <div id="screen-menu" class="screen active">
+        <div id="screen-menu" class="screen">
             <div class="menu-container">
                 <header class="menu-header">
-                    <h1 class="greeting" id="greeting">Panel publico</h1>
+                    <h1 class="greeting" id="greeting">Acceso interno</h1>
                     <button class="menu-direct-shortcut hidden" id="menu-direct-shortcut" type="button" aria-label="Abrir modo directo">
                         Directo
                     </button>
                     <button class="menu-admin-shortcut hidden" id="menu-admin-shortcut" type="button" aria-label="Configuración">
                         Configuración
                     </button>
-                    <button class="menu-login-btn" id="menu-login-btn" type="button" aria-label="Iniciar sesion con PIN">Iniciar sesion</button>
+                    <button class="menu-login-btn hidden" id="menu-login-btn" type="button" aria-label="Iniciar sesion con PIN">Iniciar sesion</button>
                     <div class="menu-clock" id="menu-clock">--:--</div>
                 </header>
 

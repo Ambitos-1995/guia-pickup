@@ -13,107 +13,114 @@ async function enterPin(page, pin) {
   }
 }
 
-test('public shell loads with updated branding and menu actions', async ({ page }) => {
+test('app boots into the internal PIN screen', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
-  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
 
   await expect(page).toHaveTitle('Punto de encuentro inclusivo');
-  await expect(page.locator('#screen-menu')).toContainText('Guia Pickup');
+  await expect(page.locator('#pin-prompt')).toHaveText('Introduce tu PIN');
   await expect(page.locator('body')).not.toContainText('Pickup TMG');
-  await expect(page.locator('#card-admin')).toBeVisible();
-  await expect(page.locator('#menu-login-btn')).toBeVisible();
+  await expect(page.locator('#pin-public-schedule')).toBeHidden();
 });
 
-test('public shell keeps mi horario and guia pickup locked until login', async ({ page }) => {
+test('anonymous users cannot reach authenticated screens', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
-  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
 
-  await expect(page.locator('#card-schedule')).toHaveAttribute('aria-disabled', 'true');
-  await expect(page.locator('#card-guia')).toHaveAttribute('aria-disabled', 'true');
-
-  await page.locator('#card-schedule').click({ force: true });
-  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.evaluate(() => window.App.navigate('screen-schedule'));
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
   await expect(page.locator('#screen-schedule.active')).toHaveCount(0);
 
-  await page.locator('#card-guia').click({ force: true });
-  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.evaluate(() => window.App.navigate('screen-guia'));
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
   await expect(page.locator('#screen-guia.active')).toHaveCount(0);
+
+  await page.evaluate(() => window.App.navigate('screen-admin'));
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+  await expect(page.locator('#screen-admin.active')).toHaveCount(0);
 });
 
-test('employee login unlocks personal actions and payment summary', async ({ page }) => {
+test('employee login opens clock first and unlocks personal menu actions', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
-  await expect(page.locator('#screen-menu.active')).toBeVisible();
-
-  await page.getByRole('button', { name: 'Iniciar sesion' }).click();
   await expect(page.locator('#screen-pin.active')).toBeVisible();
 
   await enterPin(page, '1234');
 
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
+  await page.locator('#screen-clock.active .back-btn').click();
+
   await expect(page.locator('#screen-menu.active')).toBeVisible();
   await expect(page.locator('#greeting')).toHaveText('Ismael Pérez');
+  await expect(page.locator('#card-fichar')).toBeVisible();
+  await expect(page.locator('#card-schedule')).toBeVisible();
+  await expect(page.locator('#card-guia')).toBeVisible();
   await expect(page.locator('#card-payment')).toBeVisible();
-  await expect(page.locator('#card-schedule')).toHaveAttribute('aria-disabled', 'false');
-  await expect(page.locator('#card-guia')).toHaveAttribute('aria-disabled', 'false');
-  await expect(page.locator('#menu-admin-shortcut')).toBeHidden();
-  await expect(page.locator('#admin-build-version')).toBeHidden();
-
-  await page.getByRole('button', { name: 'Mi Pago' }).click();
-  await expect(page.locator('#screen-payment.active')).toBeVisible();
-  await expect(page.locator('#pay-hours')).toContainText('24');
-  await expect(page.locator('#payment-status')).toContainText('Liquidacion calculada');
+  await expect(page.locator('#card-admin')).toBeHidden();
+  await expect(page.locator('#menu-direct-shortcut')).toBeHidden();
+  await expect(page.locator('#logout-btn')).toBeVisible();
 });
 
 test('employee session persists after reload while still valid', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
-  await expect(page.locator('#screen-menu.active')).toBeVisible();
-
-  await page.getByRole('button', { name: 'Iniciar sesion' }).click();
   await expect(page.locator('#screen-pin.active')).toBeVisible();
-  await enterPin(page, '1234');
 
-  await expect(page.locator('#greeting')).toContainText('Ismael');
-  await expect(page.locator('#card-payment')).toBeVisible();
+  await enterPin(page, '1234');
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
 
   await page.reload();
 
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
+  await page.locator('#screen-clock.active .back-btn').click();
   await expect(page.locator('#screen-menu.active')).toBeVisible();
   await expect(page.locator('#greeting')).toContainText('Ismael');
   await expect(page.locator('#card-payment')).toBeVisible();
-  await expect(page.locator('#menu-admin-shortcut')).toBeHidden();
   await expect(page.locator('#menu-login-btn')).toBeHidden();
 });
 
-test('admin can sign in from iniciar sesion with a 6-digit PIN', async ({ page }) => {
+test('logout returns to the PIN-first home', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
+  await enterPin(page, '1234');
+
+  await page.locator('#screen-clock.active .back-btn').click();
   await expect(page.locator('#screen-menu.active')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Iniciar sesion' }).click();
+  await page.locator('#logout-btn').click();
   await expect(page.locator('#screen-pin.active')).toBeVisible();
-  await expect(page.locator('#pin-prompt')).toHaveText('Introduce tu PIN (4 o 6 digitos)');
+  await expect(page.locator('#pin-prompt')).toHaveText('Introduce tu PIN');
+});
+
+test('admin can sign in from the PIN-first entry flow', async ({ page }) => {
+  await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+  await expect(page.locator('#pin-prompt')).toHaveText('Introduce tu PIN');
 
   await enterPin(page, '123456');
 
   await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#greeting')).toHaveText('Administrador');
+  await expect(page.locator('#card-fichar')).toBeHidden();
+  await expect(page.locator('#card-schedule')).toBeHidden();
+  await expect(page.locator('#card-guia')).toBeHidden();
+  await expect(page.locator('#card-payment')).toBeHidden();
+  await expect(page.locator('#card-admin')).toBeVisible();
   await expect(page.locator('#menu-admin-shortcut')).toBeVisible();
   await expect(page.locator('#menu-direct-shortcut')).toBeVisible();
-  await expect(page.locator('#menu-login-btn')).toBeHidden();
   await expect(page.locator('#logout-btn')).toBeVisible();
 });
 
 test('admin can load payments and save a configured amount', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
-  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Ajustes' }).click();
   await enterPin(page, '123456');
   await expect(page.locator('#screen-menu.active')).toBeVisible();
-  await expect(page.locator('#menu-admin-shortcut')).toBeVisible();
 
   await page.getByRole('button', { name: 'Ajustes' }).click();
   await expect(page.locator('#screen-admin.active')).toBeVisible();
@@ -131,10 +138,10 @@ test('admin can load payments and save a configured amount', async ({ page }) =>
 test('admin can create a new employee from ajustes empleados', async ({ page }) => {
   const state = await setupMockApi(page);
   await page.goto('/');
-  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Ajustes' }).click();
   await enterPin(page, '123456');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
   await page.getByRole('button', { name: 'Ajustes' }).click();
 
   await page.locator('.admin-tab', { hasText: 'Empleados' }).click();
@@ -156,12 +163,12 @@ test('admin can create a new employee from ajustes empleados', async ({ page }) 
 test('schedule create dialog is simplified for employee reservations', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
-  await expect(page.locator('#screen-menu.active')).toBeVisible();
-
-  await page.getByRole('button', { name: 'Iniciar sesion' }).click();
   await expect(page.locator('#screen-pin.active')).toBeVisible();
   await enterPin(page, '1234');
 
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
+  await page.locator('#screen-clock.active .back-btn').click();
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
   await page.getByRole('button', { name: 'Mi Horario' }).click();
   await expect(page.locator('#screen-schedule.active')).toBeVisible();
 
@@ -283,7 +290,6 @@ test('admin can move between direct mode and admin panel with dedicated buttons'
   await setupMockApi(page);
   await page.goto('/');
 
-  await page.getByRole('button', { name: 'Iniciar sesion' }).click();
   await expect(page.locator('#screen-pin.active')).toBeVisible();
   await enterPin(page, '123456');
 
