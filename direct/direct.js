@@ -6,6 +6,7 @@ var Direct = (function () {
 
     var DEFAULT_HOURS = [15, 16, 17, 18, 19, 20];
     var CACHE_TTL = 60000;
+    var PERSISTED_SCHEDULE_KEY = 'pickup-direct-schedule-cache-v1';
     var CLOCK_RESET_MS = 3600;
     var CLOCK_ERROR_RESET_MS = 1800;
     var STATUS_RESET_MS = 3200;
@@ -24,6 +25,7 @@ var Direct = (function () {
     var clockBusy = false;
     var clockResetTimer = 0;
     var clockErrorTimer = 0;
+    var lastRenderedHourCount = DEFAULT_HOURS.length;
 
     var weekPrevEl, weekNextEl, weekLabelEl, weekRangeEl;
     var scheduleGridEl, scheduleStatusEl;
@@ -109,7 +111,10 @@ var Direct = (function () {
         syncResponsivePanels();
         updateClocks();
         setInterval(updateClocks, 1000);
-        window.addEventListener('resize', syncResponsivePanels, { passive: true });
+        window.addEventListener('resize', function () {
+            syncResponsivePanels();
+            queueScheduleGridLayout();
+        }, { passive: true });
         loadWeek();
     }
 
@@ -171,12 +176,13 @@ var Direct = (function () {
 
     function loadWeek() {
         var key = currentYear + '-' + currentWeek;
-        var cached = scheduleCache[key];
+        var cached = scheduleCache[key] || readPersistedWeekCache(key);
 
         weekLabelEl.textContent = 'Semana ' + pad2(currentWeek);
         weekRangeEl.textContent = formatMonthLabel(currentYear, currentWeek);
 
         if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+            scheduleCache[key] = cached;
             slotsData = cached.data;
             renderSchedule();
             fetchWeek(currentYear, currentWeek);
@@ -184,6 +190,7 @@ var Direct = (function () {
         }
 
         if (cached) {
+            scheduleCache[key] = cached;
             slotsData = cached.data;
             renderSchedule();
         } else {
@@ -201,6 +208,7 @@ var Direct = (function () {
                 data: data,
                 timestamp: Date.now()
             };
+            persistWeekCache(key, scheduleCache[key]);
             if (currentYear === year && currentWeek === week) {
                 slotsData = data;
                 renderSchedule();
@@ -221,6 +229,8 @@ var Direct = (function () {
         var hour;
         var slot;
 
+        lastRenderedHourCount = hours.length;
+
         html += '<div class="sched-header sched-corner">Hora</div>';
         for (day = 1; day <= 5; day++) {
             html += renderHeaderCell(weekDates[day - 1], day, todayIso);
@@ -236,6 +246,51 @@ var Direct = (function () {
         }
 
         scheduleGridEl.innerHTML = html;
+        queueScheduleGridLayout();
+    }
+
+    function queueScheduleGridLayout() {
+        if (!scheduleGridEl) return;
+
+        requestAnimationFrame(function () {
+            syncScheduleGridLayout();
+            setTimeout(syncScheduleGridLayout, 60);
+        });
+    }
+
+    function syncScheduleGridLayout() {
+        var board;
+        var boardHeight;
+        var gridStyles;
+        var rowGap;
+        var totalRows;
+        var totalGapHeight;
+        var headerHeight;
+        var availableHeight;
+        var slotHeight;
+
+        if (!scheduleGridEl || !lastRenderedHourCount) return;
+
+        board = scheduleGridEl.parentElement;
+        if (!board) return;
+
+        boardHeight = board.clientHeight;
+        if (!boardHeight || boardHeight < 240) return;
+
+        gridStyles = window.getComputedStyle(scheduleGridEl);
+        rowGap = parseFloat(gridStyles.rowGap || gridStyles.gap || '0') || 0;
+        totalRows = lastRenderedHourCount + 1;
+        totalGapHeight = rowGap * Math.max(0, totalRows - 1);
+        headerHeight = window.innerWidth <= 767 ? 52 : 58;
+        availableHeight = Math.max(0, boardHeight - totalGapHeight);
+        slotHeight = Math.floor((availableHeight - headerHeight) / lastRenderedHourCount);
+
+        if (slotHeight < 60) {
+            slotHeight = 60;
+            headerHeight = Math.max(46, availableHeight - (slotHeight * lastRenderedHourCount));
+        }
+
+        scheduleGridEl.style.gridTemplateRows = headerHeight + 'px repeat(' + lastRenderedHourCount + ', minmax(0, ' + slotHeight + 'px))';
     }
 
     function renderHeaderCell(date, dayOfWeek, todayIso) {
@@ -629,7 +684,48 @@ var Direct = (function () {
     }
 
     function invalidateCurrentWeek() {
-        delete scheduleCache[currentYear + '-' + currentWeek];
+        var key = currentYear + '-' + currentWeek;
+        delete scheduleCache[key];
+        removePersistedWeekCache(key);
+    }
+
+    function readPersistedWeekCache(key) {
+        var cacheStore;
+        try {
+            if (!window.localStorage) return null;
+            cacheStore = JSON.parse(window.localStorage.getItem(PERSISTED_SCHEDULE_KEY) || '{}');
+        } catch (error) {
+            return null;
+        }
+
+        if (!cacheStore || !cacheStore[key] || !Array.isArray(cacheStore[key].data)) {
+            return null;
+        }
+
+        return cacheStore[key];
+    }
+
+    function persistWeekCache(key, value) {
+        var cacheStore = {};
+        try {
+            if (!window.localStorage) return;
+            cacheStore = JSON.parse(window.localStorage.getItem(PERSISTED_SCHEDULE_KEY) || '{}') || {};
+            cacheStore[key] = {
+                data: Array.isArray(value.data) ? value.data : [],
+                timestamp: Number(value.timestamp) || Date.now()
+            };
+            window.localStorage.setItem(PERSISTED_SCHEDULE_KEY, JSON.stringify(cacheStore));
+        } catch (error) {}
+    }
+
+    function removePersistedWeekCache(key) {
+        var cacheStore;
+        try {
+            if (!window.localStorage) return;
+            cacheStore = JSON.parse(window.localStorage.getItem(PERSISTED_SCHEDULE_KEY) || '{}') || {};
+            delete cacheStore[key];
+            window.localStorage.setItem(PERSISTED_SCHEDULE_KEY, JSON.stringify(cacheStore));
+        } catch (error) {}
     }
 
     function normalizeSlots(rawSlots) {
@@ -736,6 +832,7 @@ var Direct = (function () {
             Utils.each(panelSections, function (section) {
                 section.classList.add('is-active');
             });
+            queueScheduleGridLayout();
             return;
         }
 
@@ -743,6 +840,10 @@ var Direct = (function () {
             var isActive = section.getAttribute('data-panel-id') === activePanel;
             section.classList.toggle('is-active', isActive);
         });
+
+        if (activePanel === 'schedule') {
+            queueScheduleGridLayout();
+        }
     }
 
     function isEditableTarget(target) {

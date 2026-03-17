@@ -260,6 +260,7 @@ test('admin can move between direct mode and admin panel with dedicated buttons'
 
   await page.getByRole('link', { name: 'Admin' }).click();
 
-  await expect(page.locator('#screen-admin.active')).toBeVisible();
-  await expect(page.locator('#admin-pay-month-label')).toContainText('2026');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#greeting')).toHaveText('Administrador');
+  await expect(page.locator('#menu-admin-shortcut')).toBeVisible();
 });

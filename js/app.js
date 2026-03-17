@@ -330,6 +330,15 @@ var App = (function () {
             return 'screen-pin';
         }
 
+        if (launchScreen === 'admin-home') {
+            launchScreen = '';
+            if (hasAdminAccess()) {
+                return 'screen-menu';
+            }
+            Pin.openForAdmin('screen-menu');
+            return 'screen-pin';
+        }
+
         launchScreen = '';
         return 'screen-menu';
     }
