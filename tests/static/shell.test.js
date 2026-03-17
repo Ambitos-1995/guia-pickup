@@ -16,12 +16,12 @@ test('shell branding points to Punto de encuentro inclusivo', () => {
   assert.equal(manifest.short_name, 'Punto de encuentro inclusivo');
 });
 
-test('direct shell exposes kiosk branding and landscape manifest', () => {
+test('direct shell exposes kiosk branding without forcing orientation', () => {
   assert.match(directIndexHtml, /<title>Punto directo<\/title>/);
   assert.match(directIndexHtml, /Horario semanal/);
   assert.match(directIndexHtml, /Fichaje rapido/);
   assert.equal(directManifest.name, 'Punto directo');
-  assert.equal(directManifest.orientation, 'landscape');
+  assert.equal('orientation' in directManifest, false);
   assert.equal(directManifest.start_url, '/direct/');
 });
 
