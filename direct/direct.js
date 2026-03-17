@@ -259,38 +259,11 @@ var Direct = (function () {
     }
 
     function syncScheduleGridLayout() {
-        var board;
-        var boardHeight;
-        var gridStyles;
-        var rowGap;
-        var totalRows;
-        var totalGapHeight;
         var headerHeight;
-        var availableHeight;
-        var slotHeight;
 
         if (!scheduleGridEl || !lastRenderedHourCount) return;
-
-        board = scheduleGridEl.parentElement;
-        if (!board) return;
-
-        boardHeight = board.clientHeight;
-        if (!boardHeight || boardHeight < 240) return;
-
-        gridStyles = window.getComputedStyle(scheduleGridEl);
-        rowGap = parseFloat(gridStyles.rowGap || gridStyles.gap || '0') || 0;
-        totalRows = lastRenderedHourCount + 1;
-        totalGapHeight = rowGap * Math.max(0, totalRows - 1);
         headerHeight = window.innerWidth <= 767 ? 52 : 58;
-        availableHeight = Math.max(0, boardHeight - totalGapHeight);
-        slotHeight = Math.floor((availableHeight - headerHeight) / lastRenderedHourCount);
-
-        if (slotHeight < 60) {
-            slotHeight = 60;
-            headerHeight = Math.max(46, availableHeight - (slotHeight * lastRenderedHourCount));
-        }
-
-        scheduleGridEl.style.gridTemplateRows = headerHeight + 'px repeat(' + lastRenderedHourCount + ', minmax(0, ' + slotHeight + 'px))';
+        scheduleGridEl.style.gridTemplateRows = headerHeight + 'px repeat(' + lastRenderedHourCount + ', minmax(0, 1fr))';
     }
 
     function renderHeaderCell(date, dayOfWeek, todayIso) {
