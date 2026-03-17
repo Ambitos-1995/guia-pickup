@@ -27,8 +27,8 @@ var Clock = (function () {
 
     function show() {
         var session = App.getSession();
-        if (!session || session.role !== 'respondent') {
-            Pin.openForEmployee('screen-clock');
+        if (!session) {
+            Pin.openForLogin('screen-menu', 'screen-menu');
             App.navigate('screen-pin');
             return;
         }

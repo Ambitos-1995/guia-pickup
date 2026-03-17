@@ -41,17 +41,17 @@ var App = (function () {
             }
 
             if (card.id === 'card-fichar') {
-                if (hasEmployeeAccess()) {
+                if (hasAuthenticatedAccess()) {
                     navigate('screen-clock');
                 } else {
-                    Pin.openForEmployee('screen-clock');
+                    Pin.openForLogin('screen-menu', 'screen-menu');
                     navigate('screen-pin');
                 }
                 return;
             }
 
-            if (card.id === 'card-payment' && !hasEmployeeAccess()) {
-                Pin.openForEmployee('screen-payment');
+            if (card.id === 'card-payment' && !hasAuthenticatedAccess()) {
+                Pin.openForLogin('screen-menu', 'screen-menu');
                 navigate('screen-pin');
                 return;
             }
@@ -257,11 +257,15 @@ var App = (function () {
             if (adminBuildVersion) adminBuildVersion.classList.add('hidden');
         } else if (activeSession && activeSession.role === 'org_admin') {
             greetingEl.textContent = 'Administrador';
-            statusEl.textContent = '';
-            ficharCard.classList.add('hidden');
-            scheduleCard.classList.add('hidden');
-            guiaCard.classList.add('hidden');
-            paymentCard.classList.add('hidden');
+            statusEl.textContent = activeSession.currentStatus === 'checked_in'
+                ? 'Entrada registrada'
+                : activeSession.currentStatus === 'checked_out'
+                ? 'Turno completado'
+                : '';
+            ficharCard.classList.remove('hidden');
+            scheduleCard.classList.remove('hidden');
+            guiaCard.classList.remove('hidden');
+            paymentCard.classList.remove('hidden');
             adminCard.classList.remove('hidden');
             adminShortcut.classList.remove('hidden');
             directShortcut.classList.remove('hidden');
@@ -438,7 +442,7 @@ var App = (function () {
         if (screenId === 'screen-pin') return true;
         if (screenId === 'screen-menu') return hasAuthenticatedAccess();
         if (screenId === 'screen-schedule' || screenId === 'screen-guia') return hasAuthenticatedAccess();
-        if (screenId === 'screen-clock' || screenId === 'screen-payment') return hasEmployeeAccess();
+        if (screenId === 'screen-clock' || screenId === 'screen-payment') return hasAuthenticatedAccess();
         if (screenId === 'screen-admin') return hasAdminAccess();
         return true;
     }

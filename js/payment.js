@@ -24,8 +24,8 @@ var Payment = (function () {
 
     function show() {
         var session = App.getSession();
-        if (!session || session.role !== 'respondent') {
-            Pin.openForEmployee('screen-payment');
+        if (!session) {
+            Pin.openForLogin('screen-menu', 'screen-menu');
             App.navigate('screen-pin');
             return;
         }

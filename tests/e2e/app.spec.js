@@ -98,14 +98,30 @@ test('admin can sign in from the PIN-first entry flow', async ({ page }) => {
 
   await expect(page.locator('#screen-menu.active')).toBeVisible();
   await expect(page.locator('#greeting')).toHaveText('Administrador');
-  await expect(page.locator('#card-fichar')).toBeHidden();
-  await expect(page.locator('#card-schedule')).toBeHidden();
-  await expect(page.locator('#card-guia')).toBeHidden();
-  await expect(page.locator('#card-payment')).toBeHidden();
+  await expect(page.locator('#card-fichar')).toBeVisible();
+  await expect(page.locator('#card-schedule')).toBeVisible();
+  await expect(page.locator('#card-guia')).toBeVisible();
+  await expect(page.locator('#card-payment')).toBeVisible();
   await expect(page.locator('#card-admin')).toBeVisible();
   await expect(page.locator('#menu-admin-shortcut')).toBeVisible();
   await expect(page.locator('#menu-direct-shortcut')).toBeVisible();
   await expect(page.locator('#logout-btn')).toBeVisible();
+});
+
+test('admin can open the same four base sections from the main menu', async ({ page }) => {
+  await setupMockApi(page);
+  await page.goto('/');
+  await enterPin(page, '123456');
+
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Fichar' }).click();
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
+  await page.locator('#screen-clock .back-btn').click();
+
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.getByRole('button', { name: 'Mi Pago' }).click();
+  await expect(page.locator('#screen-payment.active')).toBeVisible();
 });
 
 test('admin can load payments and save a configured amount', async ({ page }) => {
