@@ -13,6 +13,12 @@ async function enterPin(page, pin) {
   }
 }
 
+async function enterDirectDialogPin(page, pin) {
+  for (const digit of String(pin)) {
+    await page.locator(`#direct-dialog-keypad .key-btn[data-key="${digit}"]`).click({ force: true });
+  }
+}
+
 test('app boots into the internal PIN screen', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
@@ -205,9 +211,12 @@ test('direct route allows atomic schedule reservation with pin', async ({ page }
   await expect(page.locator('#direct-dialog-mode')).toHaveText('Franja libre');
   await expect(page.locator('#direct-dialog-title')).toHaveText('Reservar franja');
   await expect(page.locator('#direct-dialog-summary')).toHaveText('Martes - 16:00 - 17:00');
-  await expect(page.locator('#direct-dialog-focus')).toBeHidden();
+  await expect(page.locator('#direct-dialog-focus-day')).toHaveText('Martes');
+  await expect(page.locator('#direct-dialog-focus-time')).toHaveText('16:00 - 17:00');
+  await expect(page.locator('#direct-dialog-pin-day')).toHaveText('Martes');
+  await expect(page.locator('#direct-dialog-pin-time')).toHaveText('16:00 - 17:00');
   await expect(page.locator('#direct-dialog-body')).toHaveText('Introduce tu PIN de 4 cifras para reservar esta franja.');
-  await page.locator('#direct-dialog-pin').fill('4321');
+  await enterDirectDialogPin(page, '4321');
   await page.locator('#direct-dialog-submit').click();
 
   await expect(page.locator('#direct-schedule-status')).toContainText('Franja reservada correctamente.');
@@ -229,10 +238,12 @@ test('direct route mirrors compact create dialog layout from main schedule', asy
   await expect(page.locator('#direct-dialog-summary')).toBeHidden();
   await expect(page.locator('#direct-dialog-focus-day')).toHaveText('Martes');
   await expect(page.locator('#direct-dialog-focus-time')).toHaveText('15:00 - 16:00');
+  await expect(page.locator('#direct-dialog-pin-day')).toHaveText('Martes');
+  await expect(page.locator('#direct-dialog-pin-time')).toHaveText('15:00 - 16:00');
   await expect(page.locator('#direct-dialog-body')).toBeHidden();
   await expect(page.locator('#direct-dialog-submit')).toHaveText('Crear y reservar');
 
-  await page.locator('#direct-dialog-pin').fill('4321');
+  await enterDirectDialogPin(page, '4321');
   await page.locator('#direct-dialog-submit').click();
 
   await expect(page.locator('#direct-schedule-status')).toContainText('Franja creada y reservada correctamente.');

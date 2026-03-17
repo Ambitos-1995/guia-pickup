@@ -19,6 +19,7 @@ var Direct = (function () {
     var selectedSlot = null;
     var pendingDay = null;
     var pendingHour = null;
+    var schedulePin = '';
     var scheduleBusy = false;
     var scheduleStatusTimer = 0;
     var clockPin = '';
@@ -30,7 +31,8 @@ var Direct = (function () {
     var weekPrevEl, weekNextEl, weekLabelEl, weekRangeEl;
     var scheduleGridEl, scheduleStatusEl;
     var dialogEl, dialogModeEl, dialogTitleEl, dialogSummaryEl, dialogFocusEl, dialogFocusDayEl, dialogFocusTimeEl, dialogBodyEl;
-    var dialogPinPanelEl, dialogPinEl, dialogHelperEl, dialogFeedbackEl, dialogSubmitEl;
+    var dialogPinPanelEl, dialogPinKickerEl, dialogPinDayEl, dialogPinTimeEl, dialogPinDotsEl, dialogPinDots, dialogPinKeypadEl;
+    var dialogHelperEl, dialogFeedbackEl, dialogSubmitEl;
     var headerClockEl, quickClockEl, quickClockStateEl, quickClockFeedbackEl;
     var quickClockFeedbackBadgeEl, quickClockFeedbackNameEl, quickClockFeedbackMessageEl, quickClockFeedbackTimeEl;
     var quickClockDotsEl, quickClockDots, quickClockErrorEl, quickClockKeypadEl, quickClockLoadingEl;
@@ -54,7 +56,12 @@ var Direct = (function () {
         dialogFocusTimeEl = document.getElementById('direct-dialog-focus-time');
         dialogBodyEl = document.getElementById('direct-dialog-body');
         dialogPinPanelEl = document.getElementById('direct-dialog-pin-panel');
-        dialogPinEl = document.getElementById('direct-dialog-pin');
+        dialogPinKickerEl = document.getElementById('direct-dialog-pin-kicker');
+        dialogPinDayEl = document.getElementById('direct-dialog-pin-day');
+        dialogPinTimeEl = document.getElementById('direct-dialog-pin-time');
+        dialogPinDotsEl = document.getElementById('direct-dialog-pin-dots');
+        dialogPinDots = dialogPinDotsEl ? dialogPinDotsEl.querySelectorAll('.pin-dot') : [];
+        dialogPinKeypadEl = document.getElementById('direct-dialog-keypad');
         dialogHelperEl = document.getElementById('direct-dialog-helper');
         dialogFeedbackEl = document.getElementById('direct-dialog-feedback');
         dialogSubmitEl = document.getElementById('direct-dialog-submit');
@@ -81,9 +88,17 @@ var Direct = (function () {
         Utils.delegatePress(scheduleGridEl, '.sched-cell', handleScheduleCellPress);
         Utils.bindPress(dialogSubmitEl, handleScheduleDialogSubmit);
         dialogEl.addEventListener('wa-after-hide', resetScheduleDialog);
-        dialogPinEl.addEventListener('input', function () {
-            dialogPinEl.value = normalizePin(dialogPinEl.value, 4);
-            clearScheduleFeedback();
+        Utils.delegatePress(dialogPinKeypadEl, '.key-btn', function (event, button) {
+            if (scheduleBusy || button.disabled) return;
+
+            if (button.dataset.key === 'clear') {
+                clearSchedulePin();
+                return;
+            }
+
+            if (button.dataset.key) {
+                addScheduleDigit(button.dataset.key);
+            }
         });
         Utils.each(panelTabs, function (tab) {
             Utils.bindPress(tab, function () {
@@ -120,6 +135,26 @@ var Direct = (function () {
 
     function handleKeydown(event) {
         if (isEditableTarget(event.target)) {
+            return;
+        }
+
+        if (isScheduleDialogCapturingPin()) {
+            if (event.key >= '0' && event.key <= '9' && schedulePin.length < 4 && !scheduleBusy) {
+                addScheduleDigit(event.key);
+                event.preventDefault();
+                return;
+            }
+
+            if (event.key === 'Backspace' && schedulePin.length > 0 && !scheduleBusy) {
+                schedulePin = schedulePin.slice(0, -1);
+                updateSchedulePinDots();
+                clearScheduleFeedback();
+                event.preventDefault();
+                return;
+            }
+        }
+
+        if (dialogEl && dialogEl.open) {
             return;
         }
 
@@ -323,10 +358,13 @@ var Direct = (function () {
                 badge: 'Franja libre',
                 title: 'Reservar franja',
                 summary: buildSlotSummary(slot),
+                focusDay: Utils.DAY_NAMES[slot.dayOfWeek],
+                focusTime: buildSlotTimeRange(slot),
                 body: 'Introduce tu PIN de 4 cifras para reservar esta franja.',
                 requiresPin: true,
                 action: 'assign',
-                primaryLabel: 'Reservar franja'
+                primaryLabel: 'Reservar franja',
+                pinKicker: 'Vas a reservar'
             }, slot);
             return;
         }
@@ -370,16 +408,16 @@ var Direct = (function () {
         dialogPinPanelEl.classList.toggle('hidden', !state.requiresPin);
         dialogSubmitEl.textContent = state.primaryLabel || 'Continuar';
         dialogSubmitEl.disabled = false;
+        dialogPinKickerEl.textContent = state.pinKicker || 'Reserva seleccionada';
+        dialogPinDayEl.textContent = state.focusDay || summaryDay(state.summary);
+        dialogPinTimeEl.textContent = state.focusTime || summaryTime(state.summary);
         dialogHelperEl.textContent = state.requiresPin
             ? 'Tu PIN solo se usa para esta accion y no se guarda.'
             : 'Puedes cerrar este cuadro si solo estabas consultando la informacion.';
         clearScheduleFeedback();
 
         if (state.requiresPin) {
-            dialogPinEl.value = '';
-            setTimeout(function () {
-                try { dialogPinEl.focus(); } catch (e) {}
-            }, 40);
+            clearSchedulePin();
         }
     }
 
@@ -392,13 +430,14 @@ var Direct = (function () {
                 badge: 'Liberar franja',
                 title: 'Liberar franja',
                 summary: selectedSlot ? buildSlotSummary(selectedSlot) : '--',
-                focusDay: '',
-                focusTime: '',
+                focusDay: selectedSlot ? Utils.DAY_NAMES[selectedSlot.dayOfWeek] : '',
+                focusTime: selectedSlot ? buildSlotTimeRange(selectedSlot) : '',
                 body: 'Introduce tu PIN de 4 cifras para liberar esta franja si realmente te pertenece.',
                 requiresPin: true,
                 action: 'release',
                 primaryLabel: 'Liberar franja',
-                compactLayout: false
+                compactLayout: false,
+                pinKicker: 'Vas a liberar'
             };
             applyScheduleDialogState();
             return;
@@ -408,15 +447,18 @@ var Direct = (function () {
     }
 
     function runScheduleProtectedAction() {
-        var pin = normalizePin(dialogPinEl.value, 4);
+        var pin = normalizePin(schedulePin, 4);
         if (!/^\d{4}$/.test(pin)) {
             showScheduleFeedback('warning', 'Introduce un PIN valido de 4 cifras.');
+            shakeSchedulePinDots();
             return;
         }
 
         scheduleBusy = true;
         dialogSubmitEl.disabled = true;
         clearScheduleFeedback();
+        dialogPinKeypadEl.style.opacity = '0.5';
+        dialogPinKeypadEl.style.pointerEvents = 'none';
 
         Api.verifyPin(pin).then(function (verifyRes) {
             if (!verifyRes || !verifyRes.success || !verifyRes.data || !verifyRes.data.accessToken) {
@@ -442,9 +484,15 @@ var Direct = (function () {
             }
         }).catch(function (error) {
             showScheduleFeedback('danger', error && error.message ? error.message : 'No se pudo completar la accion.');
+            if (error && error.message === 'PIN incorrecto') {
+                shakeSchedulePinDots();
+                clearSchedulePin();
+            }
         }).then(function () {
             scheduleBusy = false;
             dialogSubmitEl.disabled = false;
+            dialogPinKeypadEl.style.opacity = '1';
+            dialogPinKeypadEl.style.pointerEvents = 'auto';
         });
     }
 
@@ -473,6 +521,7 @@ var Direct = (function () {
         selectedSlot = null;
         pendingDay = null;
         pendingHour = null;
+        schedulePin = '';
         scheduleBusy = false;
         dialogEl.classList.remove('compact-create');
         dialogModeEl.textContent = 'Turno';
@@ -484,9 +533,14 @@ var Direct = (function () {
         dialogFocusEl.classList.add('hidden');
         dialogBodyEl.textContent = '';
         dialogBodyEl.classList.remove('hidden');
-        dialogPinEl.value = '';
+        dialogPinKickerEl.textContent = 'Reserva seleccionada';
+        dialogPinDayEl.textContent = '';
+        dialogPinTimeEl.textContent = '';
+        updateSchedulePinDots();
         dialogHelperEl.textContent = 'Tu PIN solo se usa para esta accion y no se guarda.';
         dialogPinPanelEl.classList.add('hidden');
+        dialogPinKeypadEl.style.opacity = '1';
+        dialogPinKeypadEl.style.pointerEvents = 'auto';
         clearScheduleFeedback();
     }
 
@@ -547,6 +601,32 @@ var Direct = (function () {
         Utils.each(quickClockDots, function (dot, index) {
             dot.classList.toggle('filled', index < clockPin.length);
         });
+    }
+
+    function addScheduleDigit(digit) {
+        if (schedulePin.length >= 4) return;
+        schedulePin += digit;
+        updateSchedulePinDots();
+        clearScheduleFeedback();
+    }
+
+    function clearSchedulePin() {
+        schedulePin = '';
+        updateSchedulePinDots();
+        clearScheduleFeedback();
+    }
+
+    function updateSchedulePinDots() {
+        Utils.each(dialogPinDots, function (dot, index) {
+            dot.classList.toggle('filled', index < schedulePin.length);
+        });
+    }
+
+    function shakeSchedulePinDots() {
+        if (!dialogPinDotsEl) return;
+        dialogPinDotsEl.classList.remove('shake');
+        void dialogPinDotsEl.offsetWidth;
+        dialogPinDotsEl.classList.add('shake');
     }
 
     function processQuickClockPin() {
@@ -765,6 +845,10 @@ var Direct = (function () {
         return pad2(hour) + ':00 - ' + pad2(hour + 1) + ':00';
     }
 
+    function buildSlotTimeRange(slot) {
+        return stripSeconds(slot.startTime) + ' - ' + stripSeconds(slot.endTime);
+    }
+
     function formatMonthLabel(year, week) {
         var dates = Utils.getWeekDates(year, week);
         var first = dates[0];
@@ -833,6 +917,20 @@ var Direct = (function () {
         }
 
         return !!element.isContentEditable;
+    }
+
+    function isScheduleDialogCapturingPin() {
+        return !!(dialogEl && dialogEl.open && scheduleDialogState && scheduleDialogState.requiresPin);
+    }
+
+    function summaryDay(summary) {
+        return String(summary || '').split(' - ')[0] || '';
+    }
+
+    function summaryTime(summary) {
+        var parts = String(summary || '').split(' - ');
+        if (parts.length < 3) return '';
+        return parts[1] + ' - ' + parts[2];
     }
 
     function stripSeconds(time) {
