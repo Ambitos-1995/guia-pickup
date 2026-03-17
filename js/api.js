@@ -12,12 +12,16 @@ var Api = (function () {
         var opts = options || {};
         var headers = { 'Content-Type': 'application/json' };
         var session = (typeof App !== 'undefined' && App.getSession) ? App.getSession() : null;
+        var accessToken = typeof opts.accessToken === 'string' ? opts.accessToken.trim() : '';
 
         if (opts.requiresAuth) {
-            if (!session || !session.accessToken) {
-                return Promise.resolve({ success: false, error: 'AUTH_REQUIRED', message: 'Sesion requerida' });
+            if (!accessToken) {
+                if (!session || !session.accessToken) {
+                    return Promise.resolve({ success: false, error: 'AUTH_REQUIRED', message: 'Sesion requerida' });
+                }
+                accessToken = session.accessToken;
             }
-            headers.Authorization = 'Bearer ' + session.accessToken;
+            headers.Authorization = 'Bearer ' + accessToken;
         }
 
         return fetch(url, {
@@ -35,7 +39,7 @@ var Api = (function () {
                         App.handleAuthFailure(payload.message || 'Tu sesion ha caducado.');
                     }
                 }
-                if (opts.requiresAuth && session && session.accessToken &&
+                if (opts.requiresAuth && !opts.accessToken && session && session.accessToken &&
                     !(res.status === 401 || res.status === 403) &&
                     typeof App !== 'undefined' && App.touchSession) {
                     App.touchSession();
@@ -60,6 +64,31 @@ var Api = (function () {
             orgSlug: ORG_SLUG,
             pin: pin
         });
+    }
+
+    function buildAuthOptions(options) {
+        var resolved = options || {};
+        var authOptions = { requiresAuth: true };
+
+        if (resolved.accessToken) {
+            authOptions.accessToken = resolved.accessToken;
+        }
+
+        return authOptions;
+    }
+
+    function resolveEmployeeAndOptions(employeeIdOrOptions, options) {
+        if (employeeIdOrOptions && typeof employeeIdOrOptions === 'object' && !Array.isArray(employeeIdOrOptions)) {
+            return {
+                employeeId: undefined,
+                options: employeeIdOrOptions
+            };
+        }
+
+        return {
+            employeeId: employeeIdOrOptions,
+            options: options
+        };
     }
 
     function getEmployees() {
@@ -108,20 +137,30 @@ var Api = (function () {
         }, { requiresAuth: true });
     }
 
-    function checkIn(clientDate) {
+    function checkIn(clientDate, options) {
+        if (clientDate && typeof clientDate === 'object' && !Array.isArray(clientDate)) {
+            options = clientDate;
+            clientDate = undefined;
+        }
+
         return postJson(FUNCTIONS_BASE + '/kiosk-clock', {
             orgSlug: ORG_SLUG,
             action: 'check-in',
             clientDate: clientDate || Utils.today()
-        }, { requiresAuth: true });
+        }, buildAuthOptions(options));
     }
 
-    function checkOut(clientDate) {
+    function checkOut(clientDate, options) {
+        if (clientDate && typeof clientDate === 'object' && !Array.isArray(clientDate)) {
+            options = clientDate;
+            clientDate = undefined;
+        }
+
         return postJson(FUNCTIONS_BASE + '/kiosk-clock', {
             orgSlug: ORG_SLUG,
             action: 'check-out',
             clientDate: clientDate || Utils.today()
-        }, { requiresAuth: true });
+        }, buildAuthOptions(options));
     }
 
     function getWeekSlots(year, week) {
@@ -133,19 +172,21 @@ var Api = (function () {
         });
     }
 
-    function assignSlot(slotId, employeeId) {
+    function assignSlot(slotId, employeeId, options) {
+        var resolved = resolveEmployeeAndOptions(employeeId, options);
         var body = {
             action: 'assign',
             orgSlug: ORG_SLUG,
             slotId: slotId
         };
 
-        if (employeeId) body.employeeId = employeeId;
+        if (resolved.employeeId) body.employeeId = resolved.employeeId;
 
-        return postJson(FUNCTIONS_BASE + '/kiosk-schedule', body, { requiresAuth: true });
+        return postJson(FUNCTIONS_BASE + '/kiosk-schedule', body, buildAuthOptions(resolved.options));
     }
 
-    function createAndAssignSlot(year, week, dayOfWeek, hour, employeeId) {
+    function createAndAssignSlot(year, week, dayOfWeek, hour, employeeId, options) {
+        var resolved = resolveEmployeeAndOptions(employeeId, options);
         var body = {
             action: 'create-and-assign',
             orgSlug: ORG_SLUG,
@@ -155,17 +196,17 @@ var Api = (function () {
             hour: hour
         };
 
-        if (employeeId) body.employeeId = employeeId;
+        if (resolved.employeeId) body.employeeId = resolved.employeeId;
 
-        return postJson(FUNCTIONS_BASE + '/kiosk-schedule', body, { requiresAuth: true });
+        return postJson(FUNCTIONS_BASE + '/kiosk-schedule', body, buildAuthOptions(resolved.options));
     }
 
-    function releaseSlot(slotId) {
+    function releaseSlot(slotId, options) {
         return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
             action: 'release',
             orgSlug: ORG_SLUG,
             slotId: slotId
-        }, { requiresAuth: true });
+        }, buildAuthOptions(options));
     }
 
     function createAdminSlot(body) {

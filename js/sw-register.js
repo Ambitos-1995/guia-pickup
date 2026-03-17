@@ -7,6 +7,7 @@ if ("serviceWorker" in navigator) {
 
         var refreshing = false;
         var updateIntervalId = 0;
+        var swUrl = window.SW_REGISTER_URL || './sw.js';
 
         navigator.serviceWorker.addEventListener('controllerchange', function () {
             if (refreshing) return;
@@ -15,7 +16,7 @@ if ("serviceWorker" in navigator) {
         });
 
         window.addEventListener('load', function () {
-            navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+            navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
                 .then(function (reg) {
                     forceUpdateCheck(reg);
                     updateIntervalId = setInterval(function () {

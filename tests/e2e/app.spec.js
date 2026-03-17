@@ -151,3 +151,36 @@ test('schedule create dialog is simplified for employee reservations', async ({ 
   await expect(page.locator('#schedule-slot-secondary')).toBeHidden();
   await expect(page.locator('#schedule-slot-submit')).toHaveText('Crear y reservar');
 });
+
+test('direct route allows atomic schedule reservation with pin', async ({ page }) => {
+  const state = await setupMockApi(page);
+  await page.goto('/direct/');
+
+  await expect(page.locator('h1')).toContainText('Punto directo');
+  await expect(page.locator('#direct-schedule-grid')).toBeVisible();
+
+  await page.locator('#direct-schedule-grid .sched-cell[data-slot-id="slot-2"]').click();
+  await expect(page.locator('#direct-schedule-dialog')).toHaveJSProperty('open', true);
+  await page.locator('#direct-dialog-pin').fill('4321');
+  await page.locator('#direct-dialog-submit').click();
+
+  await expect(page.locator('#direct-schedule-status')).toContainText('Franja reservada correctamente.');
+  await expect.poll(() => state.scheduleActionCalls.length).toBe(1);
+  await expect.poll(() => state.scheduleActionCalls[0].action).toBe('assign');
+  await expect.poll(() => state.scheduleActionCalls[0].auth).toContain('Bearer employee-token-2');
+});
+
+test('direct route performs quick clocking without persisting session', async ({ page }) => {
+  const state = await setupMockApi(page);
+  await page.goto('/direct/');
+
+  await expect(page.locator('#direct-clock-time')).toBeVisible();
+  await enterPin(page, '4321');
+
+  await expect(page.locator('#direct-clock-feedback')).toContainText('Lucia Garcia');
+  await expect(page.locator('#direct-clock-feedback')).toContainText('ENTRADA');
+  await expect.poll(() => state.clockActionCalls.length).toBe(1);
+  await expect.poll(() => state.clockActionCalls[0].action).toBe('check-in');
+  await expect.poll(() => state.clockActionCalls[0].auth).toContain('Bearer employee-token-2');
+  await expect(page.locator('#menu-login-btn')).toHaveCount(0);
+});

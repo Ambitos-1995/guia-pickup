@@ -1,5 +1,7 @@
-var CACHE_NAME = 'pickup-tmg-v63';
+var CACHE_NAME = 'pickup-tmg-v64';
 var FILES_TO_CACHE = [
+    './index.html',
+    './manifest.json',
     './vendor/supabase/supabase.min.js',
     './vendor/webawesome/dist-cdn/styles/webawesome.css',
     './vendor/webawesome/dist-cdn/styles/layers.css',
@@ -18,6 +20,15 @@ var FILES_TO_CACHE = [
     './icons/icon-512-maskable.png',
     './icons/icon.svg',
     './fonts/Lexend-Variable.ttf',
+    './direct/index.html',
+    './direct/manifest.json',
+    './direct/direct.css',
+    './direct/direct.js',
+    './css/styles.css',
+    './js/utils.js',
+    './js/api.js',
+    './js/webawesome-init.js',
+    './js/sw-register.js',
     './img/fotos-con-circulos/1.png',
     './img/fotos-con-circulos/2.png',
     './img/fotos-con-circulos/3.png',
@@ -46,9 +57,21 @@ function isAppShellRequest(requestUrl) {
     var pathname = requestUrl.pathname;
     return pathname === '/' ||
         pathname === '/index.html' ||
+        pathname === '/direct' ||
+        pathname === '/direct/' ||
+        pathname === '/direct/index.html' ||
         pathname === '/manifest.json' ||
+        pathname === '/direct/manifest.json' ||
         pathname.indexOf('/css/') === 0 ||
-        pathname.indexOf('/js/') === 0;
+        pathname.indexOf('/js/') === 0 ||
+        pathname.indexOf('/direct/') === 0;
+}
+
+function getNavigationFallback(requestUrl) {
+    if (requestUrl.pathname === '/direct' || requestUrl.pathname.indexOf('/direct/') === 0) {
+        return caches.match('/direct/index.html');
+    }
+    return caches.match('/index.html');
 }
 
 function cacheFirst(request) {
@@ -81,7 +104,7 @@ function networkFirst(request) {
             if (cached) return cached;
 
             if (request.mode === 'navigate') {
-                return caches.match('./index.html');
+                return getNavigationFallback(new URL(request.url));
             }
 
             return new Response('Sin conexion', {

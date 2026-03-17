@@ -55,6 +55,8 @@ function buildState(overrides = {}) {
       }
     ],
     createCalls: [],
+    scheduleActionCalls: [],
+    clockActionCalls: [],
     ...overrides
   };
 }
@@ -106,6 +108,21 @@ async function setupMockApi(page, overrides = {}) {
               employeeName: 'Ismael Pérez',
               organizationId: 'org-1',
               currentStatus: 'checked_out'
+            }
+          });
+        }
+
+        if (body.pin === '4321') {
+          return fulfillJson(route, {
+            success: true,
+            data: {
+              accessToken: 'employee-token-2',
+              expiresAt: '2099-12-31T23:59:59.000Z',
+              role: 'respondent',
+              employeeId: 'emp-3',
+              employeeName: 'Lucia Garcia',
+              organizationId: 'org-1',
+              currentStatus: 'not_checked_in'
             }
           });
         }
@@ -191,10 +208,44 @@ async function setupMockApi(page, overrides = {}) {
       if (body.action === 'list') {
         return fulfillJson(route, { success: true, data: state.scheduleSlots });
       }
+
+       if (body.action === 'assign') {
+        state.scheduleActionCalls.push({ action: 'assign', body, auth: request.headers()['authorization'] || '' });
+        return fulfillJson(route, { success: true, data: { id: body.slotId, assigned_employee_profile_id: 'emp-1', status: 'occupied' } });
+      }
+
+      if (body.action === 'create-and-assign') {
+        state.scheduleActionCalls.push({ action: 'create-and-assign', body, auth: request.headers()['authorization'] || '' });
+        return fulfillJson(route, { success: true, data: { id: 'slot-new', assigned_employee_profile_id: 'emp-3', status: 'occupied' } });
+      }
+
+      if (body.action === 'release') {
+        state.scheduleActionCalls.push({ action: 'release', body, auth: request.headers()['authorization'] || '' });
+        return fulfillJson(route, { success: true, data: { id: body.slotId, assigned_employee_profile_id: null, status: 'free' } });
+      }
     }
 
     if (url.pathname.endsWith('/kiosk-clock')) {
-      return fulfillJson(route, { success: true, data: { action: 'check-in' } });
+      state.clockActionCalls.push({ action: body.action, auth: request.headers()['authorization'] || '' });
+      if (body.action === 'check-out') {
+        return fulfillJson(route, {
+          success: true,
+          message: 'Salida registrada',
+          data: {
+            employeeName: 'Ismael Pérez',
+            currentStatus: 'checked_out'
+          }
+        });
+      }
+
+      return fulfillJson(route, {
+        success: true,
+        message: 'Entrada registrada',
+        data: {
+          employeeName: 'Lucia Garcia',
+          currentStatus: 'checked_in'
+        }
+      });
     }
 
     return fulfillJson(route, { success: false, message: `Unhandled mock route: ${url.pathname}` }, 500);

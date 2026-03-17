@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="theme-color" content="#111827">
+    <meta name="description" content="Modo kiosco directo para horario semanal y fichaje rapido del punto pickup SEUR">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Punto directo">
+    <meta name="application-name" content="Punto directo">
+
+    <title>Punto directo</title>
+
+    <link rel="manifest" href="/direct/manifest.json">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+
+    <link rel="stylesheet" href="/vendor/webawesome/dist-cdn/styles/webawesome.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/direct/direct.css">
+</head>
+<body class="direct-body">
+    <div class="direct-app" id="direct-app">
+        <header class="direct-header">
+            <div class="direct-brand">
+                <span class="direct-brand-kicker">Punto de encuentro inclusivo</span>
+                <h1>Punto directo</h1>
+                <p>Horario semanal y fichaje rapido para tablet compartida</p>
+            </div>
+
+            <div class="direct-header-tools">
+                <div class="direct-header-clock" id="direct-header-clock" aria-live="polite">--:--</div>
+                <a class="direct-settings-link" href="/index.html" aria-label="Abrir ajustes en la app principal">Ajustes</a>
+            </div>
+        </header>
+
+        <main class="direct-main">
+            <section class="direct-panel direct-panel-schedule" aria-labelledby="direct-schedule-title">
+                <div class="direct-panel-head">
+                    <div>
+                        <span class="direct-panel-kicker">Panel izquierdo</span>
+                        <h2 id="direct-schedule-title">Horario semanal</h2>
+                    </div>
+
+                    <div class="week-nav direct-week-nav">
+                        <button class="week-arrow" id="direct-week-prev" type="button" aria-label="Semana anterior">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                        </button>
+                        <div class="week-nav-center">
+                            <div class="week-label" id="direct-week-label">Semana --</div>
+                            <div class="schedule-range" id="direct-week-range">--</div>
+                        </div>
+                        <button class="week-arrow" id="direct-week-next" type="button" aria-label="Semana siguiente">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="schedule-shell direct-schedule-shell">
+                    <p class="schedule-context direct-schedule-context" id="direct-schedule-context">
+                        Consulta el horario. Para reservar, crear o liberar una franja, introduce tu PIN de 4 cifras solo en el momento de la accion.
+                    </p>
+
+                    <wa-callout id="direct-schedule-status" variant="neutral" appearance="filled-outlined" class="hidden direct-inline-callout"></wa-callout>
+
+                    <div class="schedule-board direct-schedule-board">
+                        <div class="schedule-grid" id="direct-schedule-grid">
+                            <div class="loading-text schedule-loading" style="grid-column:1/-1">Cargando horario...</div>
+                        </div>
+                    </div>
+
+                    <div class="schedule-legend direct-schedule-legend">
+                        <span class="legend-item"><span class="legend-dot legend-free"></span> Libre</span>
+                        <span class="legend-item"><span class="legend-dot legend-taken"></span> Ocupada</span>
+                        <span class="legend-item"><span class="legend-dot legend-empty"></span> Sin franja</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="direct-panel direct-panel-clock" aria-labelledby="direct-clock-title">
+                <div class="direct-clock-panel-head">
+                    <div>
+                        <span class="direct-panel-kicker direct-panel-kicker-dark">Panel derecho</span>
+                        <h2 id="direct-clock-title">Fichaje rapido</h2>
+                        <p>Introduce tu PIN y el sistema registra entrada o salida sin guardar sesion.</p>
+                    </div>
+                </div>
+
+                <div class="direct-clock-shell" id="direct-clock-shell">
+                    <div class="direct-clock-state" id="direct-clock-state">
+                        <div class="direct-clock-time" id="direct-clock-time">--:--:--</div>
+                        <p class="direct-clock-copy">Introduce tu PIN de 4 cifras</p>
+
+                        <div class="pin-dots direct-pin-dots" id="direct-pin-dots" aria-label="PIN introducido">
+                            <span class="pin-dot" data-index="0"></span>
+                            <span class="pin-dot" data-index="1"></span>
+                            <span class="pin-dot" data-index="2"></span>
+                            <span class="pin-dot" data-index="3"></span>
+                        </div>
+
+                        <p class="direct-clock-error hidden" id="direct-clock-error" aria-live="polite"></p>
+
+                        <div class="pin-keypad direct-pin-keypad" id="direct-pin-keypad">
+                            <button class="key-btn" data-key="1" type="button">1</button>
+                            <button class="key-btn" data-key="2" type="button">2</button>
+                            <button class="key-btn" data-key="3" type="button">3</button>
+                            <button class="key-btn" data-key="4" type="button">4</button>
+                            <button class="key-btn" data-key="5" type="button">5</button>
+                            <button class="key-btn" data-key="6" type="button">6</button>
+                            <button class="key-btn" data-key="7" type="button">7</button>
+                            <button class="key-btn" data-key="8" type="button">8</button>
+                            <button class="key-btn" data-key="9" type="button">9</button>
+                            <button class="key-btn key-empty" type="button" disabled></button>
+                            <button class="key-btn" data-key="0" type="button">0</button>
+                            <button class="key-btn key-clear" data-key="clear" type="button" aria-label="Borrar">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                            </button>
+                        </div>
+
+                        <div class="pin-loading hidden" id="direct-clock-loading">
+                            <div class="spinner"></div>
+                            <span>Verificando...</span>
+                        </div>
+                    </div>
+
+                    <div class="direct-clock-feedback hidden" id="direct-clock-feedback" aria-live="polite">
+                        <span class="direct-clock-feedback-badge" id="direct-clock-feedback-badge">ENTRADA</span>
+                        <h3 class="direct-clock-feedback-name" id="direct-clock-feedback-name">Empleado</h3>
+                        <p class="direct-clock-feedback-message" id="direct-clock-feedback-message">Operacion completada</p>
+                        <div class="direct-clock-feedback-time" id="direct-clock-feedback-time">00:00</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <wa-dialog label="Gestionar turno" id="direct-schedule-dialog" class="schedule-slot-dialog direct-schedule-dialog">
+        <div class="slot-dialog-stack">
+            <div class="slot-dialog-badge" id="direct-dialog-mode">Turno</div>
+            <h3 class="slot-dialog-title" id="direct-dialog-title">Gestionar franja</h3>
+            <p class="slot-dialog-summary" id="direct-dialog-summary">--</p>
+            <p class="slot-dialog-body" id="direct-dialog-body"></p>
+
+            <div class="slot-dialog-admin hidden direct-dialog-pin-panel" id="direct-dialog-pin-panel">
+                <div class="form-row slot-dialog-field">
+                    <label for="direct-dialog-pin">PIN de empleado</label>
+                    <input type="password" id="direct-dialog-pin" inputmode="numeric" autocomplete="one-time-code" maxlength="4" placeholder="1234" pattern="[0-9]{4}">
+                </div>
+                <p class="slot-dialog-helper" id="direct-dialog-helper">Tu PIN solo se usa para esta accion y no se guarda.</p>
+            </div>
+
+            <wa-callout id="direct-dialog-feedback" variant="neutral" appearance="filled-outlined" class="hidden"></wa-callout>
+        </div>
+        <wa-button slot="footer" variant="neutral" appearance="outlined" data-dialog="close">Cancelar</wa-button>
+        <wa-button slot="footer" id="direct-dialog-submit" variant="brand" appearance="accent">Continuar</wa-button>
+    </wa-dialog>
+
+    <script>
+        window.SW_REGISTER_URL = '/sw.js';
+    </script>
+    <script type="module" src="/js/webawesome-init.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/direct/direct.js"></script>
+    <script src="/js/sw-register.js"></script>
+</body>
+</html>

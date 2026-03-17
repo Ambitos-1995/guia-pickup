@@ -5,13 +5,24 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..', '..');
 const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const directIndexHtml = fs.readFileSync(path.join(root, 'direct', 'index.html'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
+const directManifest = JSON.parse(fs.readFileSync(path.join(root, 'direct', 'manifest.json'), 'utf8'));
 
 test('shell branding points to Punto de encuentro inclusivo', () => {
   assert.match(indexHtml, /<title>Punto de encuentro inclusivo<\/title>/);
   assert.match(indexHtml, /apple-mobile-web-app-title" content="Punto de encuentro inclusivo"/);
   assert.equal(manifest.name, 'Punto de encuentro inclusivo');
   assert.equal(manifest.short_name, 'Punto de encuentro inclusivo');
+});
+
+test('direct shell exposes kiosk branding and landscape manifest', () => {
+  assert.match(directIndexHtml, /<title>Punto directo<\/title>/);
+  assert.match(directIndexHtml, /Horario semanal/);
+  assert.match(directIndexHtml, /Fichaje rapido/);
+  assert.equal(directManifest.name, 'Punto directo');
+  assert.equal(directManifest.orientation, 'landscape');
+  assert.equal(directManifest.start_url, '/direct/');
 });
 
 test('legacy visible TMG branding is not present in shell files', () => {

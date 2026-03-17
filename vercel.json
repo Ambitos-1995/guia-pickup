@@ -17,7 +17,19 @@
       ]
     },
     {
+      "source": "/direct/manifest.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, must-revalidate" }
+      ]
+    },
+    {
       "source": "/js/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=60, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/direct/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=60, must-revalidate" }
       ]
@@ -30,6 +42,24 @@
     },
     {
       "source": "/index.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/direct",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/direct/",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/direct/index.html",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, must-revalidate" }
       ]
@@ -70,6 +100,16 @@
         { "key": "Cross-Origin-Resource-Policy", "value": "same-origin" },
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
       ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/direct",
+      "destination": "/direct/index.html"
+    },
+    {
+      "source": "/direct/",
+      "destination": "/direct/index.html"
     }
   ]
 }
