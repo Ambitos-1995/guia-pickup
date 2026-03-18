@@ -6,6 +6,7 @@ import {
   fetchJson,
   json,
   logAudit,
+  logScheduleMutationDebug,
   requireSession,
   resolveOrgId,
   getSupabaseConfig,
@@ -221,6 +222,23 @@ async function handleAssign(
       previousEmployeeId: slot.employee_id,
     },
   });
+  await logScheduleMutationDebug(url, key, {
+    organizationId: session.organization_id,
+    actorSessionId: session.id,
+    actorEmployeeId: session.employee_id,
+    targetEmployeeId: target.employeeId,
+    slotId,
+    mutationType: session.role === "org_admin" && slot.employee_id ? "reassign" : "assign",
+    year: slot.year,
+    week: slot.week,
+    dayOfWeek: slot.day_of_week,
+    startTime: slot.start_time,
+    endTime: slot.end_time,
+    metadata: {
+      targetEmployeeName: target.employeeName,
+      previousEmployeeId: slot.employee_id,
+    },
+  });
 
   return json({
     success: true,
@@ -283,6 +301,19 @@ async function handleRelease(
     employeeId: slot.employee_id,
     slotId,
     action: "schedule_slot_released",
+  });
+  await logScheduleMutationDebug(url, key, {
+    organizationId: session.organization_id,
+    actorSessionId: session.id,
+    actorEmployeeId: session.employee_id,
+    targetEmployeeId: slot.employee_id,
+    slotId,
+    mutationType: "release",
+    year: slot.year,
+    week: slot.week,
+    dayOfWeek: slot.day_of_week,
+    startTime: slot.start_time,
+    endTime: slot.end_time,
   });
 
   return json({
@@ -361,6 +392,17 @@ async function handleCreate(
     action: "schedule_slot_created",
     metadata: { year, week, dayOfWeek, startTime, endTime },
   });
+  await logScheduleMutationDebug(url, key, {
+    organizationId: session.organization_id,
+    actorSessionId: session.id,
+    mutationType: "create",
+    slotId: insert.data[0].id,
+    year,
+    week,
+    dayOfWeek,
+    startTime,
+    endTime,
+  });
 
   return json({
     success: true,
@@ -433,6 +475,17 @@ async function handleUpdate(
     action: "schedule_slot_updated",
     metadata: { startTime, endTime },
   });
+  await logScheduleMutationDebug(url, key, {
+    organizationId: session.organization_id,
+    actorSessionId: session.id,
+    mutationType: "update",
+    slotId,
+    year: existingSlot.year,
+    week: existingSlot.week,
+    dayOfWeek: existingSlot.day_of_week,
+    startTime,
+    endTime,
+  });
 
   return json({ success: true, data: update.data[0] });
 }
@@ -475,6 +528,17 @@ async function handleDelete(
     actorRole: session.role,
     slotId,
     action: "schedule_slot_deleted",
+  });
+  await logScheduleMutationDebug(url, key, {
+    organizationId: session.organization_id,
+    actorSessionId: session.id,
+    mutationType: "delete",
+    slotId,
+    year: slot.year,
+    week: slot.week,
+    dayOfWeek: slot.day_of_week,
+    startTime: slot.start_time,
+    endTime: slot.end_time,
   });
 
   return json({ success: true });
@@ -552,6 +616,22 @@ async function handleCreateAndAssign(
       startTime,
       endTime,
       targetEmployeeId: target.employeeId,
+      targetEmployeeName: target.employeeName,
+    },
+  });
+  await logScheduleMutationDebug(url, key, {
+    organizationId: session.organization_id,
+    actorSessionId: session.id,
+    actorEmployeeId: session.employee_id,
+    targetEmployeeId: target.employeeId,
+    slotId: insert.data[0].id,
+    mutationType: "create_and_assign",
+    year,
+    week,
+    dayOfWeek,
+    startTime,
+    endTime,
+    metadata: {
       targetEmployeeName: target.employeeName,
     },
   });

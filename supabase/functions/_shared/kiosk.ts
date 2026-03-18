@@ -484,6 +484,102 @@ export async function logAudit(
   });
 }
 
+export async function logDebugEvent(
+  supabaseUrl: string,
+  key: string,
+  payload: {
+    organizationId: string;
+    actorSessionId?: string | null;
+    employeeId?: string | null;
+    source: "frontend" | "edge" | "system";
+    scope: string;
+    action: string;
+    outcome?: string;
+    message?: string;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<void> {
+  await insertDebugRow(supabaseUrl, key, "kiosk_debug_events", {
+    organization_id: payload.organizationId,
+    actor_session_id: payload.actorSessionId || null,
+    employee_id: payload.employeeId || null,
+    source: payload.source,
+    scope: payload.scope,
+    action: payload.action,
+    outcome: payload.outcome || "info",
+    message: payload.message || "",
+    metadata: payload.metadata || {},
+  });
+}
+
+export async function logScheduleMutationDebug(
+  supabaseUrl: string,
+  key: string,
+  payload: {
+    organizationId: string;
+    actorSessionId?: string | null;
+    actorEmployeeId?: string | null;
+    targetEmployeeId?: string | null;
+    slotId?: string | null;
+    mutationType: "assign" | "reassign" | "release" | "create" | "create_and_assign" | "update" | "delete";
+    outcome?: string;
+    year?: number | null;
+    week?: number | null;
+    dayOfWeek?: number | null;
+    startTime?: string | null;
+    endTime?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<void> {
+  await insertDebugRow(supabaseUrl, key, "kiosk_debug_schedule_mutations", {
+    organization_id: payload.organizationId,
+    actor_session_id: payload.actorSessionId || null,
+    actor_employee_id: payload.actorEmployeeId || null,
+    target_employee_id: payload.targetEmployeeId || null,
+    slot_id: payload.slotId || null,
+    mutation_type: payload.mutationType,
+    outcome: payload.outcome || "success",
+    year: payload.year ?? null,
+    week: payload.week ?? null,
+    day_of_week: payload.dayOfWeek ?? null,
+    start_time: payload.startTime || null,
+    end_time: payload.endTime || null,
+    metadata: payload.metadata || {},
+  });
+}
+
+export async function logAttendanceAttemptDebug(
+  supabaseUrl: string,
+  key: string,
+  payload: {
+    organizationId: string;
+    actorSessionId?: string | null;
+    employeeId?: string | null;
+    slotId?: string | null;
+    action: "status" | "check_in" | "check_out";
+    outcome: string;
+    clientDate?: string | null;
+    scheduledStart?: string | null;
+    scheduledEnd?: string | null;
+    message?: string;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<void> {
+  await insertDebugRow(supabaseUrl, key, "kiosk_debug_attendance_attempts", {
+    organization_id: payload.organizationId,
+    actor_session_id: payload.actorSessionId || null,
+    employee_id: payload.employeeId || null,
+    slot_id: payload.slotId || null,
+    action: payload.action,
+    outcome: payload.outcome,
+    client_date: payload.clientDate || null,
+    scheduled_start: payload.scheduledStart || null,
+    scheduled_end: payload.scheduledEnd || null,
+    message: payload.message || "",
+    metadata: payload.metadata || {},
+  });
+}
+
 export async function getAttendanceDayState(
   supabaseUrl: string,
   key: string,
@@ -668,6 +764,26 @@ export async function fetchJson<T>(url: string, init: RequestInit): Promise<Rest
     data,
     raw,
   };
+}
+
+async function insertDebugRow(
+  supabaseUrl: string,
+  key: string,
+  table: string,
+  row: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/${table}`, {
+      method: "POST",
+      headers: {
+        ...authHeaders(key),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(row),
+    });
+  } catch (error) {
+    console.warn(`debug insert failed for ${table}:`, error);
+  }
 }
 
 export function isoWeekToDate(year: number, week: number, dayOfWeek: number): Date {

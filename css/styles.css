@@ -256,6 +256,7 @@ button:focus-visible {
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    width: 100%;
     min-height: 100%;
     padding: clamp(16px, 3.5vh, 24px) clamp(14px, 5vw, 24px);
     gap: clamp(10px, 2vh, 18px);
@@ -357,9 +358,12 @@ button:focus-visible {
 .pin-keypad {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
+    justify-content: center;
     gap: var(--pin-keypad-gap);
-    max-width: min(100%, calc(var(--pin-keypad-button-size) * 3 + var(--pin-keypad-gap) * 2));
-    width: 100%;
+    width: min(100%, calc(var(--pin-keypad-button-size) * 3 + var(--pin-keypad-gap) * 2));
+    max-width: calc(var(--pin-keypad-button-size) * 3 + var(--pin-keypad-gap) * 2);
+    margin-inline: auto;
+    align-self: center;
 }
 
 .pin-keypad .key-btn {
@@ -2513,7 +2517,10 @@ body {
 
 /* Small tablets and landscape phones (600px+) */
 @media (min-width: 600px) {
-    .pin-keypad { max-width: 360px; }
+    .pin-keypad {
+        width: min(100%, 360px);
+        max-width: 360px;
+    }
     .key-btn { font-size: 1.8rem; min-height: 72px; }
     .menu-container { padding: 24px 20px; }
     .clock-container { padding: 0 20px 24px; }

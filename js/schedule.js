@@ -6,8 +6,8 @@ var Schedule = (function () {
 
     var DEFAULT_HOURS = [15, 16, 17, 18, 19, 20];
     var AUTH_REDIRECT_MS = 3000;
-    var CACHE_TTL = 60000;
-    var REFRESH_INTERVAL_MS = 30000;
+    var CACHE_TTL = 5000;
+    var REFRESH_INTERVAL_MS = 5000;
 
     var currentYear, currentWeek;
     var gridEl, labelEl, rangeEl, contextEl, dialogEl;
@@ -28,6 +28,7 @@ var Schedule = (function () {
     var cache = {};
     var employeesCache = null;
     var employeesPromise = null;
+    var fetchTokens = {};
 
     function init() {
         gridEl = document.getElementById('schedule-grid');
@@ -65,6 +66,9 @@ var Schedule = (function () {
             resetDialog();
             handleDialogViewportChange();
         });
+        document.addEventListener('visibilitychange', handleVisibilityRefresh);
+        window.addEventListener('focus', refreshIfVisible);
+        window.addEventListener('pageshow', refreshIfVisible);
 
         var info = Utils.currentWeekInfo();
         fetchAndCache(info.year, info.week);
@@ -144,8 +148,13 @@ var Schedule = (function () {
 
     function fetchAndCache(y, w) {
         var key = y + '-' + w;
+        var token = (fetchTokens[key] || 0) + 1;
+        fetchTokens[key] = token;
         Api.getWeekSlots(y, w).then(function (res) {
             var data = normalizeSlots((res && res.success && res.data) ? res.data : []);
+            if (fetchTokens[key] !== token) {
+                return;
+            }
             cache[key] = { data: data, timestamp: Date.now() };
             if (currentYear === y && currentWeek === w) {
                 slotsData = data;
@@ -864,6 +873,12 @@ var Schedule = (function () {
         if (!refreshIntervalId) return;
         clearInterval(refreshIntervalId);
         refreshIntervalId = 0;
+    }
+
+    function handleVisibilityRefresh() {
+        if (document.visibilityState === 'visible') {
+            refreshIfVisible();
+        }
     }
 
     return {

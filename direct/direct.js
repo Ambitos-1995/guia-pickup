@@ -5,12 +5,12 @@ var Direct = (function () {
     'use strict';
 
     var DEFAULT_HOURS = [15, 16, 17, 18, 19, 20];
-    var CACHE_TTL = 60000;
-    var PERSISTED_SCHEDULE_KEY = 'pickup-direct-schedule-cache-v1';
+    var CACHE_TTL = 5000;
+    var PERSISTED_SCHEDULE_KEY = 'pickup-direct-schedule-cache-v2';
     var CLOCK_RESET_MS = 3600;
     var CLOCK_ERROR_RESET_MS = 1800;
     var STATUS_RESET_MS = 3200;
-    var REFRESH_INTERVAL_MS = 30000;
+    var REFRESH_INTERVAL_MS = 5000;
 
     var currentYear = 0;
     var currentWeek = 0;
@@ -27,6 +27,7 @@ var Direct = (function () {
     var clockErrorTimer = 0;
     var lastRenderedHourCount = DEFAULT_HOURS.length;
     var scheduleRefreshTimer = 0;
+    var fetchTokens = {};
 
     var weekPrevEl, weekNextEl, weekLabelEl, weekRangeEl;
     var scheduleGridEl, scheduleStatusEl;
@@ -248,8 +249,13 @@ var Direct = (function () {
 
     function fetchWeek(year, week) {
         var key = year + '-' + week;
+        var token = (fetchTokens[key] || 0) + 1;
+        fetchTokens[key] = token;
         Api.getWeekSlots(year, week).then(function (res) {
             var data = normalizeSlots(res && res.success && res.data ? res.data : []);
+            if (fetchTokens[key] !== token) {
+                return;
+            }
             scheduleCache[key] = {
                 data: data,
                 timestamp: Date.now()

@@ -54,6 +54,24 @@ test('main PIN layout fits inside a short mobile viewport', async ({ page }) => 
   expect(metrics.overflow).toBeLessThanOrEqual(2);
 });
 
+test('main PIN keypad stays horizontally centered', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+
+  const metrics = await page.evaluate(() => {
+    const keypad = document.getElementById('pin-keypad');
+    const rect = keypad.getBoundingClientRect();
+    return {
+      leftGap: Math.round(rect.left),
+      rightGap: Math.round(window.innerWidth - rect.right)
+    };
+  });
+
+  expect(Math.abs(metrics.leftGap - metrics.rightGap)).toBeLessThanOrEqual(4);
+});
+
 test('anonymous users cannot reach authenticated screens', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
@@ -321,6 +339,22 @@ test('schedule create dialog is simplified for employee reservations', async ({ 
   await expect(page.locator('#schedule-slot-note')).toBeHidden();
   await expect(page.locator('#schedule-slot-secondary')).toBeHidden();
   await expect(page.locator('#schedule-slot-submit')).toHaveText('Crear y reservar');
+});
+
+test('schedule refreshes within a few seconds when backend slots change', async ({ page }) => {
+  const state = await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+  await enterPin(page, '1234');
+
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.getByRole('button', { name: 'Mi Horario' }).click();
+  await expect(page.locator('#screen-schedule.active')).toBeVisible();
+  await expect(page.locator('.sched-cell[data-slot-id="slot-1"]')).toHaveCount(1);
+
+  state.scheduleSlots = state.scheduleSlots.filter((slot) => slot.id !== 'slot-1');
+
+  await expect(page.locator('.sched-cell[data-slot-id="slot-1"]')).toHaveCount(0, { timeout: 7000 });
 });
 
 test('direct route allows atomic schedule reservation with pin', async ({ page }) => {

@@ -163,6 +163,19 @@ var Api = (function () {
         }, buildAuthOptions(options));
     }
 
+    function getClockStatus(clientDate, options) {
+        if (clientDate && typeof clientDate === 'object' && !Array.isArray(clientDate)) {
+            options = clientDate;
+            clientDate = undefined;
+        }
+
+        return postJson(FUNCTIONS_BASE + '/kiosk-clock', {
+            orgSlug: ORG_SLUG,
+            action: 'status',
+            clientDate: clientDate || Utils.today()
+        }, buildAuthOptions(options));
+    }
+
     function getWeekSlots(year, week) {
         return postJson(FUNCTIONS_BASE + '/kiosk-schedule', {
             action: 'list',
@@ -273,6 +286,7 @@ var Api = (function () {
         verifyAdminPin: verifyAdminPin,
         checkIn: checkIn,
         checkOut: checkOut,
+        getClockStatus: getClockStatus,
         getWeekSlots: getWeekSlots,
         assignSlot: assignSlot,
         createAndAssignSlot: createAndAssignSlot,

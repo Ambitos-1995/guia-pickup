@@ -4,7 +4,7 @@
 var App = (function () {
     'use strict';
 
-    var APP_VERSION = '2026.03.17-r2';
+    var APP_VERSION = '2026.03.18-r1';
     var SESSION_STORAGE_KEY = 'pickup-tmg-session-v1';
     var EMPLOYEE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
     var ADMIN_IDLE_TIMEOUT_MS = 5 * 60 * 1000;

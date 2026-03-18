@@ -9,6 +9,7 @@ import {
   isoWeekInfoFromClientDate,
   json,
   logAudit,
+  logAttendanceAttemptDebug,
   requireSession,
   resolveOrgId,
   getSupabaseConfig,
@@ -99,6 +100,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const employeeName = `${employee.nombre} ${employee.apellido}`.trim();
 
     if (action === "status") {
+      await logAttendanceAttemptDebug(url, serviceRoleKey, {
+        organizationId: orgId,
+        actorSessionId: auth.session.id,
+        employeeId: employee.id,
+        action: "status",
+        outcome: currentStatus,
+        clientDate,
+        slotId: dayState.openSlotId,
+        scheduledStart: dayState.openSlot?.start_time || null,
+        scheduledEnd: dayState.openSlot?.end_time || null,
+        message: "Estado de fichaje consultado",
+      });
       return json({
         success: true,
         data: { employeeName, currentStatus },
@@ -127,13 +140,44 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // ======================== CHECK-IN ========================
     if (action === "check-in") {
       if (currentStatus === "checked_in") {
+        await logAttendanceAttemptDebug(url, serviceRoleKey, {
+          organizationId: orgId,
+          actorSessionId: auth.session.id,
+          employeeId: employee.id,
+          action: "check_in",
+          outcome: "blocked_checked_in",
+          clientDate,
+          slotId: dayState.openSlotId,
+          scheduledStart: dayState.openSlot?.start_time || null,
+          scheduledEnd: dayState.openSlot?.end_time || null,
+          message: "Ya tienes entrada registrada hoy",
+        });
         return json({ success: false, message: "Ya tienes entrada registrada hoy" }, 409);
       }
       if (currentStatus === "checked_out" && !eligibleCheckInSlot) {
+        await logAttendanceAttemptDebug(url, serviceRoleKey, {
+          organizationId: orgId,
+          actorSessionId: auth.session.id,
+          employeeId: employee.id,
+          action: "check_in",
+          outcome: "blocked_checked_out",
+          clientDate,
+          message: "Ya has fichado entrada y salida hoy",
+        });
         return json({ success: false, message: "Ya has fichado entrada y salida hoy" }, 409);
       }
 
       if (!todaySlots.length) {
+        await logAttendanceAttemptDebug(url, serviceRoleKey, {
+          organizationId: orgId,
+          actorSessionId: auth.session.id,
+          employeeId: employee.id,
+          action: "check_in",
+          outcome: "blocked_no_schedule",
+          clientDate,
+          message: buildNoScheduleMessage(nextScheduledSlot),
+          metadata: buildNextSlotData(nextScheduledSlot, "no_schedule"),
+        });
         return json(
           {
             success: false,
@@ -150,10 +194,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
           : nextScheduledSlot;
         const referenceSlot = findReferenceTodaySlot(todaySlots, clientDate, now) || todaySlots[todaySlots.length - 1];
         const isEarly = !!(nextAvailableTodaySlot && isBeforeCheckInWindow(nextAvailableTodaySlot, clientDate, now));
+        const blockedMessage = buildOutsideScheduleMessage(fallbackNextSlot, referenceSlot, isEarly);
+        const blockedData = buildNextSlotData(fallbackNextSlot, "outside_schedule", referenceSlot);
+        await logAttendanceAttemptDebug(url, serviceRoleKey, {
+          organizationId: orgId,
+          actorSessionId: auth.session.id,
+          employeeId: employee.id,
+          action: "check_in",
+          outcome: isEarly ? "blocked_too_early" : "blocked_outside_schedule",
+          clientDate,
+          slotId: referenceSlot.id,
+          scheduledStart: referenceSlot.start_time,
+          scheduledEnd: referenceSlot.end_time,
+          message: blockedMessage,
+          metadata: blockedData,
+        });
         return json({
           success: false,
-          message: buildOutsideScheduleMessage(fallbackNextSlot, referenceSlot, isEarly),
-          data: buildNextSlotData(fallbackNextSlot, "outside_schedule", referenceSlot),
+          message: blockedMessage,
+          data: blockedData,
         }, 403);
       }
 
@@ -188,6 +247,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
         slotId: eligibleCheckInSlot.id,
         action: "attendance_check_in",
       });
+      await logAttendanceAttemptDebug(url, serviceRoleKey, {
+        organizationId: orgId,
+        actorSessionId: auth.session.id,
+        employeeId: employee.id,
+        action: "check_in",
+        outcome: "success",
+        clientDate,
+        slotId: eligibleCheckInSlot.id,
+        scheduledStart: eligibleCheckInSlot.start_time,
+        scheduledEnd: eligibleCheckInSlot.end_time,
+        message: `Entrada registrada. El turno conciliara hasta las ${eligibleCheckInSlot.end_time.slice(0, 5)}.`,
+      });
 
       return json({
         success: true,
@@ -203,6 +274,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // ======================== CHECK-OUT ========================
     if (action === "check-out") {
       if (currentStatus !== "checked_in" || !dayState.openSlotId) {
+        await logAttendanceAttemptDebug(url, serviceRoleKey, {
+          organizationId: orgId,
+          actorSessionId: auth.session.id,
+          employeeId: employee.id,
+          action: "check_out",
+          outcome: "blocked_not_checked_in",
+          clientDate,
+          message: "No tienes entrada registrada hoy",
+        });
         return json({ success: false, message: "No tienes entrada registrada hoy" }, 409);
       }
 
@@ -236,6 +316,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
         employeeId: employee.id,
         slotId: dayState.openSlotId,
         action: "attendance_check_out",
+      });
+      await logAttendanceAttemptDebug(url, serviceRoleKey, {
+        organizationId: orgId,
+        actorSessionId: auth.session.id,
+        employeeId: employee.id,
+        action: "check_out",
+        outcome: "success",
+        clientDate,
+        slotId: dayState.openSlotId,
+        scheduledStart: dayState.openSlot?.start_time || null,
+        scheduledEnd: dayState.openSlot?.end_time || null,
+        message: "Salida registrada",
       });
 
       const updatedState = await getAttendanceDayState(url, serviceRoleKey, orgId, employee.id, clientDate, now);

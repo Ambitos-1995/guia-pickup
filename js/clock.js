@@ -5,8 +5,11 @@ var Clock = (function () {
     'use strict';
 
     var clockTimer;
+    var syncTimer;
+    var todaySlotRequestId = 0;
     var timeEl, statusEl, todaySlotEl;
     var btnIn, btnOut, feedbackEl, feedbackMsg, feedbackScheduleBtn;
+    var SYNC_INTERVAL_MS = 5000;
 
     function init() {
         timeEl = document.getElementById('clock-time');
@@ -36,11 +39,15 @@ var Clock = (function () {
         updateClock();
         clockTimer = setInterval(updateClock, 1000);
         refreshStatus();
-        loadTodaySlot();
+        refreshRemoteState();
+        syncTimer = setInterval(refreshRemoteState, SYNC_INTERVAL_MS);
     }
 
     function hide() {
         if (clockTimer) clearInterval(clockTimer);
+        if (syncTimer) clearInterval(syncTimer);
+        clockTimer = 0;
+        syncTimer = 0;
     }
 
     function updateClock() {
@@ -73,6 +80,7 @@ var Clock = (function () {
 
     function loadTodaySlot() {
         var session = App.getSession();
+        var requestId;
         if (!session) return;
 
         var info = Utils.currentWeekInfo();
@@ -85,10 +93,12 @@ var Clock = (function () {
         }
 
         todaySlotEl.textContent = 'Cargando turno de hoy...';
+        requestId = ++todaySlotRequestId;
 
         Api.getWeekSlots(info.year, info.week).then(function (res) {
             if (!res || !res.success || !res.data) {
-                todaySlotEl.textContent = '';
+                if (requestId !== todaySlotRequestId) return;
+                todaySlotEl.textContent = 'No se pudo comprobar el turno de hoy';
                 return;
             }
 
@@ -101,6 +111,8 @@ var Clock = (function () {
                 }
             }
 
+            if (requestId !== todaySlotRequestId) return;
+
             if (mySlot) {
                 todaySlotEl.textContent = 'Hoy tienes turno de ' +
                     mySlot.start_time.substring(0, 5) + ' a ' +
@@ -108,7 +120,31 @@ var Clock = (function () {
             } else {
                 todaySlotEl.textContent = 'No tienes turno asignado hoy';
             }
+        }).catch(function () {
+            if (requestId !== todaySlotRequestId) return;
+            todaySlotEl.textContent = 'No se pudo comprobar el turno de hoy';
         });
+    }
+
+    function refreshRemoteState() {
+        var session = App.getSession();
+        if (!session) return;
+
+        Api.getClockStatus().then(function (res) {
+            if (!(res && res.success && res.data)) return;
+
+            session = App.getSession();
+            if (!session) return;
+
+            session.currentStatus = res.data.currentStatus || session.currentStatus || 'not_checked_in';
+            if (typeof res.data.employeeName === 'string' && res.data.employeeName) {
+                session.employeeName = res.data.employeeName;
+            }
+            App.setSession(session);
+            refreshStatus();
+        }).catch(function () {});
+
+        loadTodaySlot();
     }
 
     function doCheckIn() {
@@ -125,6 +161,7 @@ var Clock = (function () {
             if (res && res.success) {
                 session.currentStatus = 'checked_in';
                 App.setSession(session);
+                refreshRemoteState();
                 showFeedback('success', res.message || 'Entrada registrada');
                 setTimeout(function () { App.navigate('screen-menu'); }, 1800);
                 return;
@@ -152,6 +189,7 @@ var Clock = (function () {
             if (res && res.success) {
                 session.currentStatus = 'checked_out';
                 App.setSession(session);
+                refreshRemoteState();
                 showFeedback('success', res.message || 'Salida registrada');
                 setTimeout(function () { App.navigate('screen-menu'); }, 1800);
                 return;
