@@ -7,6 +7,28 @@ export const corsHeaders: Record<string, string> = {
   "Content-Type": "application/json",
 };
 
+export const APP_TIME_ZONE = "Europe/Madrid";
+
+interface CivilDateTimeParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+}
+
+const MADRID_DATE_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
 export type SessionRole = "org_admin" | "respondent";
 
 export interface SessionRecord {
@@ -765,8 +787,7 @@ export async function autoCloseStaleCheckIns(
     const slot = slotRes.ok ? slotRes.data[0] : null;
     if (!slot) continue;
 
-    const [eh, em] = slot.end_time.split(":").map(Number);
-    const slotEnd = new Date(`${clientDate}T${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}:00`);
+    const slotEnd = buildMadridDateTime(clientDate, slot.end_time);
     const autoCloseThreshold = new Date(slotEnd.getTime() + AUTO_CLOSE_DELAY_MIN * 60000);
 
     if (now >= autoCloseThreshold) {
@@ -867,12 +888,9 @@ export function slotHours(startTime: string, endTime: string): number {
 }
 
 export function computeWorkedMinutes(slotDate: Date, startTime: string, endTime: string, checkInIso: string): number {
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  const slotStart = new Date(slotDate);
-  slotStart.setUTCHours(sh, sm, 0, 0);
-  const slotEnd = new Date(slotDate);
-  slotEnd.setUTCHours(eh, em, 0, 0);
+  const slotDateIso = toUtcDateIso(slotDate);
+  const slotStart = buildMadridDateTime(slotDateIso, startTime);
+  const slotEnd = buildMadridDateTime(slotDateIso, endTime);
 
   const checkIn = new Date(checkInIso);
   const effectiveStart = new Date(Math.max(slotStart.getTime(), checkIn.getTime()));
@@ -884,19 +902,19 @@ export function computeWorkedMinutes(slotDate: Date, startTime: string, endTime:
 
 export function isoWeekInfoFromClientDate(clientDate: string): { year: number; week: number; dayOfWeek: number; date: Date } {
   const [year, month, day] = clientDate.split("-").map(Number);
-  const date = new Date(year, (month || 1) - 1, day || 1);
-  const dayValue = date.getDay();
+  const date = new Date(Date.UTC(year, (month || 1) - 1, day || 1));
+  const dayValue = date.getUTCDay();
   const dayOfWeek = dayValue === 0 ? 7 : dayValue;
   const anchor = new Date(date);
-  anchor.setHours(0, 0, 0, 0);
-  anchor.setDate(anchor.getDate() + 3 - (anchor.getDay() + 6) % 7);
-  const yearStart = new Date(anchor.getFullYear(), 0, 4);
+  anchor.setUTCHours(0, 0, 0, 0);
+  anchor.setUTCDate(anchor.getUTCDate() + 3 - (anchor.getUTCDay() + 6) % 7);
+  const yearStart = new Date(Date.UTC(anchor.getUTCFullYear(), 0, 4));
   const week = 1 + Math.round(
-    ((anchor.getTime() - yearStart.getTime()) / 86400000 - 3 + (yearStart.getDay() + 6) % 7) / 7,
+    ((anchor.getTime() - yearStart.getTime()) / 86400000 - 3 + (yearStart.getUTCDay() + 6) % 7) / 7,
   );
 
   return {
-    year: anchor.getFullYear(),
+    year: anchor.getUTCFullYear(),
     week,
     dayOfWeek,
     date,
@@ -911,7 +929,7 @@ function hasRemainingTodaySlot(
 ): boolean {
   for (const slot of slots) {
     if (slotStates[slot.id] === "closed") continue;
-    if (referenceNow <= buildClientDateTime(clientDate, slot.end_time)) {
+    if (referenceNow <= buildMadridDateTime(clientDate, slot.end_time)) {
       return true;
     }
   }
@@ -919,10 +937,82 @@ function hasRemainingTodaySlot(
   return false;
 }
 
-function buildClientDateTime(clientDate: string, timeValue: string): Date {
+export function madridDateIso(reference = new Date()): string {
+  const parts = getMadridDateTimeParts(reference);
+  return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
+}
+
+export function buildMadridDateTime(clientDate: string, timeValue: string): Date {
+  const target = parseCivilDateTime(clientDate, timeValue);
+  let candidate = new Date(Date.UTC(
+    target.year,
+    target.month - 1,
+    target.day,
+    target.hour,
+    target.minute,
+    target.second,
+    0,
+  ));
+
+  for (let i = 0; i < 4; i++) {
+    const resolved = getMadridDateTimeParts(candidate);
+    const diffMs = civilPartsToEpochMs(target) - civilPartsToEpochMs(resolved);
+    if (diffMs === 0) {
+      break;
+    }
+    candidate = new Date(candidate.getTime() + diffMs);
+  }
+
+  return candidate;
+}
+
+function parseCivilDateTime(clientDate: string, timeValue: string): CivilDateTimeParts {
   const [year, month, day] = clientDate.split("-").map(Number);
   const [hours, minutes, seconds] = String(timeValue || "00:00:00").split(":").map(Number);
-  return new Date(year, (month || 1) - 1, day || 1, hours || 0, minutes || 0, seconds || 0, 0);
+
+  return {
+    year,
+    month: month || 1,
+    day: day || 1,
+    hour: hours || 0,
+    minute: minutes || 0,
+    second: seconds || 0,
+  };
+}
+
+function getMadridDateTimeParts(reference: Date): CivilDateTimeParts {
+  const parts = MADRID_DATE_TIME_FORMATTER.formatToParts(reference);
+  const values: Partial<CivilDateTimeParts> = {};
+
+  for (const part of parts) {
+    if (part.type === "year") values.year = Number(part.value);
+    if (part.type === "month") values.month = Number(part.value);
+    if (part.type === "day") values.day = Number(part.value);
+    if (part.type === "hour") values.hour = Number(part.value);
+    if (part.type === "minute") values.minute = Number(part.value);
+    if (part.type === "second") values.second = Number(part.value);
+  }
+
+  return {
+    year: values.year || 0,
+    month: values.month || 1,
+    day: values.day || 1,
+    hour: values.hour || 0,
+    minute: values.minute || 0,
+    second: values.second || 0,
+  };
+}
+
+function civilPartsToEpochMs(value: CivilDateTimeParts): number {
+  return Date.UTC(value.year, value.month - 1, value.day, value.hour, value.minute, value.second, 0);
+}
+
+function toUtcDateIso(date: Date): string {
+  return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
 }
 
 function pushUnique(collection: string[], value: string): void {

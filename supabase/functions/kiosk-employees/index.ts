@@ -15,6 +15,7 @@ import {
   issueSession,
   json,
   logAudit,
+  madridDateIso,
   recordAuthAttempt,
   requireSession,
   resolveEmployeeByPin,
@@ -148,7 +149,7 @@ async function handleVerify(
   }
 
   const userAgent = getUserAgent(req);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = madridDateIso();
   const currentStatus = await currentAttendanceStatus(supabaseUrl, key, orgId, employee.id, today);
 
   const sessionRole = "respondent";

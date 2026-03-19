@@ -1,15 +1,19 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import {
+  APP_TIME_ZONE,
   authHeaders,
   autoCloseStaleCheckIns,
+  buildMadridDateTime,
   corsHeaders,
   fetchJson,
   getAttendanceDayState,
   isoWeekInfoFromClientDate,
+  isoWeekToDate,
   json,
   logAudit,
   logAttendanceAttemptDebug,
+  madridDateIso,
   requireOfflineClockToken,
   requireSession,
   resolveOrgId,
@@ -57,7 +61,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const body = await req.json() as ClockBody;
     const orgSlug = String(body.orgSlug || "").trim();
     const action = String(body.action || "").trim();
-    const clientDate = String(body.clientDate || new Date().toISOString().slice(0, 10));
+    const clientDate = String(body.clientDate || madridDateIso());
     const clientTimestamp = String(body.clientTimestamp || "").trim();
     const clientEventId = String(body.clientEventId || "").trim();
     const eventNow = parseClientTimestamp(clientTimestamp) || new Date();
@@ -449,9 +453,7 @@ function findNextAssignedSlot(
 ): { slot: ScheduleSlotRow; date: Date } | null {
   for (const slot of slots) {
     const slotDate = isoWeekDate(Number(slot.year), Number(slot.week), Number(slot.day_of_week));
-    const [sh, sm] = slot.start_time.split(":").map(Number);
-    const slotStart = new Date(slotDate);
-    slotStart.setHours(sh, sm, 0, 0);
+    const slotStart = buildMadridDateTime(toDateIso(slotDate), slot.start_time);
 
     if (slotStart.getTime() >= reference.getTime()) {
       return { slot, date: slotDate };
@@ -514,6 +516,7 @@ function buildNextSlotData(
 
 function formatSlotLabel(nextSlot: { slot: ScheduleSlotRow; date: Date }): string {
   const dayLabel = new Intl.DateTimeFormat("es-ES", {
+    timeZone: APP_TIME_ZONE,
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -523,18 +526,13 @@ function formatSlotLabel(nextSlot: { slot: ScheduleSlotRow; date: Date }): strin
 }
 
 function isoWeekDate(year: number, week: number, dayOfWeek: number): Date {
-  const jan4 = new Date(Date.UTC(year, 0, 4));
-  const jan4Day = jan4.getUTCDay() || 7;
-  const monday = new Date(jan4);
-  monday.setUTCDate(jan4.getUTCDate() - jan4Day + 1 + ((week - 1) * 7) + (dayOfWeek - 1));
-
-  return new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate());
+  return isoWeekToDate(year, week, dayOfWeek);
 }
 
 function toDateIso(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -562,7 +560,7 @@ function findNextAvailableTodaySlot(
 ): ScheduleSlotRow | null {
   for (const slot of slots) {
     if (slotStates[slot.id] === "closed") continue;
-    if (now <= buildClientDateTime(clientDate, slot.end_time)) {
+    if (now <= buildMadridDateTime(clientDate, slot.end_time)) {
       return slot;
     }
   }
@@ -578,7 +576,7 @@ function findReferenceTodaySlot(
   let reference: ScheduleSlotRow | null = null;
 
   for (const slot of slots) {
-    if (now >= buildClientDateTime(clientDate, slot.end_time)) {
+    if (now >= buildMadridDateTime(clientDate, slot.end_time)) {
       reference = slot;
       continue;
     }
@@ -593,20 +591,14 @@ function findReferenceTodaySlot(
 }
 
 function isInsideCheckInWindow(slot: ScheduleSlotRow, clientDate: string, now: Date): boolean {
-  const windowStart = new Date(buildClientDateTime(clientDate, slot.start_time).getTime() - 15 * 60000);
-  const slotEnd = buildClientDateTime(clientDate, slot.end_time);
+  const windowStart = new Date(buildMadridDateTime(clientDate, slot.start_time).getTime() - 15 * 60000);
+  const slotEnd = buildMadridDateTime(clientDate, slot.end_time);
   return now >= windowStart && now <= slotEnd;
 }
 
 function isBeforeCheckInWindow(slot: ScheduleSlotRow, clientDate: string, now: Date): boolean {
-  const windowStart = new Date(buildClientDateTime(clientDate, slot.start_time).getTime() - 15 * 60000);
+  const windowStart = new Date(buildMadridDateTime(clientDate, slot.start_time).getTime() - 15 * 60000);
   return now < windowStart;
-}
-
-function buildClientDateTime(clientDate: string, timeValue: string): Date {
-  const [year, month, day] = clientDate.split("-").map(Number);
-  const [hours, minutes, seconds] = String(timeValue || "00:00:00").split(":").map(Number);
-  return new Date(year, (month || 1) - 1, day || 1, hours || 0, minutes || 0, seconds || 0, 0);
 }
 
 async function findAttendanceByClientEventId(
