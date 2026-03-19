@@ -1,6 +1,8 @@
 {
+    "id": "/",
     "name": "Punto de encuentro inclusivo",
-    "short_name": "Punto de encuentro inclusivo",
+    "short_name": "Pickup TMG",
+    "lang": "es",
     "description": "Fichaje y horarios para el punto pickup SEUR",
     "start_url": "./index.html",
     "scope": "./",

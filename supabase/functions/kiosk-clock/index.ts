@@ -19,6 +19,8 @@ interface ClockBody {
   orgSlug?: string;
   action?: string;
   clientDate?: string;
+  clientTimestamp?: string;
+  clientEventId?: string;
 }
 
 interface ScheduleSlotRow {
@@ -29,6 +31,17 @@ interface ScheduleSlotRow {
   start_time: string;
   end_time: string;
 }
+
+interface AttendanceReplayRow {
+  id: string;
+  action: string;
+  slot_id: string | null;
+  recorded_at: string;
+  client_event_id?: string | null;
+}
+
+const MAX_CLIENT_TIMESTAMP_AGE_MS = 72 * 60 * 60 * 1000;
+const MAX_CLIENT_TIMESTAMP_FUTURE_MS = 5 * 60 * 1000;
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -44,6 +57,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const orgSlug = String(body.orgSlug || "").trim();
     const action = String(body.action || "").trim();
     const clientDate = String(body.clientDate || new Date().toISOString().slice(0, 10));
+    const clientTimestamp = String(body.clientTimestamp || "").trim();
+    const clientEventId = String(body.clientEventId || "").trim();
+    const eventNow = parseClientTimestamp(clientTimestamp) || new Date();
 
     if (!orgSlug) {
       return json({ success: false, message: "Falta la organizacion" }, 400);
@@ -94,10 +110,33 @@ Deno.serve(async (req: Request): Promise<Response> => {
       console.warn("Auto-close error (non-fatal):", e);
     }
 
-    const now = new Date();
-    const dayState = await getAttendanceDayState(url, serviceRoleKey, orgId, employee.id, clientDate, now);
-    const currentStatus = dayState.status;
     const employeeName = `${employee.nombre} ${employee.apellido}`.trim();
+
+    if (clientEventId && action !== "status") {
+      const existingAttendance = await findAttendanceByClientEventId(
+        url,
+        serviceRoleKey,
+        orgId,
+        employee.id,
+        clientEventId,
+      );
+      if (existingAttendance) {
+        return await buildReplayResponse(
+          url,
+          serviceRoleKey,
+          orgId,
+          employee.id,
+          employeeName,
+          clientDate,
+          eventNow,
+          action,
+          existingAttendance,
+        );
+      }
+    }
+
+    const dayState = await getAttendanceDayState(url, serviceRoleKey, orgId, employee.id, clientDate, eventNow);
+    const currentStatus = dayState.status;
 
     if (action === "status") {
       await logAttendanceAttemptDebug(url, serviceRoleKey, {
@@ -133,9 +172,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
         Number(item.week) === week &&
         Number(item.day_of_week) === dayOfWeek
       );
-    const nextScheduledSlot = findNextAssignedSlot(employeeSlots, now);
-    const eligibleCheckInSlot = findEligibleCheckInSlot(todaySlots, dayState.slotStates, clientDate, now);
-    const nextAvailableTodaySlot = findNextAvailableTodaySlot(todaySlots, dayState.slotStates, clientDate, now);
+    const nextScheduledSlot = findNextAssignedSlot(employeeSlots, eventNow);
+    const eligibleCheckInSlot = findEligibleCheckInSlot(todaySlots, dayState.slotStates, clientDate, eventNow);
+    const nextAvailableTodaySlot = findNextAvailableTodaySlot(todaySlots, dayState.slotStates, clientDate, eventNow);
 
     // ======================== CHECK-IN ========================
     if (action === "check-in") {
@@ -192,8 +231,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const fallbackNextSlot = nextAvailableTodaySlot
           ? toScheduledSlotRef(nextAvailableTodaySlot)
           : nextScheduledSlot;
-        const referenceSlot = findReferenceTodaySlot(todaySlots, clientDate, now) || todaySlots[todaySlots.length - 1];
-        const isEarly = !!(nextAvailableTodaySlot && isBeforeCheckInWindow(nextAvailableTodaySlot, clientDate, now));
+        const referenceSlot = findReferenceTodaySlot(todaySlots, clientDate, eventNow) || todaySlots[todaySlots.length - 1];
+        const isEarly = !!(nextAvailableTodaySlot && isBeforeCheckInWindow(nextAvailableTodaySlot, clientDate, eventNow));
         const blockedMessage = buildOutsideScheduleMessage(fallbackNextSlot, referenceSlot, isEarly);
         const blockedData = buildNextSlotData(fallbackNextSlot, "outside_schedule", referenceSlot);
         await logAttendanceAttemptDebug(url, serviceRoleKey, {
@@ -231,11 +270,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
             slot_id: eligibleCheckInSlot.id,
             action: "check_in",
             client_date: clientDate,
+            recorded_at: eventNow.toISOString(),
+            client_event_id: clientEventId || null,
           }),
         },
       );
 
       if (!insert.ok || !insert.data[0]) {
+        const replayResponse = clientEventId
+          ? await buildReplayResponseFromExistingAttendance(
+            url,
+            serviceRoleKey,
+            orgId,
+            employee.id,
+            employeeName,
+            clientDate,
+            eventNow,
+            action,
+            clientEventId,
+          )
+          : null;
+        if (replayResponse) {
+          return replayResponse;
+        }
+
         return json({ success: false, message: "Error al registrar fichaje" }, 500);
       }
 
@@ -301,11 +359,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
             slot_id: dayState.openSlotId,
             action: "check_out",
             client_date: clientDate,
+            recorded_at: eventNow.toISOString(),
+            client_event_id: clientEventId || null,
           }),
         },
       );
 
       if (!insertOut.ok || !insertOut.data[0]) {
+        const replayResponse = clientEventId
+          ? await buildReplayResponseFromExistingAttendance(
+            url,
+            serviceRoleKey,
+            orgId,
+            employee.id,
+            employeeName,
+            clientDate,
+            eventNow,
+            action,
+            clientEventId,
+          )
+          : null;
+        if (replayResponse) {
+          return replayResponse;
+        }
+
         return json({ success: false, message: "Error al registrar salida" }, 500);
       }
 
@@ -330,7 +407,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         message: "Salida registrada",
       });
 
-      const updatedState = await getAttendanceDayState(url, serviceRoleKey, orgId, employee.id, clientDate, now);
+      const updatedState = await getAttendanceDayState(url, serviceRoleKey, orgId, employee.id, clientDate, eventNow);
 
       return json({
         success: true,
@@ -510,4 +587,138 @@ function buildClientDateTime(clientDate: string, timeValue: string): Date {
   const [year, month, day] = clientDate.split("-").map(Number);
   const [hours, minutes, seconds] = String(timeValue || "00:00:00").split(":").map(Number);
   return new Date(year, (month || 1) - 1, day || 1, hours || 0, minutes || 0, seconds || 0, 0);
+}
+
+async function findAttendanceByClientEventId(
+  supabaseUrl: string,
+  key: string,
+  orgId: string,
+  employeeId: string,
+  clientEventId: string,
+): Promise<AttendanceReplayRow | null> {
+  const encodedId = encodeURIComponent(clientEventId);
+  const res = await fetchJson<AttendanceReplayRow[]>(
+    `${supabaseUrl}/rest/v1/kiosk_attendance` +
+      `?select=id,action,slot_id,recorded_at,client_event_id` +
+      `&organization_id=eq.${orgId}` +
+      `&employee_id=eq.${employeeId}` +
+      `&client_event_id=eq.${encodedId}` +
+      `&limit=1`,
+    { headers: authHeaders(key) },
+  );
+
+  return res.ok ? res.data[0] ?? null : null;
+}
+
+async function buildReplayResponse(
+  supabaseUrl: string,
+  key: string,
+  orgId: string,
+  employeeId: string,
+  employeeName: string,
+  clientDate: string,
+  referenceNow: Date,
+  requestedAction: string,
+  existingAttendance: AttendanceReplayRow,
+): Promise<Response> {
+  const normalizedExistingAction = existingAttendance.action === "check_in"
+    ? "check-in"
+    : existingAttendance.action === "check_out"
+    ? "check-out"
+    : existingAttendance.action;
+
+  if (normalizedExistingAction !== requestedAction) {
+    return json({ success: false, message: "El fichaje reenviado no coincide con la accion original" }, 409);
+  }
+
+  const dayState = await getAttendanceDayState(supabaseUrl, key, orgId, employeeId, clientDate, referenceNow);
+  if (requestedAction === "check-in") {
+    const shiftEndTime = await findSlotEndTimeById(supabaseUrl, key, existingAttendance.slot_id);
+    const message = shiftEndTime
+      ? `Entrada registrada. El turno conciliara hasta las ${shiftEndTime.slice(0, 5)}.`
+      : "Entrada registrada";
+
+    return json({
+      success: true,
+      message,
+      data: {
+        employeeName,
+        currentStatus: dayState.status,
+        shiftEndTime: shiftEndTime ? shiftEndTime.slice(0, 5) : undefined,
+      },
+    });
+  }
+
+  return json({
+    success: true,
+    message: "Salida registrada",
+    data: {
+      employeeName,
+      currentStatus: dayState.status,
+    },
+  });
+}
+
+async function buildReplayResponseFromExistingAttendance(
+  supabaseUrl: string,
+  key: string,
+  orgId: string,
+  employeeId: string,
+  employeeName: string,
+  clientDate: string,
+  referenceNow: Date,
+  requestedAction: string,
+  clientEventId: string,
+): Promise<Response | null> {
+  const existingAttendance = await findAttendanceByClientEventId(
+    supabaseUrl,
+    key,
+    orgId,
+    employeeId,
+    clientEventId,
+  );
+
+  if (!existingAttendance) {
+    return null;
+  }
+
+  return buildReplayResponse(
+    supabaseUrl,
+    key,
+    orgId,
+    employeeId,
+    employeeName,
+    clientDate,
+    referenceNow,
+    requestedAction,
+    existingAttendance,
+  );
+}
+
+async function findSlotEndTimeById(
+  supabaseUrl: string,
+  key: string,
+  slotId: string | null,
+): Promise<string> {
+  if (!slotId) return "";
+
+  const res = await fetchJson<Array<{ end_time: string }>>(
+    `${supabaseUrl}/rest/v1/kiosk_schedule_slots?select=end_time&id=eq.${slotId}&limit=1`,
+    { headers: authHeaders(key) },
+  );
+
+  return res.ok && res.data[0] ? res.data[0].end_time : "";
+}
+
+function parseClientTimestamp(value: string): Date | null {
+  if (!value) return null;
+
+  const parsed = new Date(value);
+  if (isNaN(parsed.getTime())) return null;
+
+  const deltaMs = parsed.getTime() - Date.now();
+  if (deltaMs > MAX_CLIENT_TIMESTAMP_FUTURE_MS) return null;
+  if (deltaMs < -MAX_CLIENT_TIMESTAMP_AGE_MS) return null;
+
+  return parsed;
 }

@@ -7,6 +7,7 @@ module.exports = defineConfig({
     timeout: 5000
   },
   fullyParallel: true,
+  workers: 2,
   reporter: 'list',
   use: {
     baseURL: 'http://127.0.0.1:4173',

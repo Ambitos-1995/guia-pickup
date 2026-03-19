@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pickup-tmg-v67';
+var CACHE_NAME = 'pickup-tmg-v69';
 var FILES_TO_CACHE = [
     './index.html',
     './manifest.json',
@@ -26,6 +26,7 @@ var FILES_TO_CACHE = [
     './js/utils.js',
     './js/pin-pad.js',
     './js/api.js',
+    './js/offline-clock-queue.js',
     './js/webawesome-init.js',
     './js/pin.js',
     './js/schedule.js',
@@ -35,18 +36,7 @@ var FILES_TO_CACHE = [
     './js/admin.js',
     './js/install.js',
     './js/app.js',
-    './js/sw-register.js',
-    './img/fotos-con-circulos/1.png',
-    './img/fotos-con-circulos/2.png',
-    './img/fotos-con-circulos/3.png',
-    './img/fotos-con-circulos/4.png',
-    './img/fotos-con-circulos/5.png',
-    './img/fotos-con-circulos/6.png',
-    './img/fotos-con-circulos/7.png',
-    './img/fotos-con-circulos/8.png',
-    './img/fotos-con-circulos/9.png',
-    './img/fotos-con-circulos/10.png',
-    './img/fotos-con-circulos/11.png'
+    './js/sw-register.js'
 ];
 
 function isSameOrigin(url) {
@@ -121,13 +111,11 @@ function networkFirst(request) {
     });
 }
 
-// Install: cache all static assets, then activate immediately
+// Install: cache all static assets. Updates wait for explicit client approval.
 self.addEventListener('install', function (e) {
     e.waitUntil(
         caches.open(CACHE_NAME).then(function (cache) {
             return cache.addAll(FILES_TO_CACHE);
-        }).then(function () {
-            return self.skipWaiting();
         })
     );
 });
@@ -165,7 +153,9 @@ self.addEventListener('fetch', function (e) {
         e.respondWith(
             fetch(e.request).catch(function () {
                 return new Response(JSON.stringify({ success: false, message: 'Sin conexion' }), {
-                    headers: { 'Content-Type': 'application/json' }
+                    status: 503,
+                    statusText: 'Offline',
+                    headers: { 'Content-Type': 'application/json; charset=utf-8' }
                 });
             })
         );

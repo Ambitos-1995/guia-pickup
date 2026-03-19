@@ -33,16 +33,16 @@ var Api = (function () {
                 return { success: false, message: 'Respuesta invalida del servidor' };
             }).then(function (payload) {
                 payload.httpStatus = res.status;
-                if (opts.requiresAuth && (res.status === 401 || res.status === 403) &&
+                if (!opts.suppressTouchSession && opts.requiresAuth && !opts.accessToken && session && session.accessToken &&
+                    !(res.status === 401 || res.status === 403) &&
+                    typeof App !== 'undefined' && App.touchSession) {
+                    App.touchSession();
+                }
+                if (!opts.silentAuthFailure && opts.requiresAuth && (res.status === 401 || res.status === 403) &&
                     payload && (payload.error === 'AUTH_REQUIRED' || payload.error === 'SESSION_EXPIRED' || payload.error === 'TOKEN_INVALID' || payload.error === 'SESSION_NOT_FOUND')) {
                     if (typeof App !== 'undefined' && App.handleAuthFailure) {
                         App.handleAuthFailure(payload.message || 'Tu sesion ha caducado.');
                     }
-                }
-                if (opts.requiresAuth && !opts.accessToken && session && session.accessToken &&
-                    !(res.status === 401 || res.status === 403) &&
-                    typeof App !== 'undefined' && App.touchSession) {
-                    App.touchSession();
                 }
                 return payload;
             });
@@ -68,7 +68,11 @@ var Api = (function () {
 
     function buildAuthOptions(options) {
         var resolved = options || {};
-        var authOptions = { requiresAuth: true };
+        var authOptions = {
+            requiresAuth: true,
+            silentAuthFailure: !!resolved.silentAuthFailure,
+            suppressTouchSession: !!resolved.suppressTouchSession
+        };
 
         if (resolved.accessToken) {
             authOptions.accessToken = resolved.accessToken;
@@ -146,7 +150,9 @@ var Api = (function () {
         return postJson(FUNCTIONS_BASE + '/kiosk-clock', {
             orgSlug: ORG_SLUG,
             action: 'check-in',
-            clientDate: clientDate || Utils.today()
+            clientDate: clientDate || Utils.today(),
+            clientTimestamp: (options && typeof options.clientTimestamp === 'string' && options.clientTimestamp) ? options.clientTimestamp : new Date().toISOString(),
+            clientEventId: (options && typeof options.clientEventId === 'string' && options.clientEventId) ? options.clientEventId : ''
         }, buildAuthOptions(options));
     }
 
@@ -159,7 +165,9 @@ var Api = (function () {
         return postJson(FUNCTIONS_BASE + '/kiosk-clock', {
             orgSlug: ORG_SLUG,
             action: 'check-out',
-            clientDate: clientDate || Utils.today()
+            clientDate: clientDate || Utils.today(),
+            clientTimestamp: (options && typeof options.clientTimestamp === 'string' && options.clientTimestamp) ? options.clientTimestamp : new Date().toISOString(),
+            clientEventId: (options && typeof options.clientEventId === 'string' && options.clientEventId) ? options.clientEventId : ''
         }, buildAuthOptions(options));
     }
 

@@ -65,6 +65,14 @@ function buildState(overrides = {}) {
     createCalls: [],
     scheduleActionCalls: [],
     clockActionCalls: [],
+    clockStatus: 'not_checked_in',
+    employeeVerifyFailuresRemaining: 0,
+    clockFailuresRemaining: 0,
+    clockPermanentFailuresRemaining: 0,
+    clockPermanentFailureStatus: 409,
+    clockPermanentFailureMessage: 'No se pudo sincronizar el fichaje pendiente.',
+    clockCommitThenFailRemaining: 0,
+    clockEventsById: {},
     ...overrides
   };
 }
@@ -105,6 +113,11 @@ async function setupMockApi(page, overrides = {}) {
 
     if (url.pathname.endsWith('/kiosk-employees')) {
       if (body.action === 'verify') {
+        if (state.employeeVerifyFailuresRemaining > 0) {
+          state.employeeVerifyFailuresRemaining -= 1;
+          return fulfillJson(route, { success: false, message: 'Sin conexion' }, 503);
+        }
+
         if (body.pin === '1234') {
           return fulfillJson(route, {
             success: true,
@@ -249,7 +262,52 @@ async function setupMockApi(page, overrides = {}) {
     }
 
     if (url.pathname.endsWith('/kiosk-clock')) {
-      state.clockActionCalls.push({ action: body.action, auth: request.headers()['authorization'] || '' });
+      state.clockActionCalls.push({
+        action: body.action,
+        auth: request.headers()['authorization'] || '',
+        clientDate: body.clientDate || '',
+        clientTimestamp: body.clientTimestamp || '',
+        clientEventId: body.clientEventId || ''
+      });
+
+      if (body.action !== 'status' && state.clockFailuresRemaining > 0) {
+        state.clockFailuresRemaining -= 1;
+        return fulfillJson(route, {
+          success: false,
+          message: 'Sin conexion'
+        }, 503);
+      }
+
+      if (body.action !== 'status' && state.clockPermanentFailuresRemaining > 0) {
+        state.clockPermanentFailuresRemaining -= 1;
+        return fulfillJson(route, {
+          success: false,
+          message: state.clockPermanentFailureMessage
+        }, state.clockPermanentFailureStatus);
+      }
+
+      if (body.action !== 'status' && body.clientEventId && state.clockEventsById[body.clientEventId]) {
+        const existing = state.clockEventsById[body.clientEventId];
+        return fulfillJson(route, {
+          success: true,
+          message: existing.action === 'check-in' ? 'Entrada registrada' : 'Salida registrada',
+          data: {
+            employeeName: existing.employeeName,
+            currentStatus: existing.currentStatus
+          }
+        });
+      }
+
+      if (body.action === 'status') {
+        return fulfillJson(route, {
+          success: true,
+          data: {
+            employeeName: 'Ismael PÃ©rez',
+            currentStatus: state.clockStatus
+          }
+        });
+      }
+
       if ((request.headers()['authorization'] || '').includes('employee-token-4')) {
         return fulfillJson(route, {
           success: false,
@@ -264,7 +322,40 @@ async function setupMockApi(page, overrides = {}) {
         }, 403);
       }
 
+      if (body.action !== 'status' && state.clockCommitThenFailRemaining > 0) {
+        state.clockCommitThenFailRemaining -= 1;
+        if (body.action === 'check-out') {
+          state.clockStatus = 'checked_out';
+          if (body.clientEventId) {
+            state.clockEventsById[body.clientEventId] = {
+              action: 'check-out',
+              employeeName: 'Ismael Pérez',
+              currentStatus: 'checked_out'
+            };
+          }
+          return fulfillJson(route, { success: false, message: 'Sin conexion' }, 503);
+        }
+
+        state.clockStatus = 'checked_in';
+        if (body.clientEventId) {
+          state.clockEventsById[body.clientEventId] = {
+            action: 'check-in',
+            employeeName: 'Lucia Garcia',
+            currentStatus: 'checked_in'
+          };
+        }
+        return fulfillJson(route, { success: false, message: 'Sin conexion' }, 503);
+      }
+
       if (body.action === 'check-out') {
+        state.clockStatus = 'checked_out';
+        if (body.clientEventId) {
+          state.clockEventsById[body.clientEventId] = {
+            action: 'check-out',
+            employeeName: 'Ismael Pérez',
+            currentStatus: 'checked_out'
+          };
+        }
         return fulfillJson(route, {
           success: true,
           message: 'Salida registrada',
@@ -275,6 +366,14 @@ async function setupMockApi(page, overrides = {}) {
         });
       }
 
+      state.clockStatus = 'checked_in';
+      if (body.clientEventId) {
+        state.clockEventsById[body.clientEventId] = {
+          action: 'check-in',
+          employeeName: 'Lucia Garcia',
+          currentStatus: 'checked_in'
+        };
+      }
       return fulfillJson(route, {
         success: true,
         message: 'Entrada registrada',

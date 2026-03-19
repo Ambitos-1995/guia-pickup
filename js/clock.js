@@ -26,6 +26,9 @@ var Clock = (function () {
         Utils.bindPress(feedbackScheduleBtn, function () {
             App.navigate('screen-schedule');
         });
+
+        window.addEventListener('offline-clock-queue-empty', handleQueueEmpty);
+        window.addEventListener('offline-clock-queue-dropped', handleQueueDropped);
     }
 
     function show() {
@@ -56,16 +59,27 @@ var Clock = (function () {
 
     function refreshStatus() {
         var session = App.getSession();
+        var hasPending = hasPendingClockActions(session);
+        var effectiveStatus;
         if (!session) return;
+        effectiveStatus = getEffectiveStatus(session);
 
         feedbackEl.classList.add('hidden');
 
-        if (session.currentStatus === 'checked_in') {
+        if (hasPending) {
+            statusEl.className = 'clock-status status-pending-sync';
+            statusEl.textContent = 'Pendiente de sincronizacion';
+            btnIn.classList.add('hidden');
+            btnOut.classList.add('hidden');
+            return;
+        }
+
+        if (effectiveStatus === 'checked_in') {
             statusEl.className = 'clock-status status-pending-out';
             statusEl.textContent = 'Entrada registrada hoy';
             btnIn.classList.add('hidden');
             btnOut.classList.remove('hidden');
-        } else if (session.currentStatus === 'checked_out') {
+        } else if (effectiveStatus === 'checked_out') {
             statusEl.className = 'clock-status status-done';
             statusEl.textContent = 'Turno completado hoy';
             btnIn.classList.add('hidden');
@@ -130,6 +144,12 @@ var Clock = (function () {
         var session = App.getSession();
         if (!session) return;
 
+        if (hasPendingClockActions(session)) {
+            refreshStatus();
+            loadTodaySlot();
+            return;
+        }
+
         Api.getClockStatus().then(function (res) {
             if (!(res && res.success && res.data)) return;
 
@@ -149,18 +169,34 @@ var Clock = (function () {
 
     function doCheckIn() {
         var session = App.getSession();
+        var clientTimestamp;
         if (!session) return;
 
         btnIn.disabled = true;
         btnIn.textContent = 'Procesando...';
+        clientTimestamp = new Date().toISOString();
 
-        Api.checkIn().then(function (res) {
+        OfflineClockQueue.checkIn({
+            accessToken: session.accessToken,
+            expiresAt: session.expiresAt,
+            clientDate: Utils.today(),
+            clientTimestamp: clientTimestamp,
+            employeeId: session.employeeId,
+            employeeName: session.employeeName,
+            organizationId: session.organizationId
+        }).then(function (res) {
             btnIn.disabled = false;
             btnIn.textContent = 'ENTRADA';
 
             if (res && res.success) {
-                session.currentStatus = 'checked_in';
+                session.currentStatus = (res.data && res.data.currentStatus) || 'checked_in';
                 App.setSession(session);
+                if (res.queued) {
+                    showFeedback('warning', res.message || 'Entrada guardada sin conexion. Se sincronizara automaticamente.');
+                    setTimeout(function () { App.navigate('screen-menu'); }, 1800);
+                    return;
+                }
+
                 refreshRemoteState();
                 showFeedback('success', res.message || 'Entrada registrada');
                 setTimeout(function () { App.navigate('screen-menu'); }, 1800);
@@ -177,18 +213,34 @@ var Clock = (function () {
 
     function doCheckOut() {
         var session = App.getSession();
+        var clientTimestamp;
         if (!session) return;
 
         btnOut.disabled = true;
         btnOut.textContent = 'Procesando...';
+        clientTimestamp = new Date().toISOString();
 
-        Api.checkOut().then(function (res) {
+        OfflineClockQueue.checkOut({
+            accessToken: session.accessToken,
+            expiresAt: session.expiresAt,
+            clientDate: Utils.today(),
+            clientTimestamp: clientTimestamp,
+            employeeId: session.employeeId,
+            employeeName: session.employeeName,
+            organizationId: session.organizationId
+        }).then(function (res) {
             btnOut.disabled = false;
             btnOut.textContent = 'SALIDA';
 
             if (res && res.success) {
-                session.currentStatus = 'checked_out';
+                session.currentStatus = (res.data && res.data.currentStatus) || 'checked_out';
                 App.setSession(session);
+                if (res.queued) {
+                    showFeedback('warning', res.message || 'Salida guardada sin conexion. Se sincronizara automaticamente.');
+                    setTimeout(function () { App.navigate('screen-menu'); }, 1800);
+                    return;
+                }
+
                 refreshRemoteState();
                 showFeedback('success', res.message || 'Salida registrada');
                 setTimeout(function () { App.navigate('screen-menu'); }, 1800);
@@ -200,13 +252,46 @@ var Clock = (function () {
     }
 
     function showFeedback(type, message, showScheduleBtn) {
-        feedbackEl.classList.remove('hidden', 'feedback-success', 'feedback-error');
+        feedbackEl.classList.remove('hidden', 'feedback-success', 'feedback-error', 'feedback-warning');
         feedbackEl.classList.add('feedback-' + type);
         feedbackMsg.textContent = message;
         btnIn.classList.add('hidden');
         btnOut.classList.add('hidden');
         if (showScheduleBtn) feedbackScheduleBtn.classList.remove('hidden');
         else feedbackScheduleBtn.classList.add('hidden');
+    }
+
+    function hasPendingClockActions(session) {
+        if (!(typeof OfflineClockQueue !== 'undefined' && OfflineClockQueue.hasPendingForEmployee)) {
+            return false;
+        }
+
+        return !!(session && session.employeeId && OfflineClockQueue.hasPendingForEmployee(session.employeeId));
+    }
+
+    function getEffectiveStatus(session) {
+        if (!session) return 'not_checked_in';
+        if (!(typeof OfflineClockQueue !== 'undefined' && OfflineClockQueue.getOptimisticStatus)) {
+            return session.currentStatus || 'not_checked_in';
+        }
+
+        return OfflineClockQueue.getOptimisticStatus(session.employeeId, session.currentStatus || 'not_checked_in');
+    }
+
+    function handleQueueEmpty() {
+        if (!App.isScreen('screen-clock')) return;
+        refreshRemoteState();
+    }
+
+    function handleQueueDropped(event) {
+        var detail = event && event.detail ? event.detail : {};
+        var session = App.getSession();
+        if (!session || detail.employeeId !== session.employeeId) return;
+
+        refreshRemoteState();
+        if (App.isScreen('screen-clock')) {
+            showFeedback('error', detail.message || 'Un fichaje pendiente no pudo sincronizarse.', false);
+        }
     }
 
     function buildClockScheduleMessage(res) {

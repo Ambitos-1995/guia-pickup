@@ -5,9 +5,14 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..', '..');
 const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const directIndexHtml = fs.readFileSync(path.join(root, 'direct', 'index.html'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
 const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 const swRegister = fs.readFileSync(path.join(root, 'js', 'sw-register.js'), 'utf8');
+const apiJs = fs.readFileSync(path.join(root, 'js', 'api.js'), 'utf8');
+const offlineQueueJs = fs.readFileSync(path.join(root, 'js', 'offline-clock-queue.js'), 'utf8');
+const guiaJs = fs.readFileSync(path.join(root, 'js', 'guia.js'), 'utf8');
+const clockFunction = fs.readFileSync(path.join(root, 'supabase', 'functions', 'kiosk-clock', 'index.ts'), 'utf8');
 
 test('manifest icons exist on disk', () => {
   manifest.icons.forEach((icon) => {
@@ -22,6 +27,7 @@ test('core cached assets exist in the project', () => {
     'js/app.js',
     'js/admin.js',
     'js/api.js',
+    'js/offline-clock-queue.js',
     'js/pin.js',
     'manifest.json',
     'sw.js',
@@ -35,12 +41,35 @@ test('core cached assets exist in the project', () => {
   });
 });
 
+test('guide screenshots exist as webp assets', () => {
+  [
+    '1.webp',
+    '2.webp',
+    '3.webp',
+    '4.webp',
+    '5.webp',
+    '6.webp',
+    '7.webp',
+    '8.webp',
+    '9.webp',
+    '10.webp',
+    '11.webp'
+  ].forEach((fileName) => {
+    const filePath = path.join(root, 'img', 'fotos-con-circulos', fileName);
+    assert.ok(fs.existsSync(filePath), `Missing guide image: ${fileName}`);
+  });
+
+  assert.match(guiaJs, /fotos-con-circulos\/1\.webp/);
+  assert.doesNotMatch(guiaJs, /fotos-con-circulos\/1\.png/);
+});
+
 test('service worker uses network-first for app shell requests', () => {
   assert.match(sw, /function isAppShellRequest/);
   assert.match(sw, /e\.respondWith\(networkFirst\(e\.request\)\)/);
   assert.match(sw, /pathname === '\/direct' \|\|/);
   assert.match(sw, /return caches\.match\('\/direct\/index\.html'\)/);
   assert.doesNotMatch(sw, /direct\/manifest\.json/);
+  assert.doesNotMatch(sw, /fotos-con-circulos\/\d+\.(png|webp)/);
   [
     './js/pin-pad.js',
     './js/pin.js',
@@ -50,6 +79,7 @@ test('service worker uses network-first for app shell requests', () => {
     './js/payment.js',
     './js/admin.js',
     './js/install.js',
+    './js/offline-clock-queue.js',
     './js/app.js'
   ].forEach((assetPath) => {
     assert.match(sw, new RegExp(assetPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -57,10 +87,20 @@ test('service worker uses network-first for app shell requests', () => {
   assert.doesNotMatch(sw, /vendor\/supabase\/supabase\.min\.js/);
 });
 
-test('service worker registration bypasses cache and activates updates silently', () => {
+test('service worker registration exposes the manual update button and avoids the asset probe', () => {
   assert.match(swRegister, /updateViaCache:\s*'none'/);
+  assert.match(swRegister, /getElementById\('update-btn'\)/);
   assert.match(swRegister, /postMessage\(\{\s*type:\s*'SKIP_WAITING'\s*\}\)/);
   assert.match(swRegister, /window\.SW_REGISTER_URL \|\| '\/sw\.js'/);
+  assert.match(swRegister, /window\.location\.pathname\.indexOf\('\/direct'\)\s*===\s*0/);
+  assert.doesNotMatch(swRegister, /method:\s*'HEAD'/);
+  assert.doesNotMatch(swRegister, /assetProbeIntervalId/);
+  assert.doesNotMatch(swRegister, /fetchAssetFingerprint/);
+});
+
+test('service worker offline api fallback returns 503', () => {
+  assert.match(sw, /status:\s*503/);
+  assert.match(sw, /statusText:\s*'Offline'/);
 });
 
 test('index shell contains the main screen anchors', () => {
@@ -75,4 +115,32 @@ test('index shell contains the main screen anchors', () => {
   ].forEach((screenId) => {
     assert.match(indexHtml, new RegExp(`id="${screenId}"`), `Missing screen container ${screenId}`);
   });
+});
+
+test('shells expose the offline clock banner placeholder', () => {
+  assert.match(indexHtml, /id="offline-clock-banner"/);
+  assert.match(directIndexHtml, /id="offline-clock-banner"/);
+});
+
+test('direct shell also exposes the service worker update button', () => {
+  assert.match(directIndexHtml, /id="update-btn"/);
+});
+
+test('kiosk-clock keeps the original client timestamp when replaying offline punches', () => {
+  assert.match(clockFunction, /clientTimestamp\?: string/);
+  assert.match(clockFunction, /clientEventId\?: string/);
+  assert.match(clockFunction, /const eventNow = parseClientTimestamp\(clientTimestamp\) \|\| new Date\(\);/);
+  assert.match(clockFunction, /recorded_at: eventNow\.toISOString\(\)/);
+  assert.match(clockFunction, /client_event_id: clientEventId \|\| null/);
+  assert.ok(
+    clockFunction.indexOf('const employeeName =') < clockFunction.indexOf('return await buildReplayResponse('),
+    'employeeName must be initialized before the replay branch uses it'
+  );
+  assert.match(clockFunction, /buildReplayResponseFromExistingAttendance/);
+});
+
+test('clock requests carry a stable client event id through queue and api layers', () => {
+  assert.match(apiJs, /clientEventId:/);
+  assert.match(offlineQueueJs, /clientEventId/);
+  assert.match(offlineQueueJs, /generateClientEventId/);
 });

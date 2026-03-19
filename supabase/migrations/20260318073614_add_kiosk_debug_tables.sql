@@ -92,4 +92,4 @@ grant select, insert, update, delete on public.kiosk_debug_schedule_mutations to
 grant select, insert, update, delete on public.kiosk_debug_attendance_attempts to service_role;
 grant select, insert, update, delete on public.kiosk_debug_client_reports to service_role;
 
-commit;
+commit;;

@@ -148,6 +148,12 @@ var Pin = (function () {
                 currentStatus: res.data.currentStatus || 'not_checked_in'
             });
 
+            if ((res.data.role || 'respondent') === 'respondent' &&
+                typeof OfflineClockQueue !== 'undefined' &&
+                OfflineClockQueue.rememberVerifiedPin) {
+                OfflineClockQueue.rememberVerifiedPin(pin, res.data);
+            }
+
             clearPin();
             if (mode === 'login') {
                 if ((res.data.role || 'respondent') === 'org_admin') {

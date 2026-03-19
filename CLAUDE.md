@@ -55,7 +55,7 @@ All Edge Functions have `verify_jwt = false` — the kiosk uses PIN-based auth, 
 All JS files use **IIFE module pattern** (no ES modules, no bundler). Load order in `index.html` matters — dependencies must load before dependents:
 
 ```
-utils.js → api.js → pin.js, clock.js, schedule.js, guia.js, payment.js, admin.js, install.js → app.js
+utils.js → api.js → offline-clock-queue.js → pin.js, clock.js, schedule.js, guia.js, payment.js, admin.js, install.js → app.js
 ```
 
 `app.js` is loaded last and bootstraps everything via `App.init()`.
@@ -70,7 +70,7 @@ utils.js → api.js → pin.js, clock.js, schedule.js, guia.js, payment.js, admi
 All API calls go through **Supabase Edge Functions** at `https://mzuvkinwebqgmnutchsv.supabase.co/functions/v1`. Every request is a `POST` with JSON body including `orgSlug`. Functions: `kiosk-admin-verify`, `kiosk-employees`, `kiosk-clock`, `kiosk-schedule`, `kiosk-payment`.
 
 ### Service Worker (`sw.js`)
-Cache version is hardcoded (currently `pickup-tmg-v19`). **Increment the cache version number** whenever static assets change to force cache invalidation on existing clients. The SW uses cache-first for static assets and network-first for API/Supabase calls. The app auto-checks for SW updates every 60 seconds and on visibility change.
+Cache version is hardcoded (currently `pickup-tmg-v69`). **Increment the cache version number** whenever static assets change to force cache invalidation on existing clients. The SW uses cache-first for static assets and network-first for API/Supabase calls. The app checks for SW updates every 5 minutes and on visibility change, and the user confirms activation with the on-screen update button.
 
 ### Web Awesome Components
 UI components (dialogs, buttons, inputs, selects) come from Web Awesome, loaded from `vendor/webawesome/dist-cdn/`. Import declarations are in `js/webawesome-init.js`.

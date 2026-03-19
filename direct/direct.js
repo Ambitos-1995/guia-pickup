@@ -479,6 +479,13 @@ var Direct = (function () {
                 throw createActionError((verifyRes && verifyRes.message) || 'PIN incorrecto');
             }
 
+            if (OfflineClockQueue.rememberVerifiedPin) {
+                OfflineClockQueue.rememberVerifiedPin(pin, verifyRes.data);
+            }
+            if (OfflineClockQueue.rebindAccessToken) {
+                OfflineClockQueue.rebindAccessToken(verifyRes.data.employeeId, verifyRes.data.accessToken, verifyRes.data.expiresAt);
+            }
+
             return runScheduleActionWithToken(verifyRes.data.accessToken);
         }).then(function (actionRes) {
             if (!actionRes || !actionRes.success) {
@@ -597,35 +604,72 @@ var Direct = (function () {
         quickClockLoadingEl.classList.remove('hidden');
         if (quickClockPad) quickClockPad.setBusy(true);
 
-        Api.verifyPin(currentPin).then(function (verifyRes) {
-            if (!verifyRes || !verifyRes.success || !verifyRes.data || !verifyRes.data.accessToken) {
-                throw createActionError((verifyRes && verifyRes.message) || 'PIN incorrecto');
+        resolveClockIdentity(currentPin).then(function (identity) {
+            var effectiveStatus;
+            var hasPendingForEmployee;
+
+            if (!identity || !identity.data || !identity.data.accessToken) {
+                throw createActionError('PIN incorrecto');
             }
 
-            if (verifyRes.data.currentStatus === 'checked_out') {
-                showQuickClockResult('neutral', 'Turno completado', verifyRes.data.employeeName || 'Empleado', 'Ya has fichado entrada y salida hoy.');
+            hasPendingForEmployee = !!(OfflineClockQueue.hasPendingForEmployee && OfflineClockQueue.hasPendingForEmployee(identity.data.employeeId));
+            effectiveStatus = OfflineClockQueue.getOptimisticStatus
+                ? OfflineClockQueue.getOptimisticStatus(identity.data.employeeId, identity.data.currentStatus || 'not_checked_in')
+                : (identity.data.currentStatus || 'not_checked_in');
+
+            if (hasPendingForEmployee) {
+                showQuickClockResult('neutral', 'PENDIENTE', identity.data.employeeName || 'Empleado', 'Ya tienes un fichaje pendiente de sincronizar. Espera a que se complete antes de volver a fichar.');
                 return null;
             }
 
-            if (verifyRes.data.currentStatus === 'checked_in') {
-                return Api.checkOut({ accessToken: verifyRes.data.accessToken }).then(function (clockRes) {
+            if (effectiveStatus === 'checked_out') {
+                showQuickClockResult('neutral', 'Turno completado', identity.data.employeeName || 'Empleado', 'Ya has fichado entrada y salida hoy.');
+                return null;
+            }
+
+            if (effectiveStatus === 'checked_in') {
+                return OfflineClockQueue.checkOut({
+                    accessToken: identity.data.accessToken,
+                    expiresAt: identity.data.expiresAt || '',
+                    clientDate: Utils.today(),
+                    clientTimestamp: new Date().toISOString(),
+                    employeeId: identity.data.employeeId,
+                    employeeName: identity.data.employeeName,
+                    organizationId: identity.data.organizationId
+                }).then(function (clockRes) {
                     if (!clockRes || !clockRes.success) {
                         throw createActionError((clockRes && clockRes.message) || 'No se pudo registrar la salida.', {
-                            employeeName: verifyRes.data.employeeName || 'Empleado'
+                            employeeName: identity.data.employeeName || 'Empleado'
                         });
                     }
-                    showQuickClockResult('success', 'SALIDA', (clockRes.data && clockRes.data.employeeName) || verifyRes.data.employeeName || 'Empleado', (clockRes && clockRes.message) || 'Salida registrada.');
+                    if (clockRes.queued) {
+                        showQuickClockResult('neutral', 'PENDIENTE', (clockRes.data && clockRes.data.employeeName) || identity.data.employeeName || 'Empleado', (clockRes && clockRes.message) || 'Salida guardada sin conexion. Se sincronizara automaticamente.');
+                        return null;
+                    }
+                    showQuickClockResult('success', 'SALIDA', (clockRes.data && clockRes.data.employeeName) || identity.data.employeeName || 'Empleado', (clockRes && clockRes.message) || 'Salida registrada.');
                     return null;
                 });
             }
 
-            return Api.checkIn({ accessToken: verifyRes.data.accessToken }).then(function (clockRes) {
+            return OfflineClockQueue.checkIn({
+                accessToken: identity.data.accessToken,
+                expiresAt: identity.data.expiresAt || '',
+                clientDate: Utils.today(),
+                clientTimestamp: new Date().toISOString(),
+                employeeId: identity.data.employeeId,
+                employeeName: identity.data.employeeName,
+                organizationId: identity.data.organizationId
+            }).then(function (clockRes) {
                 if (!clockRes || !clockRes.success) {
                     throw createActionError((clockRes && clockRes.message) || 'No se pudo registrar la entrada.', {
-                        employeeName: verifyRes.data.employeeName || 'Empleado'
+                        employeeName: identity.data.employeeName || 'Empleado'
                     });
                 }
-                showQuickClockResult('success', 'ENTRADA', (clockRes.data && clockRes.data.employeeName) || verifyRes.data.employeeName || 'Empleado', (clockRes && clockRes.message) || 'Entrada registrada.');
+                if (clockRes.queued) {
+                    showQuickClockResult('neutral', 'PENDIENTE', (clockRes.data && clockRes.data.employeeName) || identity.data.employeeName || 'Empleado', (clockRes && clockRes.message) || 'Entrada guardada sin conexion. Se sincronizara automaticamente.');
+                    return null;
+                }
+                showQuickClockResult('success', 'ENTRADA', (clockRes.data && clockRes.data.employeeName) || identity.data.employeeName || 'Empleado', (clockRes && clockRes.message) || 'Entrada registrada.');
                 return null;
             });
         }).catch(function (error) {
@@ -638,6 +682,51 @@ var Direct = (function () {
             clockBusy = false;
             quickClockLoadingEl.classList.add('hidden');
             if (quickClockPad) quickClockPad.setBusy(false);
+        });
+    }
+
+    function resolveClockIdentity(pin) {
+        return Api.verifyPin(pin).then(function (verifyRes) {
+            if (verifyRes && verifyRes.success && verifyRes.data && verifyRes.data.accessToken) {
+                if (OfflineClockQueue.rememberVerifiedPin) {
+                    OfflineClockQueue.rememberVerifiedPin(pin, verifyRes.data);
+                }
+                if (OfflineClockQueue.rebindAccessToken) {
+                    OfflineClockQueue.rebindAccessToken(verifyRes.data.employeeId, verifyRes.data.accessToken, verifyRes.data.expiresAt);
+                }
+                return {
+                    fromOfflineCache: false,
+                    data: verifyRes.data
+                };
+            }
+
+            if (OfflineClockQueue.isTransientVerifyFailure && OfflineClockQueue.isTransientVerifyFailure(verifyRes)) {
+                return resolveOfflineClockIdentity(pin);
+            }
+
+            throw createActionError((verifyRes && verifyRes.message) || 'PIN incorrecto');
+        }).catch(function (error) {
+            if (error && error.message === 'PIN incorrecto') {
+                throw error;
+            }
+            return resolveOfflineClockIdentity(pin, error);
+        });
+    }
+
+    function resolveOfflineClockIdentity(pin, originalError) {
+        if (!OfflineClockQueue.resolveOfflinePin) {
+            throw createActionError((originalError && originalError.message) || 'Sin conexion');
+        }
+
+        return OfflineClockQueue.resolveOfflinePin(pin).then(function (cachedIdentity) {
+            if (cachedIdentity && cachedIdentity.accessToken) {
+                return {
+                    fromOfflineCache: true,
+                    data: cachedIdentity
+                };
+            }
+
+            throw createActionError('Sin conexion. Este PIN todavia no se puede validar sin red.');
         });
     }
 

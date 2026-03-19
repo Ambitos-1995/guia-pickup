@@ -4,7 +4,7 @@
 var App = (function () {
     'use strict';
 
-    var APP_VERSION = '2026.03.18-r1';
+    var APP_VERSION = '2026.03.18-r3';
     var SESSION_STORAGE_KEY = 'pickup-tmg-session-v1';
     var EMPLOYEE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
     var ADMIN_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
@@ -102,7 +102,7 @@ var App = (function () {
         requestAnimationFrame(function () {
             if (menuEl) menuEl.classList.remove('no-transition');
         });
-
+        bindOfflineQueueEvents();
     }
 
     function navigate(screenId) {
@@ -165,6 +165,10 @@ var App = (function () {
         session = normalizeSession(data);
         persistSession();
         showMenu();
+        if (session && session.employeeId && session.accessToken &&
+            typeof OfflineClockQueue !== 'undefined' && OfflineClockQueue.rebindAccessToken) {
+            OfflineClockQueue.rebindAccessToken(session.employeeId, session.accessToken, session.expiresAt);
+        }
     }
 
     function clearSession() {
@@ -223,6 +227,7 @@ var App = (function () {
 
     function showMenu() {
         var activeSession = getSession();
+        var hasPending = hasPendingClockActions(activeSession);
         var greetingEl = document.getElementById('greeting');
         var statusEl = document.getElementById('fichar-status');
         var scheduleCard = document.getElementById('card-schedule');
@@ -242,9 +247,11 @@ var App = (function () {
 
         if (activeSession && activeSession.role === 'respondent') {
             greetingEl.textContent = activeSession.employeeName || 'Sesion activa';
-            statusEl.textContent = activeSession.currentStatus === 'checked_in'
+            statusEl.textContent = hasPending
+                ? 'Pendiente'
+                : getEffectiveStatus(activeSession) === 'checked_in'
                 ? 'Entrada registrada'
-                : activeSession.currentStatus === 'checked_out'
+                : getEffectiveStatus(activeSession) === 'checked_out'
                 ? 'Turno completado'
                 : '';
             ficharCard.classList.remove('hidden');
@@ -259,9 +266,11 @@ var App = (function () {
             if (adminBuildVersion) adminBuildVersion.classList.add('hidden');
         } else if (activeSession && activeSession.role === 'org_admin') {
             greetingEl.textContent = 'Administrador';
-            statusEl.textContent = activeSession.currentStatus === 'checked_in'
+            statusEl.textContent = hasPending
+                ? 'Pendiente'
+                : getEffectiveStatus(activeSession) === 'checked_in'
                 ? 'Entrada registrada'
-                : activeSession.currentStatus === 'checked_out'
+                : getEffectiveStatus(activeSession) === 'checked_out'
                 ? 'Turno completado'
                 : '';
             ficharCard.classList.remove('hidden');
@@ -467,6 +476,73 @@ var App = (function () {
         card.disabled = !!locked;
         card.setAttribute('aria-disabled', locked ? 'true' : 'false');
         card.classList.toggle('is-locked', !!locked);
+    }
+
+    function hasPendingClockActions(activeSession) {
+        if (!(typeof OfflineClockQueue !== 'undefined' && OfflineClockQueue.hasPendingForEmployee)) {
+            return false;
+        }
+
+        return !!(activeSession && activeSession.employeeId && OfflineClockQueue.hasPendingForEmployee(activeSession.employeeId));
+    }
+
+    function getEffectiveStatus(activeSession) {
+        if (!activeSession) return 'not_checked_in';
+        if (!(typeof OfflineClockQueue !== 'undefined' && OfflineClockQueue.getOptimisticStatus)) {
+            return activeSession.currentStatus || 'not_checked_in';
+        }
+
+        return OfflineClockQueue.getOptimisticStatus(activeSession.employeeId, activeSession.currentStatus || 'not_checked_in');
+    }
+
+    function bindOfflineQueueEvents() {
+        window.addEventListener('offline-clock-queue-change', function () {
+            if (currentScreen === 'screen-menu') {
+                showMenu();
+            }
+        });
+
+        window.addEventListener('offline-clock-queue-synced', function (event) {
+            var detail = event && event.detail ? event.detail : {};
+            var activeSession = getSession();
+            if (!activeSession || !detail || detail.employeeId !== activeSession.employeeId) {
+                if (currentScreen === 'screen-menu') {
+                    showMenu();
+                }
+                return;
+            }
+
+            if (detail.response && detail.response.data && detail.response.data.currentStatus) {
+                activeSession.currentStatus = detail.response.data.currentStatus;
+                setSession(activeSession);
+                return;
+            }
+
+            if (currentScreen === 'screen-menu') {
+                showMenu();
+            }
+        });
+
+        window.addEventListener('offline-clock-queue-dropped', function (event) {
+            var detail = event && event.detail ? event.detail : {};
+            var activeSession = getSession();
+
+            if (!activeSession || !detail || detail.employeeId !== activeSession.employeeId) {
+                if (currentScreen === 'screen-menu') {
+                    showMenu();
+                }
+                return;
+            }
+
+            if (currentScreen === 'screen-menu') {
+                showMenu();
+            }
+
+            confirm(
+                'Fichaje no sincronizado',
+                detail.message || 'Un fichaje pendiente no pudo sincronizarse y se ha retirado de la cola.'
+            );
+        });
     }
 
     function restoreSession() {

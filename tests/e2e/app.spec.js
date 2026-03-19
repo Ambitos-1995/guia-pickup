@@ -19,6 +19,29 @@ async function enterDirectDialogPin(page, pin) {
   }
 }
 
+test.afterEach(async ({ page }) => {
+  if (!page) return;
+
+  await page.evaluate(async () => {
+    try {
+      window.localStorage.clear();
+    } catch (error) {}
+
+    try {
+      window.sessionStorage.clear();
+    } catch (error) {}
+
+    if (window.indexedDB) {
+      await new Promise((resolve) => {
+        const request = window.indexedDB.deleteDatabase('pickup-tmg-offline-clock-v1');
+        request.onsuccess = function () { resolve(); };
+        request.onerror = function () { resolve(); };
+        request.onblocked = function () { resolve(); };
+      });
+    }
+  }).catch(() => {});
+});
+
 test('app boots into the internal PIN screen', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
@@ -28,6 +51,28 @@ test('app boots into the internal PIN screen', async ({ page }) => {
   await expect(page.locator('#pin-prompt')).toHaveText('Introduce tu PIN de 4 o 6 cifras');
   await expect(page.locator('body')).not.toContainText('Pickup TMG');
   await expect(page.locator('#pin-public-schedule')).toBeHidden();
+});
+
+test.describe('service worker shell', () => {
+  test.use({ serviceWorkers: 'allow' });
+
+  test('main shell reloads offline once the service worker is controlling the page', async ({ page, context }) => {
+    await setupMockApi(page);
+    await page.goto('/');
+    await page.waitForFunction(() => !!navigator.serviceWorker);
+    await page.waitForFunction(() => navigator.serviceWorker.ready.then(() => true));
+
+    await page.reload();
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+
+    await context.setOffline(true);
+    await page.reload();
+
+    await expect(page.locator('#screen-pin.active')).toBeVisible();
+    await expect(page.locator('#pin-prompt')).toContainText('Introduce');
+
+    await context.setOffline(false);
+  });
 });
 
 test('main PIN layout fits inside a short mobile viewport', async ({ page }) => {
@@ -122,6 +167,103 @@ test('employee session persists after reload while still valid', async ({ page }
   await expect(page.locator('#greeting')).toContainText('Ismael');
   await expect(page.locator('#card-payment')).toBeVisible();
   await expect(page.locator('#menu-login-btn')).toBeHidden();
+});
+
+test('employee clock actions queue offline and sync automatically', async ({ page }) => {
+  const state = await setupMockApi(page, { clockFailuresRemaining: 1 });
+  const clockActions = () => state.clockActionCalls.filter((call) => call.action !== 'status');
+  await page.goto('/');
+  await enterPin(page, '1234');
+
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.locator('#card-fichar').click();
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
+
+  await page.locator('#btn-check-in').click();
+
+  await expect(page.locator('#offline-clock-banner')).toBeVisible();
+  await expect(page.locator('#offline-clock-banner')).toHaveText('1 fichaje pendiente de sincronizar');
+  await expect(page.locator('#clock-feedback')).toContainText('guardada sin conexion');
+  await expect(page.locator('#clock-feedback')).toContainText('sincronizara automaticamente');
+  await expect.poll(() => clockActions().length).toBe(2, { timeout: 8000 });
+  expect(clockActions()[0].clientTimestamp).toBe(clockActions()[1].clientTimestamp);
+  await expect(page.locator('#offline-clock-banner')).toBeHidden({ timeout: 8000 });
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#fichar-status')).toContainText('Entrada registrada');
+});
+
+test('employee clock replay stays idempotent when the backend already committed the first attempt', async ({ page }) => {
+  const state = await setupMockApi(page, { clockCommitThenFailRemaining: 1 });
+  const clockActions = () => state.clockActionCalls.filter((call) => call.action !== 'status');
+  await page.goto('/');
+  await enterPin(page, '1234');
+
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.locator('#card-fichar').click();
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
+
+  await page.locator('#btn-check-in').click();
+
+  await expect(page.locator('#offline-clock-banner')).toBeVisible();
+  await expect.poll(() => clockActions().length).toBe(2, { timeout: 8000 });
+  expect(clockActions()[0].clientEventId).toBeTruthy();
+  expect(clockActions()[0].clientEventId).toBe(clockActions()[1].clientEventId);
+  await expect(page.locator('#offline-clock-banner')).toBeHidden({ timeout: 8000 });
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#fichar-status')).toContainText('Entrada registrada');
+});
+
+test('a permanently rejected queued punch is dropped so the employee is not left blocked', async ({ page }) => {
+  await setupMockApi(page, {
+    clockFailuresRemaining: 1,
+    clockPermanentFailuresRemaining: 1,
+    clockPermanentFailureMessage: 'El fichaje pendiente ya no es valido.'
+  });
+  await page.goto('/');
+  await enterPin(page, '1234');
+
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.getByRole('button', { name: 'Fichar' }).click();
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
+  await page.locator('#btn-check-in').click();
+
+  await expect(page.locator('#offline-clock-banner')).toBeVisible();
+  await expect(page.locator('#clock-feedback')).toContainText('guardada sin conexion');
+  await expect(page.locator('#offline-clock-banner')).toBeHidden({ timeout: 8000 });
+  await expect(page.locator('#clock-feedback')).toContainText('ya no es valido');
+  await expect(page.locator('#modal-confirm')).toBeVisible();
+  await page.locator('#modal-ok').click();
+
+  await page.locator('#screen-clock .back-btn').click();
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#fichar-status')).not.toContainText('Pendiente');
+  await page.locator('#card-fichar').click();
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
+  await expect(page.locator('#btn-check-in')).toBeVisible();
+});
+
+test('a pending offline punch for one employee does not block clocking for another employee', async ({ page }) => {
+  await setupMockApi(page, { clockFailuresRemaining: 10 });
+  await page.goto('/');
+  await enterPin(page, '1234');
+
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.getByRole('button', { name: 'Fichar' }).click();
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
+  await page.locator('#btn-check-in').click();
+
+  await expect(page.locator('#offline-clock-banner')).toBeVisible();
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.locator('#logout-btn').click();
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+
+  await enterPin(page, '4321');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#fichar-status')).not.toContainText('Pendiente');
+  await page.getByRole('button', { name: 'Fichar' }).click();
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
+  await expect(page.locator('#btn-check-in')).toBeVisible();
+  await expect(page.locator('#clock-status')).toContainText('Entrada pendiente');
 });
 
 test('logout returns to the PIN-first home', async ({ page }) => {
@@ -348,7 +490,7 @@ test('schedule refreshes within a few seconds when backend slots change', async 
   await enterPin(page, '1234');
 
   await expect(page.locator('#screen-menu.active')).toBeVisible();
-  await page.getByRole('button', { name: 'Mi Horario' }).click();
+  await page.locator('#card-schedule').click();
   await expect(page.locator('#screen-schedule.active')).toBeVisible();
   await expect(page.locator('.sched-cell[data-slot-id="slot-1"]')).toHaveCount(1);
 
@@ -504,6 +646,51 @@ test('direct route performs quick clocking without persisting session', async ({
   await expect.poll(() => state.clockActionCalls[0].action).toBe('check-in');
   await expect.poll(() => state.clockActionCalls[0].auth).toContain('Bearer employee-token-2');
   await expect(page.locator('#menu-login-btn')).toHaveCount(0);
+});
+
+test('direct route queues quick clocking offline and syncs later', async ({ page }) => {
+  const state = await setupMockApi(page, { clockFailuresRemaining: 1 });
+  await page.goto('/direct/');
+
+  const clockPanel = page.locator('.direct-panel[data-panel-id="clock"]');
+  if (!(await clockPanel.evaluate((node) => window.getComputedStyle(node).display !== 'none'))) {
+    await page.locator('#direct-tab-clock').click();
+  }
+
+  await expect(page.locator('#direct-clock-time')).toBeVisible();
+  await enterPin(page, '4321');
+
+  await expect(page.locator('#direct-clock-feedback-badge')).toHaveText('PENDIENTE');
+  await expect(page.locator('#direct-clock-feedback')).toContainText('guardada sin conexion');
+  await expect(page.locator('#offline-clock-banner')).toBeVisible();
+  await expect(page.locator('#offline-clock-banner')).toHaveText('1 fichaje pendiente de sincronizar');
+  await expect.poll(() => state.clockActionCalls.length).toBe(2, { timeout: 8000 });
+  expect(state.clockActionCalls[0].clientTimestamp).toBe(state.clockActionCalls[1].clientTimestamp);
+  await expect(page.locator('#offline-clock-banner')).toBeHidden({ timeout: 8000 });
+});
+
+test('direct route can verify a cached PIN offline and sync once the connection returns', async ({ page }) => {
+  const state = await setupMockApi(page);
+  await page.goto('/');
+  await enterPin(page, '4321');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+
+  await page.goto('/direct/');
+  const clockPanel = page.locator('.direct-panel[data-panel-id="clock"]');
+  if (!(await clockPanel.evaluate((node) => window.getComputedStyle(node).display !== 'none'))) {
+    await page.locator('#direct-tab-clock').click();
+  }
+
+  state.employeeVerifyFailuresRemaining = 1;
+  state.clockFailuresRemaining = 1;
+  await enterPin(page, '4321');
+
+  await expect(page.locator('#direct-clock-feedback-badge')).toHaveText('PENDIENTE');
+  await expect(page.locator('#direct-clock-feedback')).toContainText('guardada sin conexion');
+  await expect(page.locator('#offline-clock-banner')).toBeVisible();
+
+  await expect.poll(() => state.clockActionCalls.filter((call) => call.action !== 'status').length).toBe(2, { timeout: 8000 });
+  await expect(page.locator('#offline-clock-banner')).toBeHidden({ timeout: 8000 });
 });
 
 test('direct route shows the next assigned schedule when check-in is outside any shift', async ({ page }) => {

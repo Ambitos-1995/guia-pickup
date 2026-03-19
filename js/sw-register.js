@@ -7,44 +7,50 @@ if ("serviceWorker" in navigator) {
 
         var refreshing = false;
         var updateIntervalId = 0;
-        var assetProbeIntervalId = 0;
-        var assetCheckInFlight = false;
-        var assetFingerprints = {};
+        var screenObserver = null;
+        var updateBtn = null;
+        var waitingWorker = null;
+        var pendingReload = false;
         var swUrl = window.SW_REGISTER_URL || '/sw.js';
+        var UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
         navigator.serviceWorker.addEventListener('controllerchange', function () {
             if (refreshing) return;
+            if (!pendingReload) {
+                waitingWorker = null;
+                syncUpdateButton();
+                return;
+            }
+
             refreshing = true;
             window.location.reload();
         });
 
         window.addEventListener('load', function () {
+            updateBtn = document.getElementById('update-btn');
+            bindUpdateButton();
+            observeScreenState();
             navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
                 .then(function (reg) {
                     forceUpdateCheck(reg);
                     updateIntervalId = setInterval(function () {
                         forceUpdateCheck(reg);
-                    }, 30000);
-                    primeAssetFingerprints().then(function () {
-                        assetProbeIntervalId = setInterval(function () {
-                            checkForAssetUpdates();
-                        }, 30000);
-                    }).catch(function () {});
+                    }, UPDATE_CHECK_INTERVAL_MS);
 
                     document.addEventListener('visibilitychange', function () {
                         if (document.visibilityState === 'visible') {
                             forceUpdateCheck(reg);
-                            checkForAssetUpdates();
+                            syncUpdateButton();
                         }
                     });
 
                     window.addEventListener('pageshow', function () {
                         forceUpdateCheck(reg);
-                        checkForAssetUpdates();
+                        syncUpdateButton();
                     });
 
                     if (reg.waiting) {
-                        activateWaitingWorker(reg.waiting);
+                        handleWaitingWorker(reg.waiting);
                     }
 
                     reg.addEventListener('updatefound', function () {
@@ -53,7 +59,7 @@ if ("serviceWorker" in navigator) {
 
                         installing.addEventListener('statechange', function () {
                             if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-                                activateWaitingWorker(installing);
+                                handleWaitingWorker(installing);
                             }
                         });
                     });
@@ -61,6 +67,8 @@ if ("serviceWorker" in navigator) {
                 .catch(function (err) {
                     console.warn('SW error:', err);
                 });
+
+            syncUpdateButton();
         });
 
         function forceUpdateCheck(registration) {
@@ -68,113 +76,67 @@ if ("serviceWorker" in navigator) {
 
             registration.update().catch(function () {});
             if (registration.waiting) {
-                activateWaitingWorker(registration.waiting);
+                handleWaitingWorker(registration.waiting);
             }
         }
 
-        function activateWaitingWorker(waitingSW) {
+        function handleWaitingWorker(waitingSW) {
             if (!waitingSW) return;
-            waitingSW.postMessage({ type: 'SKIP_WAITING' });
+            waitingWorker = waitingSW;
+            syncUpdateButton();
         }
 
-        function getAssetProbeUrls() {
-            var urls = [
-                '/css/styles.css',
-                '/js/utils.js',
-                '/js/pin-pad.js',
-                '/js/api.js',
-                '/js/webawesome-init.js',
-                '/js/sw-register.js'
-            ];
+        function bindUpdateButton() {
+            if (!updateBtn) return;
 
+            updateBtn.addEventListener('click', requestUpdate);
+        }
+
+        function observeScreenState() {
+            var screens;
+
+            if (screenObserver || !window.MutationObserver) return;
+
+            screens = document.querySelectorAll('.screen');
+            if (!screens || !screens.length) return;
+
+            screenObserver = new MutationObserver(function () {
+                syncUpdateButton();
+            });
+
+            Utils.each(screens, function (screen) {
+                screenObserver.observe(screen, {
+                    attributes: true,
+                    attributeFilter: ['class']
+                });
+            });
+        }
+
+        function requestUpdate() {
+            if (!waitingWorker || pendingReload || !isSafeToReload()) return;
+
+            pendingReload = true;
+            syncUpdateButton();
+            waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+        }
+
+        function syncUpdateButton() {
+            var shouldShow = !!waitingWorker && isSafeToReload() && !pendingReload;
+
+            if (!updateBtn) return;
+
+            updateBtn.classList.toggle('hidden', !shouldShow);
+            updateBtn.disabled = !shouldShow;
+        }
+
+        function isSafeToReload() {
             if (window.location.pathname.indexOf('/direct') === 0) {
-                urls.push('/direct/index.html', '/direct/direct.css', '/direct/direct.js');
-            } else {
-                urls.push(
-                    '/index.html',
-                    '/js/pin.js',
-                    '/js/schedule.js',
-                    '/js/clock.js',
-                    '/js/guia.js',
-                    '/js/payment.js',
-                    '/js/admin.js',
-                    '/js/install.js',
-                    '/js/app.js'
-                );
+                return true;
             }
 
-            return urls;
-        }
-
-        function primeAssetFingerprints() {
-            return Promise.all(getAssetProbeUrls().map(fetchAssetFingerprint)).then(function (results) {
-                results.forEach(function (result) {
-                    if (result && result.url && result.signature) {
-                        assetFingerprints[result.url] = result.signature;
-                    }
-                });
-            });
-        }
-
-        function checkForAssetUpdates() {
-            if (assetCheckInFlight) return;
-            assetCheckInFlight = true;
-
-            Promise.all(getAssetProbeUrls().map(fetchAssetFingerprint))
-                .then(function (results) {
-                    var hasChanges = false;
-
-                    results.forEach(function (result) {
-                        if (!result || !result.url || !result.signature) return;
-
-                        if (assetFingerprints[result.url] && assetFingerprints[result.url] !== result.signature) {
-                            hasChanges = true;
-                        }
-
-                        assetFingerprints[result.url] = result.signature;
-                    });
-
-                    if (hasChanges) {
-                        window.location.reload();
-                    }
-                })
-                .catch(function () {})
-                .then(function () {
-                    assetCheckInFlight = false;
-                });
-        }
-
-        function fetchAssetFingerprint(url) {
-            return fetch(url, {
-                method: 'HEAD',
-                cache: 'no-store'
-            }).then(function (response) {
-                if (!response.ok) {
-                    throw new Error('HEAD request failed');
-                }
-                return buildFingerprint(url, response);
-            }).catch(function () {
-                return fetch(url, {
-                    cache: 'no-store'
-                }).then(function (response) {
-                    if (!response.ok) {
-                        throw new Error('GET request failed');
-                    }
-                    return buildFingerprint(url, response);
-                }).catch(function () {
-                    return null;
-                });
-            });
-        }
-
-        function buildFingerprint(url, response) {
-            var etag = response.headers.get('etag') || '';
-            var modified = response.headers.get('last-modified') || '';
-            var length = response.headers.get('content-length') || '';
-            return {
-                url: url,
-                signature: [etag, modified, length].join('|') || ('status:' + response.status)
-            };
+            var activeScreen = document.querySelector('.screen.active');
+            var screenId = activeScreen ? activeScreen.id : '';
+            return screenId === 'screen-pin' || screenId === 'screen-menu';
         }
     })();
 }

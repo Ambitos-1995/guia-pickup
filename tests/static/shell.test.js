@@ -12,7 +12,9 @@ test('shell branding points to Punto de encuentro inclusivo', () => {
   assert.match(indexHtml, /<title>Punto de encuentro inclusivo<\/title>/);
   assert.match(indexHtml, /apple-mobile-web-app-title" content="Punto de encuentro inclusivo"/);
   assert.equal(manifest.name, 'Punto de encuentro inclusivo');
-  assert.equal(manifest.short_name, 'Punto de encuentro inclusivo');
+  assert.equal(manifest.short_name, 'Pickup TMG');
+  assert.equal(manifest.id, '/');
+  assert.equal(manifest.lang, 'es');
 });
 
 test('direct shell exposes kiosk branding inside the main PWA', () => {
@@ -21,6 +23,9 @@ test('direct shell exposes kiosk branding inside the main PWA', () => {
   assert.match(directIndexHtml, /Fichaje rapido/);
   assert.match(directIndexHtml, /<link rel="manifest" href="\/manifest\.json">/);
   assert.match(directIndexHtml, /<script src="\/js\/pin-pad\.js"><\/script>/);
+  assert.match(directIndexHtml, /id="update-btn"/);
+  assert.match(directIndexHtml, /<script src="\/js\/offline-clock-queue\.js"><\/script>/);
+  assert.ok(directIndexHtml.indexOf('js/offline-clock-queue.js') < directIndexHtml.indexOf('direct/direct.js'));
   assert.doesNotMatch(directIndexHtml, /direct\/manifest\.json/);
   assert.doesNotMatch(directIndexHtml, /window\.SW_REGISTER_URL/);
 });
@@ -36,6 +41,7 @@ test('critical scripts keep the expected load order', () => {
     'js/utils.js',
     'js/pin-pad.js',
     'js/api.js',
+    'js/offline-clock-queue.js',
     'js/pin.js',
     'js/schedule.js',
     'js/clock.js',
