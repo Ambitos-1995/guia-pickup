@@ -26,6 +26,31 @@ if ("serviceWorker" in navigator) {
             window.location.reload();
         });
 
+        if (window.__ENABLE_SW_TEST_API__) {
+            window.__swRegisterTestApi = {
+                setWaitingWorkerForTest: function () {
+                    var messages = [];
+
+                    handleWaitingWorker({
+                        __messages: messages,
+                        postMessage: function (message) {
+                            messages.push(message);
+                        }
+                    });
+
+                    return true;
+                },
+                getWaitingWorkerMessages: function () {
+                    return waitingWorker && waitingWorker.__messages
+                        ? waitingWorker.__messages.slice()
+                        : [];
+                },
+                syncUpdateButtonForTest: syncUpdateButton,
+                isSafeToReloadForTest: isSafeToReload,
+                requestUpdateForTest: requestUpdate
+            };
+        }
+
         window.addEventListener('load', function () {
             updateBtn = document.getElementById('update-btn');
             bindUpdateButton();

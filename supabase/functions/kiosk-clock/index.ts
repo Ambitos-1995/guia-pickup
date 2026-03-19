@@ -10,6 +10,7 @@ import {
   json,
   logAudit,
   logAttendanceAttemptDebug,
+  requireOfflineClockToken,
   requireSession,
   resolveOrgId,
   getSupabaseConfig,
@@ -75,13 +76,32 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return json({ success: false, message: "Organizacion no encontrada" }, 404);
     }
 
-    const auth = await requireSession(req, url, serviceRoleKey, ["respondent"]);
-    if (auth instanceof Response) {
-      return auth;
-    }
+    const authHeader = String(req.headers.get("authorization") || "").trim();
+    const clockTokenHeader = String(req.headers.get("x-kiosk-clock-token") || "").trim();
+    let employeeId = "";
+    let actorSessionId: string | null = null;
 
-    if (auth.session.organization_id !== orgId || !auth.session.employee_id) {
-      return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
+    if (action === "status" || authHeader.startsWith("Bearer ")) {
+      const auth = await requireSession(req, url, serviceRoleKey, ["respondent"]);
+      if (auth instanceof Response) {
+        return auth;
+      }
+
+      if (auth.session.organization_id !== orgId || !auth.session.employee_id) {
+        return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
+      }
+
+      employeeId = auth.session.employee_id;
+      actorSessionId = auth.session.id;
+    } else if (clockTokenHeader) {
+      const offlineClock = await requireOfflineClockToken(req, orgId);
+      if (offlineClock instanceof Response) {
+        return offlineClock;
+      }
+
+      employeeId = offlineClock.employeeId;
+    } else {
+      return json({ success: false, error: "AUTH_REQUIRED", message: "Sesion requerida" }, 401);
     }
 
     const employeeRes = await fetchJson<Array<{
@@ -90,7 +110,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       apellido: string;
       attendance_enabled: boolean;
     }>>(
-      `${url}/rest/v1/kiosk_employees?select=id,nombre,apellido,attendance_enabled&id=eq.${auth.session.employee_id}&organization_id=eq.${orgId}&limit=1`,
+      `${url}/rest/v1/kiosk_employees?select=id,nombre,apellido,attendance_enabled&id=eq.${employeeId}&organization_id=eq.${orgId}&limit=1`,
       { headers: authHeaders(serviceRoleKey) },
     );
 
@@ -141,7 +161,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (action === "status") {
       await logAttendanceAttemptDebug(url, serviceRoleKey, {
         organizationId: orgId,
-        actorSessionId: auth.session.id,
+        actorSessionId: actorSessionId,
         employeeId: employee.id,
         action: "status",
         outcome: currentStatus,
@@ -181,7 +201,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (currentStatus === "checked_in") {
         await logAttendanceAttemptDebug(url, serviceRoleKey, {
           organizationId: orgId,
-          actorSessionId: auth.session.id,
+          actorSessionId: actorSessionId,
           employeeId: employee.id,
           action: "check_in",
           outcome: "blocked_checked_in",
@@ -196,7 +216,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (currentStatus === "checked_out" && !eligibleCheckInSlot) {
         await logAttendanceAttemptDebug(url, serviceRoleKey, {
           organizationId: orgId,
-          actorSessionId: auth.session.id,
+          actorSessionId: actorSessionId,
           employeeId: employee.id,
           action: "check_in",
           outcome: "blocked_checked_out",
@@ -209,7 +229,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (!todaySlots.length) {
         await logAttendanceAttemptDebug(url, serviceRoleKey, {
           organizationId: orgId,
-          actorSessionId: auth.session.id,
+          actorSessionId: actorSessionId,
           employeeId: employee.id,
           action: "check_in",
           outcome: "blocked_no_schedule",
@@ -237,7 +257,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const blockedData = buildNextSlotData(fallbackNextSlot, "outside_schedule", referenceSlot);
         await logAttendanceAttemptDebug(url, serviceRoleKey, {
           organizationId: orgId,
-          actorSessionId: auth.session.id,
+          actorSessionId: actorSessionId,
           employeeId: employee.id,
           action: "check_in",
           outcome: isEarly ? "blocked_too_early" : "blocked_outside_schedule",
@@ -299,7 +319,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       await logAudit(url, serviceRoleKey, {
         organizationId: orgId,
-        actorSessionId: auth.session.id,
+        actorSessionId: actorSessionId,
         actorRole: "respondent",
         employeeId: employee.id,
         slotId: eligibleCheckInSlot.id,
@@ -307,7 +327,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
       await logAttendanceAttemptDebug(url, serviceRoleKey, {
         organizationId: orgId,
-        actorSessionId: auth.session.id,
+        actorSessionId: actorSessionId,
         employeeId: employee.id,
         action: "check_in",
         outcome: "success",
@@ -334,7 +354,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (currentStatus !== "checked_in" || !dayState.openSlotId) {
         await logAttendanceAttemptDebug(url, serviceRoleKey, {
           organizationId: orgId,
-          actorSessionId: auth.session.id,
+          actorSessionId: actorSessionId,
           employeeId: employee.id,
           action: "check_out",
           outcome: "blocked_not_checked_in",
@@ -388,7 +408,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       await logAudit(url, serviceRoleKey, {
         organizationId: orgId,
-        actorSessionId: auth.session.id,
+        actorSessionId: actorSessionId,
         actorRole: "respondent",
         employeeId: employee.id,
         slotId: dayState.openSlotId,
@@ -396,7 +416,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
       await logAttendanceAttemptDebug(url, serviceRoleKey, {
         organizationId: orgId,
-        actorSessionId: auth.session.id,
+        actorSessionId: actorSessionId,
         employeeId: employee.id,
         action: "check_out",
         outcome: "success",

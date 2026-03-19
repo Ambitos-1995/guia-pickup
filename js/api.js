@@ -13,15 +13,22 @@ var Api = (function () {
         var headers = { 'Content-Type': 'application/json' };
         var session = (typeof App !== 'undefined' && App.getSession) ? App.getSession() : null;
         var accessToken = typeof opts.accessToken === 'string' ? opts.accessToken.trim() : '';
+        var offlineClockToken = typeof opts.offlineClockToken === 'string' ? opts.offlineClockToken.trim() : '';
 
         if (opts.requiresAuth) {
-            if (!accessToken) {
+            if (!accessToken && !offlineClockToken) {
                 if (!session || !session.accessToken) {
                     return Promise.resolve({ success: false, error: 'AUTH_REQUIRED', message: 'Sesion requerida' });
                 }
                 accessToken = session.accessToken;
             }
-            headers.Authorization = 'Bearer ' + accessToken;
+            if (accessToken) {
+                headers.Authorization = 'Bearer ' + accessToken;
+            }
+        }
+
+        if (offlineClockToken) {
+            headers['X-Kiosk-Clock-Token'] = offlineClockToken;
         }
 
         return fetch(url, {
@@ -33,7 +40,7 @@ var Api = (function () {
                 return { success: false, message: 'Respuesta invalida del servidor' };
             }).then(function (payload) {
                 payload.httpStatus = res.status;
-                if (!opts.suppressTouchSession && opts.requiresAuth && !opts.accessToken && session && session.accessToken &&
+                if (!opts.suppressTouchSession && opts.requiresAuth && !opts.accessToken && !opts.offlineClockToken && session && session.accessToken &&
                     !(res.status === 401 || res.status === 403) &&
                     typeof App !== 'undefined' && App.touchSession) {
                     App.touchSession();
@@ -76,6 +83,9 @@ var Api = (function () {
 
         if (resolved.accessToken) {
             authOptions.accessToken = resolved.accessToken;
+        }
+        if (resolved.offlineClockToken) {
+            authOptions.offlineClockToken = resolved.offlineClockToken;
         }
 
         return authOptions;

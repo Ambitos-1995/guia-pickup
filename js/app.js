@@ -165,10 +165,6 @@ var App = (function () {
         session = normalizeSession(data);
         persistSession();
         showMenu();
-        if (session && session.employeeId && session.accessToken &&
-            typeof OfflineClockQueue !== 'undefined' && OfflineClockQueue.rebindAccessToken) {
-            OfflineClockQueue.rebindAccessToken(session.employeeId, session.accessToken, session.expiresAt);
-        }
     }
 
     function clearSession() {
@@ -543,6 +539,27 @@ var App = (function () {
                 detail.message || 'Un fichaje pendiente no pudo sincronizarse y se ha retirado de la cola.'
             );
         });
+
+        window.addEventListener('offline-clock-queue-blocked', function (event) {
+            var detail = event && event.detail ? event.detail : {};
+            var activeSession = getSession();
+
+            if (!activeSession || !detail || detail.employeeId !== activeSession.employeeId) {
+                if (currentScreen === 'screen-menu') {
+                    showMenu();
+                }
+                return;
+            }
+
+            if (currentScreen === 'screen-menu') {
+                showMenu();
+            }
+
+            confirm(
+                'Fichaje pendiente bloqueado',
+                detail.message || 'Conectate y vuelve a validar tu PIN para sincronizar el fichaje pendiente.'
+            );
+        });
     }
 
     function restoreSession() {
@@ -562,6 +579,8 @@ var App = (function () {
         var normalized = {
             accessToken: typeof data.accessToken === 'string' ? data.accessToken : '',
             expiresAt: typeof data.expiresAt === 'string' ? data.expiresAt : '',
+            offlineClockToken: typeof data.offlineClockToken === 'string' ? data.offlineClockToken : '',
+            offlineClockTokenExpiresAt: typeof data.offlineClockTokenExpiresAt === 'string' ? data.offlineClockTokenExpiresAt : '',
             idleExpiresAt: typeof data.idleExpiresAt === 'string' ? data.idleExpiresAt : '',
             role: data.role === 'org_admin' ? 'org_admin' : 'respondent',
             employeeId: data.employeeId || null,

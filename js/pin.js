@@ -141,6 +141,8 @@ var Pin = (function () {
             App.setSession({
                 accessToken: res.data.accessToken,
                 expiresAt: res.data.expiresAt,
+                offlineClockToken: res.data.offlineClockToken || '',
+                offlineClockTokenExpiresAt: res.data.offlineClockTokenExpiresAt || '',
                 role: res.data.role || 'respondent',
                 employeeId: res.data.employeeId || null,
                 employeeName: res.data.employeeName || '',
@@ -152,6 +154,15 @@ var Pin = (function () {
                 typeof OfflineClockQueue !== 'undefined' &&
                 OfflineClockQueue.rememberVerifiedPin) {
                 OfflineClockQueue.rememberVerifiedPin(pin, res.data);
+            }
+            if ((res.data.role || 'respondent') === 'respondent' &&
+                typeof OfflineClockQueue !== 'undefined' &&
+                OfflineClockQueue.refreshOfflineClockCredential) {
+                OfflineClockQueue.refreshOfflineClockCredential(
+                    res.data.employeeId,
+                    res.data.offlineClockToken || '',
+                    res.data.offlineClockTokenExpiresAt || ''
+                );
             }
 
             clearPin();

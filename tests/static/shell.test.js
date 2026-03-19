@@ -12,8 +12,10 @@ test('shell branding points to Punto de encuentro inclusivo', () => {
   assert.match(indexHtml, /<title>Punto de encuentro inclusivo<\/title>/);
   assert.match(indexHtml, /apple-mobile-web-app-title" content="Punto de encuentro inclusivo"/);
   assert.equal(manifest.name, 'Punto de encuentro inclusivo');
-  assert.equal(manifest.short_name, 'Pickup TMG');
+  assert.equal(manifest.short_name, 'Punto SEUR');
   assert.equal(manifest.id, '/');
+  assert.equal(manifest.start_url, '/');
+  assert.equal(manifest.scope, '/');
   assert.equal(manifest.lang, 'es');
 });
 

@@ -11,6 +11,7 @@ import {
   getUserAgent,
   getRateLimitStatus,
   hashPin,
+  issueOfflineClockToken,
   issueSession,
   json,
   logAudit,
@@ -23,6 +24,7 @@ import {
 const EMPLOYEE_PIN_REGEX = /^[0-9]{4,6}$/;
 const EMPLOYEE_IDLE_TIMEOUT_SECONDS = 10 * 60;
 const EMPLOYEE_ABSOLUTE_TIMEOUT_SECONDS = 30 * 60;
+const OFFLINE_CLOCK_TOKEN_TIMEOUT_SECONDS = 30 * 60;
 const EMPLOYEE_FAILURE_LIMIT = 8;
 const EMPLOYEE_BLOCK_MINUTES = 10;
 
@@ -162,6 +164,11 @@ async function handleVerify(
     ipAddress,
     userAgent,
   });
+  const offlineClock = await issueOfflineClockToken({
+    organizationId: orgId,
+    employeeId: employee.id,
+    ttlSeconds: OFFLINE_CLOCK_TOKEN_TIMEOUT_SECONDS,
+  });
 
   await Promise.all([
     recordAuthAttempt(supabaseUrl, key, orgId, "employee", ipAddress, true, 0, null),
@@ -180,6 +187,8 @@ async function handleVerify(
     data: {
       accessToken: issued.accessToken,
       expiresAt: issued.expiresAt,
+      offlineClockToken: offlineClock.offlineClockToken,
+      offlineClockTokenExpiresAt: offlineClock.offlineClockTokenExpiresAt,
       employeeId: employee.id,
       employeeName: `${employee.nombre} ${employee.apellido}`.trim(),
       currentStatus,

@@ -24,14 +24,24 @@ module.exports = defineConfig({
   projects: [
     {
       name: 'desktop-chromium',
+      testIgnore: /pwa\.webkit\.spec\.js/,
       use: {
         ...devices['Desktop Chrome']
       }
     },
     {
       name: 'mobile-chrome',
+      testIgnore: /pwa\.webkit\.spec\.js/,
       use: {
         ...devices['Pixel 7']
+      }
+    },
+    {
+      name: 'desktop-webkit',
+      testMatch: /pwa\.webkit\.spec\.js/,
+      use: {
+        browserName: 'webkit',
+        viewport: { width: 1280, height: 800 }
       }
     }
   ]

@@ -4,7 +4,7 @@ function buildState(overrides = {}) {
       {
         id: 'emp-1',
         nombre: 'Ismael',
-        apellido: 'Pérez',
+        apellido: 'Perez',
         attendance_enabled: true,
         role: 'employee',
         created_at: '2026-03-16T10:00:00.000Z'
@@ -48,7 +48,7 @@ function buildState(overrides = {}) {
         day_of_week: 1,
         start_time: '15:00',
         end_time: '16:00',
-        assigned_employee_name: 'Ismael Pérez',
+        assigned_employee_name: 'Ismael Perez',
         assigned_employee_code: 'emp-1',
         assigned_employee_profile_id: 'emp-1'
       },
@@ -71,6 +71,10 @@ function buildState(overrides = {}) {
     clockPermanentFailuresRemaining: 0,
     clockPermanentFailureStatus: 409,
     clockPermanentFailureMessage: 'No se pudo sincronizar el fichaje pendiente.',
+    clockOfflineTokenFailuresRemaining: 0,
+    clockOfflineTokenFailureStatus: 401,
+    clockOfflineTokenFailureError: 'CLOCK_TOKEN_EXPIRED',
+    clockOfflineTokenFailureMessage: 'La credencial offline ha caducado. Conectate y vuelve a validar tu PIN.',
     clockCommitThenFailRemaining: 0,
     clockEventsById: {},
     ...overrides
@@ -83,6 +87,34 @@ async function fulfillJson(route, payload, status = 200) {
     contentType: 'application/json; charset=utf-8',
     body: JSON.stringify(payload)
   });
+}
+
+function employeePayload(accessToken, offlineClockToken, employeeId, employeeName, currentStatus) {
+  return {
+    accessToken,
+    expiresAt: '2099-12-31T23:59:59.000Z',
+    offlineClockToken,
+    offlineClockTokenExpiresAt: '2099-12-31T23:59:59.000Z',
+    role: 'respondent',
+    employeeId,
+    employeeName,
+    organizationId: 'org-1',
+    currentStatus
+  };
+}
+
+function resolveClockIdentity(authHeader, offlineClockToken) {
+  var effectiveCredential = authHeader || offlineClockToken || '';
+
+  if (effectiveCredential.includes('employee-token-2') || effectiveCredential.includes('offline-clock-token-2')) {
+    return { employeeId: 'emp-3', employeeName: 'Lucia Garcia', isOutsideSchedule: false };
+  }
+
+  if (effectiveCredential.includes('employee-token-4') || effectiveCredential.includes('offline-clock-token-4')) {
+    return { employeeId: 'emp-4', employeeName: 'Nora Diaz', isOutsideSchedule: true };
+  }
+
+  return { employeeId: 'emp-1', employeeName: 'Ismael Perez', isOutsideSchedule: false };
 }
 
 async function setupMockApi(page, overrides = {}) {
@@ -121,45 +153,21 @@ async function setupMockApi(page, overrides = {}) {
         if (body.pin === '1234') {
           return fulfillJson(route, {
             success: true,
-            data: {
-              accessToken: 'employee-token',
-              expiresAt: '2099-12-31T23:59:59.000Z',
-              role: 'respondent',
-              employeeId: 'emp-1',
-              employeeName: 'Ismael Pérez',
-              organizationId: 'org-1',
-              currentStatus: 'checked_out'
-            }
+            data: employeePayload('employee-token', 'offline-clock-token-1', 'emp-1', 'Ismael Perez', 'checked_out')
           });
         }
 
         if (body.pin === '4321') {
           return fulfillJson(route, {
             success: true,
-            data: {
-              accessToken: 'employee-token-2',
-              expiresAt: '2099-12-31T23:59:59.000Z',
-              role: 'respondent',
-              employeeId: 'emp-3',
-              employeeName: 'Lucia Garcia',
-              organizationId: 'org-1',
-              currentStatus: 'not_checked_in'
-            }
+            data: employeePayload('employee-token-2', 'offline-clock-token-2', 'emp-3', 'Lucia Garcia', 'not_checked_in')
           });
         }
 
         if (body.pin === '5555') {
           return fulfillJson(route, {
             success: true,
-            data: {
-              accessToken: 'employee-token-4',
-              expiresAt: '2099-12-31T23:59:59.000Z',
-              role: 'respondent',
-              employeeId: 'emp-4',
-              employeeName: 'Nora Diaz',
-              organizationId: 'org-1',
-              currentStatus: 'not_checked_in'
-            }
+            data: employeePayload('employee-token-4', 'offline-clock-token-4', 'emp-4', 'Nora Diaz', 'not_checked_in')
           });
         }
 
@@ -224,7 +232,7 @@ async function setupMockApi(page, overrides = {}) {
           configured: true,
           calculations: [
             {
-              employee_name: 'Ismael Pérez',
+              employee_name: 'Ismael Perez',
               hours_worked: 24,
               status: 'calculated',
               amount_earned: 312.5
@@ -245,7 +253,7 @@ async function setupMockApi(page, overrides = {}) {
         return fulfillJson(route, { success: true, data: state.scheduleSlots });
       }
 
-       if (body.action === 'assign') {
+      if (body.action === 'assign') {
         state.scheduleActionCalls.push({ action: 'assign', body, auth: request.headers()['authorization'] || '' });
         return fulfillJson(route, { success: true, data: { id: body.slotId, assigned_employee_profile_id: 'emp-1', status: 'occupied' } });
       }
@@ -262,9 +270,14 @@ async function setupMockApi(page, overrides = {}) {
     }
 
     if (url.pathname.endsWith('/kiosk-clock')) {
+      const authHeader = request.headers()['authorization'] || '';
+      const offlineClockToken = request.headers()['x-kiosk-clock-token'] || '';
+      const identity = resolveClockIdentity(authHeader, offlineClockToken);
+
       state.clockActionCalls.push({
         action: body.action,
-        auth: request.headers()['authorization'] || '',
+        auth: authHeader,
+        clockToken: offlineClockToken,
         clientDate: body.clientDate || '',
         clientTimestamp: body.clientTimestamp || '',
         clientEventId: body.clientEventId || ''
@@ -286,6 +299,15 @@ async function setupMockApi(page, overrides = {}) {
         }, state.clockPermanentFailureStatus);
       }
 
+      if (body.action !== 'status' && state.clockOfflineTokenFailuresRemaining > 0 && offlineClockToken) {
+        state.clockOfflineTokenFailuresRemaining -= 1;
+        return fulfillJson(route, {
+          success: false,
+          error: state.clockOfflineTokenFailureError,
+          message: state.clockOfflineTokenFailureMessage
+        }, state.clockOfflineTokenFailureStatus);
+      }
+
       if (body.action !== 'status' && body.clientEventId && state.clockEventsById[body.clientEventId]) {
         const existing = state.clockEventsById[body.clientEventId];
         return fulfillJson(route, {
@@ -302,13 +324,13 @@ async function setupMockApi(page, overrides = {}) {
         return fulfillJson(route, {
           success: true,
           data: {
-            employeeName: 'Ismael PÃ©rez',
+            employeeName: identity.employeeName,
             currentStatus: state.clockStatus
           }
         });
       }
 
-      if ((request.headers()['authorization'] || '').includes('employee-token-4')) {
+      if (identity.isOutsideSchedule) {
         return fulfillJson(route, {
           success: false,
           message: 'Ahora no tienes turno. Tu proximo horario es jueves 19 de marzo de 17:00 a 18:00.',
@@ -329,7 +351,7 @@ async function setupMockApi(page, overrides = {}) {
           if (body.clientEventId) {
             state.clockEventsById[body.clientEventId] = {
               action: 'check-out',
-              employeeName: 'Ismael Pérez',
+              employeeName: identity.employeeName,
               currentStatus: 'checked_out'
             };
           }
@@ -340,7 +362,7 @@ async function setupMockApi(page, overrides = {}) {
         if (body.clientEventId) {
           state.clockEventsById[body.clientEventId] = {
             action: 'check-in',
-            employeeName: 'Lucia Garcia',
+            employeeName: identity.employeeName,
             currentStatus: 'checked_in'
           };
         }
@@ -352,7 +374,7 @@ async function setupMockApi(page, overrides = {}) {
         if (body.clientEventId) {
           state.clockEventsById[body.clientEventId] = {
             action: 'check-out',
-            employeeName: 'Ismael Pérez',
+            employeeName: identity.employeeName,
             currentStatus: 'checked_out'
           };
         }
@@ -360,7 +382,7 @@ async function setupMockApi(page, overrides = {}) {
           success: true,
           message: 'Salida registrada',
           data: {
-            employeeName: 'Ismael Pérez',
+            employeeName: identity.employeeName,
             currentStatus: 'checked_out'
           }
         });
@@ -370,7 +392,7 @@ async function setupMockApi(page, overrides = {}) {
       if (body.clientEventId) {
         state.clockEventsById[body.clientEventId] = {
           action: 'check-in',
-          employeeName: 'Lucia Garcia',
+          employeeName: identity.employeeName,
           currentStatus: 'checked_in'
         };
       }
@@ -378,7 +400,7 @@ async function setupMockApi(page, overrides = {}) {
         success: true,
         message: 'Entrada registrada',
         data: {
-          employeeName: 'Lucia Garcia',
+          employeeName: identity.employeeName,
           currentStatus: 'checked_in'
         }
       });

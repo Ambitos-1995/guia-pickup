@@ -482,8 +482,12 @@ var Direct = (function () {
             if (OfflineClockQueue.rememberVerifiedPin) {
                 OfflineClockQueue.rememberVerifiedPin(pin, verifyRes.data);
             }
-            if (OfflineClockQueue.rebindAccessToken) {
-                OfflineClockQueue.rebindAccessToken(verifyRes.data.employeeId, verifyRes.data.accessToken, verifyRes.data.expiresAt);
+            if (OfflineClockQueue.refreshOfflineClockCredential) {
+                OfflineClockQueue.refreshOfflineClockCredential(
+                    verifyRes.data.employeeId,
+                    verifyRes.data.offlineClockToken || '',
+                    verifyRes.data.offlineClockTokenExpiresAt || ''
+                );
             }
 
             return runScheduleActionWithToken(verifyRes.data.accessToken);
@@ -608,7 +612,7 @@ var Direct = (function () {
             var effectiveStatus;
             var hasPendingForEmployee;
 
-            if (!identity || !identity.data || !identity.data.accessToken) {
+            if (!identity || !identity.data || (!identity.data.accessToken && !identity.data.offlineClockToken)) {
                 throw createActionError('PIN incorrecto');
             }
 
@@ -630,7 +634,8 @@ var Direct = (function () {
             if (effectiveStatus === 'checked_in') {
                 return OfflineClockQueue.checkOut({
                     accessToken: identity.data.accessToken,
-                    expiresAt: identity.data.expiresAt || '',
+                    offlineClockToken: identity.data.offlineClockToken || '',
+                    offlineClockTokenExpiresAt: identity.data.offlineClockTokenExpiresAt || '',
                     clientDate: Utils.today(),
                     clientTimestamp: new Date().toISOString(),
                     employeeId: identity.data.employeeId,
@@ -653,7 +658,8 @@ var Direct = (function () {
 
             return OfflineClockQueue.checkIn({
                 accessToken: identity.data.accessToken,
-                expiresAt: identity.data.expiresAt || '',
+                offlineClockToken: identity.data.offlineClockToken || '',
+                offlineClockTokenExpiresAt: identity.data.offlineClockTokenExpiresAt || '',
                 clientDate: Utils.today(),
                 clientTimestamp: new Date().toISOString(),
                 employeeId: identity.data.employeeId,
@@ -691,8 +697,12 @@ var Direct = (function () {
                 if (OfflineClockQueue.rememberVerifiedPin) {
                     OfflineClockQueue.rememberVerifiedPin(pin, verifyRes.data);
                 }
-                if (OfflineClockQueue.rebindAccessToken) {
-                    OfflineClockQueue.rebindAccessToken(verifyRes.data.employeeId, verifyRes.data.accessToken, verifyRes.data.expiresAt);
+                if (OfflineClockQueue.refreshOfflineClockCredential) {
+                    OfflineClockQueue.refreshOfflineClockCredential(
+                        verifyRes.data.employeeId,
+                        verifyRes.data.offlineClockToken || '',
+                        verifyRes.data.offlineClockTokenExpiresAt || ''
+                    );
                 }
                 return {
                     fromOfflineCache: false,
@@ -719,14 +729,18 @@ var Direct = (function () {
         }
 
         return OfflineClockQueue.resolveOfflinePin(pin).then(function (cachedIdentity) {
-            if (cachedIdentity && cachedIdentity.accessToken) {
+            if (cachedIdentity && cachedIdentity.offlineClockToken) {
                 return {
                     fromOfflineCache: true,
                     data: cachedIdentity
                 };
             }
 
-            throw createActionError('Sin conexion. Este PIN todavia no se puede validar sin red.');
+            if (cachedIdentity && cachedIdentity.errorCode === 'OFFLINE_CREDENTIAL_EXPIRED') {
+                throw createActionError('Sin conexion. La credencial offline de este PIN ha caducado. Conectate y vuelve a validarlo.');
+            }
+
+            throw createActionError('Sin conexion. Este PIN no tiene credencial offline disponible o el navegador ha limpiado los datos. Conectate y vuelve a validarlo.');
         });
     }
 

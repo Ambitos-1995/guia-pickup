@@ -13,6 +13,14 @@ const apiJs = fs.readFileSync(path.join(root, 'js', 'api.js'), 'utf8');
 const offlineQueueJs = fs.readFileSync(path.join(root, 'js', 'offline-clock-queue.js'), 'utf8');
 const guiaJs = fs.readFileSync(path.join(root, 'js', 'guia.js'), 'utf8');
 const clockFunction = fs.readFileSync(path.join(root, 'supabase', 'functions', 'kiosk-clock', 'index.ts'), 'utf8');
+const queuedRecordSource = offlineQueueJs.slice(
+  offlineQueueJs.indexOf('function buildQueuedRecord'),
+  offlineQueueJs.indexOf('function generateClientEventId')
+);
+const pinCacheSource = offlineQueueJs.slice(
+  offlineQueueJs.indexOf('function rememberVerifiedPin'),
+  offlineQueueJs.indexOf('function resolveOfflinePin')
+);
 
 test('manifest icons exist on disk', () => {
   manifest.icons.forEach((icon) => {
@@ -39,6 +47,8 @@ test('core cached assets exist in the project', () => {
   requiredFiles.forEach((filePath) => {
     assert.ok(fs.existsSync(path.join(root, filePath)), `Missing required file: ${filePath}`);
   });
+
+  assert.equal(fs.existsSync(path.join(root, 'direct', 'manifest.json')), false);
 });
 
 test('guide screenshots exist as webp assets', () => {
@@ -143,4 +153,18 @@ test('clock requests carry a stable client event id through queue and api layers
   assert.match(apiJs, /clientEventId:/);
   assert.match(offlineQueueJs, /clientEventId/);
   assert.match(offlineQueueJs, /generateClientEventId/);
+});
+
+test('offline queue stores only scoped clock credentials and requests storage persistence progressively', () => {
+  assert.match(apiJs, /X-Kiosk-Clock-Token/);
+  assert.match(offlineQueueJs, /navigator\.storage\.persist/);
+  assert.match(offlineQueueJs, /sanitizePersistedCredentials/);
+  assert.match(queuedRecordSource, /offlineClockToken:/);
+  assert.match(queuedRecordSource, /offlineClockTokenExpiresAt:/);
+  assert.doesNotMatch(queuedRecordSource, /accessToken:/);
+  assert.doesNotMatch(queuedRecordSource, /expiresAt:/);
+  assert.match(pinCacheSource, /offlineClockToken:/);
+  assert.match(pinCacheSource, /offlineClockTokenExpiresAt:/);
+  assert.doesNotMatch(pinCacheSource, /accessToken:/);
+  assert.doesNotMatch(pinCacheSource, /expiresAt:/);
 });

@@ -2,7 +2,7 @@ import Argon2id from "jsr:@rabbit-company/argon2id";
 
 export const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers": "authorization, content-type, x-kiosk-clock-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 };
@@ -27,6 +27,15 @@ interface SessionTokenPayload {
   orgId: string;
   employeeId: string | null;
   role: SessionRole;
+  iat: number;
+  exp: number;
+  ver: 1;
+}
+
+interface OfflineClockTokenPayload {
+  orgId: string;
+  employeeId: string;
+  scope: "clock_offline";
   iat: number;
   exp: number;
   ver: 1;
@@ -312,6 +321,28 @@ export async function issueSession(
   };
 }
 
+export async function issueOfflineClockToken(input: {
+  organizationId: string;
+  employeeId: string;
+  ttlSeconds: number;
+}): Promise<{ offlineClockToken: string; offlineClockTokenExpiresAt: string }> {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + input.ttlSeconds * 1000);
+  const token = await signOfflineClockToken({
+    orgId: input.organizationId,
+    employeeId: input.employeeId,
+    scope: "clock_offline",
+    iat: Math.floor(now.getTime() / 1000),
+    exp: Math.floor(expiresAt.getTime() / 1000),
+    ver: 1,
+  });
+
+  return {
+    offlineClockToken: token,
+    offlineClockTokenExpiresAt: expiresAt.toISOString(),
+  };
+}
+
 export async function requireSession(
   req: Request,
   supabaseUrl: string,
@@ -396,6 +427,28 @@ export async function revokeSession(supabaseUrl: string, key: string, sessionId:
       }),
     },
   );
+}
+
+export async function requireOfflineClockToken(req: Request, orgId: string): Promise<OfflineClockTokenPayload | Response> {
+  const rawToken = String(req.headers.get("x-kiosk-clock-token") || "").trim();
+  if (!rawToken) {
+    return json({ success: false, error: "CLOCK_TOKEN_REQUIRED", message: "Credencial offline requerida" }, 401);
+  }
+
+  const payload = await verifyOfflineClockToken(rawToken);
+  if (!payload) {
+    return json({ success: false, error: "CLOCK_TOKEN_INVALID", message: "Credencial offline invalida" }, 401);
+  }
+
+  if (payload.scope !== "clock_offline") {
+    return json({ success: false, error: "CLOCK_TOKEN_INVALID", message: "Credencial offline invalida" }, 401);
+  }
+
+  if (payload.orgId !== orgId) {
+    return json({ success: false, error: "CLOCK_TOKEN_FORBIDDEN", message: "Credencial offline fuera de la organizacion activa" }, 403);
+  }
+
+  return payload;
 }
 
 export async function getRateLimitStatus(
@@ -890,15 +943,37 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 async function signSessionToken(payload: SessionTokenPayload): Promise<string> {
-  const payloadB64 = base64UrlEncode(JSON.stringify(payload));
-  const secret = await importHmacKey(getSessionSecret());
-  const signature = await crypto.subtle.sign("HMAC", secret, new TextEncoder().encode(payloadB64));
-  return `kst1.${payloadB64}.${base64UrlEncodeBytes(new Uint8Array(signature))}`;
+  return await signStructuredToken("kst1", payload);
 }
 
 async function verifySessionToken(token: string): Promise<SessionTokenPayload | null> {
+  const payload = await verifyStructuredToken(token, "kst1");
+  if (!payload) return null;
+
+  return payload as SessionTokenPayload;
+}
+
+async function signOfflineClockToken(payload: OfflineClockTokenPayload): Promise<string> {
+  return await signStructuredToken("kct1", payload);
+}
+
+async function verifyOfflineClockToken(token: string): Promise<OfflineClockTokenPayload | null> {
+  const payload = await verifyStructuredToken(token, "kct1");
+  if (!payload) return null;
+
+  return payload as OfflineClockTokenPayload;
+}
+
+async function signStructuredToken(prefix: string, payload: { ver: 1 }): Promise<string> {
+  const payloadB64 = base64UrlEncode(JSON.stringify(payload));
+  const secret = await importHmacKey(getSessionSecret());
+  const signature = await crypto.subtle.sign("HMAC", secret, new TextEncoder().encode(payloadB64));
+  return `${prefix}.${payloadB64}.${base64UrlEncodeBytes(new Uint8Array(signature))}`;
+}
+
+async function verifyStructuredToken(token: string, prefix: string): Promise<{ ver: 1; exp: number } | null> {
   const parts = token.split(".");
-  if (parts.length !== 3 || parts[0] !== "kst1") return null;
+  if (parts.length !== 3 || parts[0] !== prefix) return null;
 
   const payloadB64 = parts[1];
   const signatureB64 = parts[2];
@@ -911,7 +986,7 @@ async function verifySessionToken(token: string): Promise<SessionTokenPayload | 
   const received = base64UrlDecodeBytes(signatureB64);
   if (!timingSafeEqual(expected, received)) return null;
 
-  const payload = JSON.parse(base64UrlDecode(payloadB64)) as SessionTokenPayload;
+  const payload = JSON.parse(base64UrlDecode(payloadB64)) as { ver: 1; exp: number };
   if (payload.ver !== 1) return null;
   if (payload.exp * 1000 < Date.now()) return null;
   return payload;

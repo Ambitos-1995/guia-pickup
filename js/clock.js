@@ -29,6 +29,7 @@ var Clock = (function () {
 
         window.addEventListener('offline-clock-queue-empty', handleQueueEmpty);
         window.addEventListener('offline-clock-queue-dropped', handleQueueDropped);
+        window.addEventListener('offline-clock-queue-blocked', handleQueueBlocked);
     }
 
     function show() {
@@ -178,7 +179,8 @@ var Clock = (function () {
 
         OfflineClockQueue.checkIn({
             accessToken: session.accessToken,
-            expiresAt: session.expiresAt,
+            offlineClockToken: session.offlineClockToken || '',
+            offlineClockTokenExpiresAt: session.offlineClockTokenExpiresAt || '',
             clientDate: Utils.today(),
             clientTimestamp: clientTimestamp,
             employeeId: session.employeeId,
@@ -222,7 +224,8 @@ var Clock = (function () {
 
         OfflineClockQueue.checkOut({
             accessToken: session.accessToken,
-            expiresAt: session.expiresAt,
+            offlineClockToken: session.offlineClockToken || '',
+            offlineClockTokenExpiresAt: session.offlineClockTokenExpiresAt || '',
             clientDate: Utils.today(),
             clientTimestamp: clientTimestamp,
             employeeId: session.employeeId,
@@ -291,6 +294,17 @@ var Clock = (function () {
         refreshRemoteState();
         if (App.isScreen('screen-clock')) {
             showFeedback('error', detail.message || 'Un fichaje pendiente no pudo sincronizarse.', false);
+        }
+    }
+
+    function handleQueueBlocked(event) {
+        var detail = event && event.detail ? event.detail : {};
+        var session = App.getSession();
+        if (!session || detail.employeeId !== session.employeeId) return;
+
+        refreshStatus();
+        if (App.isScreen('screen-clock')) {
+            showFeedback('warning', detail.message || 'Conectate y vuelve a validar tu PIN para sincronizar el fichaje pendiente.', false);
         }
     }
 

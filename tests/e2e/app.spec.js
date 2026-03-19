@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { setupMockApi } = require('./helpers/mock-api');
+const OFFLINE_DB_NAME = 'pickup-tmg-offline-clock-v1';
 
 async function enterPin(page, pin) {
   const inMainPinScreen = await page.locator('#screen-pin.active').isVisible().catch(() => false);
@@ -17,6 +18,47 @@ async function enterDirectDialogPin(page, pin) {
   for (const digit of String(pin)) {
     await page.locator(`#direct-dialog-keypad .key-btn[data-key="${digit}"]`).click({ force: true });
   }
+}
+
+async function readOfflineStores(page) {
+  return page.evaluate(async (dbName) => {
+    if (!window.indexedDB) {
+      return { queue: [], pinCache: [] };
+    }
+
+    function requestToPromise(request) {
+      return new Promise((resolve, reject) => {
+        request.onsuccess = function () { resolve(request.result); };
+        request.onerror = function () { reject(request.error || new Error('IndexedDB error')); };
+      });
+    }
+
+    const db = await new Promise((resolve, reject) => {
+      const request = window.indexedDB.open(dbName);
+      request.onsuccess = function () { resolve(request.result); };
+      request.onerror = function () { reject(request.error || new Error('Open DB failed')); };
+    });
+
+    try {
+      const queueTx = db.transaction('clock_actions', 'readonly');
+      const pinTx = db.transaction('employee_pin_cache', 'readonly');
+      const queueRequest = queueTx.objectStore('clock_actions').getAll();
+      const pinRequest = pinTx.objectStore('employee_pin_cache').getAll();
+      const [queue, pinCache] = await Promise.all([
+        requestToPromise(queueRequest),
+        requestToPromise(pinRequest)
+      ]);
+      return { queue, pinCache };
+    } finally {
+      db.close();
+    }
+  }, OFFLINE_DB_NAME);
+}
+
+async function enableSwTestApi(page) {
+  await page.addInitScript(() => {
+    window.__ENABLE_SW_TEST_API__ = true;
+  });
 }
 
 test.afterEach(async ({ page }) => {
@@ -73,6 +115,39 @@ test.describe('service worker shell', () => {
 
     await context.setOffline(false);
   });
+});
+
+test('main shell shows the manual update action only on safe screens', async ({ page }) => {
+  await enableSwTestApi(page);
+  await setupMockApi(page);
+  await page.goto('/');
+  await page.waitForFunction(() => !!window.__swRegisterTestApi);
+
+  await page.evaluate(() => window.__swRegisterTestApi.setWaitingWorkerForTest());
+  await expect(page.locator('#update-btn')).toBeVisible();
+
+  await enterPin(page, '1234');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.locator('#card-fichar').click();
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
+
+  await page.evaluate(() => window.__swRegisterTestApi.syncUpdateButtonForTest());
+  await expect(page.locator('#update-btn')).toBeHidden();
+});
+
+test('direct route exposes the manual update action and requests skip waiting', async ({ page }) => {
+  await enableSwTestApi(page);
+  await setupMockApi(page);
+  await page.goto('/direct/');
+  await page.waitForFunction(() => !!window.__swRegisterTestApi);
+
+  await page.evaluate(() => window.__swRegisterTestApi.setWaitingWorkerForTest());
+  await expect(page.locator('#update-btn')).toBeVisible();
+  await page.locator('#update-btn').click();
+
+  await expect.poll(async () => {
+    return page.evaluate(() => window.__swRegisterTestApi.getWaitingWorkerMessages());
+  }).toEqual([{ type: 'SKIP_WAITING' }]);
 });
 
 test('main PIN layout fits inside a short mobile viewport', async ({ page }) => {
@@ -143,7 +218,7 @@ test('employee login opens the main menu and unlocks personal actions', async ({
   await enterPin(page, '1234');
 
   await expect(page.locator('#screen-menu.active')).toBeVisible();
-  await expect(page.locator('#greeting')).toHaveText('Ismael Pérez');
+  await expect(page.locator('#greeting')).toHaveText('Ismael Perez');
   await expect(page.locator('#card-fichar')).toBeVisible();
   await expect(page.locator('#card-schedule')).toBeVisible();
   await expect(page.locator('#card-guia')).toBeVisible();
@@ -187,9 +262,59 @@ test('employee clock actions queue offline and sync automatically', async ({ pag
   await expect(page.locator('#clock-feedback')).toContainText('sincronizara automaticamente');
   await expect.poll(() => clockActions().length).toBe(2, { timeout: 8000 });
   expect(clockActions()[0].clientTimestamp).toBe(clockActions()[1].clientTimestamp);
+  expect(clockActions()[0].auth).toContain('Bearer employee-token');
+  expect(clockActions()[0].clockToken).toBe('');
+  expect(clockActions()[1].auth).toBe('');
+  expect(clockActions()[1].clockToken).toContain('offline-clock-token-1');
   await expect(page.locator('#offline-clock-banner')).toBeHidden({ timeout: 8000 });
   await expect(page.locator('#screen-menu.active')).toBeVisible();
   await expect(page.locator('#fichar-status')).toContainText('Entrada registrada');
+});
+
+test('a blocked offline replay keeps the queued punch recoverable until the employee revalidates the PIN', async ({ page }) => {
+  const state = await setupMockApi(page, {
+    clockFailuresRemaining: 1,
+    clockOfflineTokenFailuresRemaining: 1
+  });
+  const clockActions = () => state.clockActionCalls.filter((call) => call.action !== 'status');
+  await page.goto('/');
+  await enterPin(page, '1234');
+
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.locator('#card-fichar').click();
+  await expect(page.locator('#screen-clock.active')).toBeVisible();
+  await page.locator('#btn-check-in').click();
+
+  await expect(page.locator('#offline-clock-banner')).toBeVisible();
+  await expect.poll(() => clockActions().length).toBe(2, { timeout: 8000 });
+  expect(clockActions()[1].auth).toBe('');
+  expect(clockActions()[1].clockToken).toContain('offline-clock-token-1');
+  await expect(page.locator('#modal-confirm')).toBeVisible();
+  await expect(page.locator('#modal-body')).toContainText('vuelve a validar tu PIN');
+
+  const storedBeforeRecovery = await readOfflineStores(page);
+  expect(storedBeforeRecovery.queue).toHaveLength(1);
+  expect(storedBeforeRecovery.queue[0].offlineClockToken).toContain('offline-clock-token-1');
+  expect(Object.prototype.hasOwnProperty.call(storedBeforeRecovery.queue[0], 'accessToken')).toBe(false);
+  expect(storedBeforeRecovery.pinCache.length).toBeGreaterThan(0);
+  expect(Object.prototype.hasOwnProperty.call(storedBeforeRecovery.pinCache[0], 'accessToken')).toBe(false);
+
+  await page.locator('#modal-ok').click();
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.locator('#logout-btn').click();
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+
+  state.clockOfflineTokenFailuresRemaining = 0;
+  await enterPin(page, '1234');
+
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect.poll(() => clockActions().length).toBe(3, { timeout: 8000 });
+  expect(clockActions()[2].auth).toBe('');
+  expect(clockActions()[2].clockToken).toContain('offline-clock-token-1');
+  await expect(page.locator('#offline-clock-banner')).toBeHidden({ timeout: 8000 });
+
+  const storedAfterRecovery = await readOfflineStores(page);
+  expect(storedAfterRecovery.queue).toHaveLength(0);
 });
 
 test('employee clock replay stays idempotent when the backend already committed the first attempt', async ({ page }) => {
@@ -233,8 +358,6 @@ test('a permanently rejected queued punch is dropped so the employee is not left
   await expect(page.locator('#clock-feedback')).toContainText('ya no es valido');
   await expect(page.locator('#modal-confirm')).toBeVisible();
   await page.locator('#modal-ok').click();
-
-  await page.locator('#screen-clock .back-btn').click();
   await expect(page.locator('#screen-menu.active')).toBeVisible();
   await expect(page.locator('#fichar-status')).not.toContainText('Pendiente');
   await page.locator('#card-fichar').click();
@@ -345,7 +468,7 @@ test('admin can create a new employee from ajustes empleados', async ({ page }) 
   await page.locator('#menu-admin-shortcut').click();
 
   await page.locator('.admin-tab', { hasText: 'Empleados' }).click();
-  await expect(page.locator('#admin-employee-list')).toContainText('Ismael Pérez');
+  await expect(page.locator('#admin-employee-list')).toContainText('Ismael Perez');
 
   await page.locator('#admin-emp-toggle-form').click();
   await page.locator('#emp-name').fill('Lucia');
@@ -666,6 +789,10 @@ test('direct route queues quick clocking offline and syncs later', async ({ page
   await expect(page.locator('#offline-clock-banner')).toHaveText('1 fichaje pendiente de sincronizar');
   await expect.poll(() => state.clockActionCalls.length).toBe(2, { timeout: 8000 });
   expect(state.clockActionCalls[0].clientTimestamp).toBe(state.clockActionCalls[1].clientTimestamp);
+  expect(state.clockActionCalls[0].auth).toContain('Bearer employee-token-2');
+  expect(state.clockActionCalls[0].clockToken).toBe('');
+  expect(state.clockActionCalls[1].auth).toBe('');
+  expect(state.clockActionCalls[1].clockToken).toContain('offline-clock-token-2');
   await expect(page.locator('#offline-clock-banner')).toBeHidden({ timeout: 8000 });
 });
 
@@ -690,7 +817,72 @@ test('direct route can verify a cached PIN offline and sync once the connection 
   await expect(page.locator('#offline-clock-banner')).toBeVisible();
 
   await expect.poll(() => state.clockActionCalls.filter((call) => call.action !== 'status').length).toBe(2, { timeout: 8000 });
+  expect(state.clockActionCalls[1].auth).toBe('');
+  expect(state.clockActionCalls[1].clockToken).toContain('offline-clock-token-2');
   await expect(page.locator('#offline-clock-banner')).toBeHidden({ timeout: 8000 });
+});
+
+test('direct route explains clearly when offline verification has no cached credential', async ({ page }) => {
+  await setupMockApi(page, { employeeVerifyFailuresRemaining: 1 });
+  await page.goto('/direct/');
+
+  const clockPanel = page.locator('.direct-panel[data-panel-id="clock"]');
+  if (!(await clockPanel.evaluate((node) => window.getComputedStyle(node).display !== 'none'))) {
+    await page.locator('#direct-tab-clock').click();
+  }
+
+  await enterPin(page, '4321');
+  await expect(page.locator('#direct-clock-feedback')).toContainText('no tiene credencial offline disponible');
+});
+
+test('direct route explains clearly when the cached offline credential has expired', async ({ page }) => {
+  const state = await setupMockApi(page);
+  await page.goto('/');
+  await enterPin(page, '4321');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+
+  await page.evaluate(async (dbName) => {
+    function requestToPromise(request) {
+      return new Promise((resolve, reject) => {
+        request.onsuccess = function () { resolve(request.result); };
+        request.onerror = function () { reject(request.error || new Error('IndexedDB error')); };
+      });
+    }
+
+    const db = await new Promise((resolve, reject) => {
+      const request = window.indexedDB.open(dbName);
+      request.onsuccess = function () { resolve(request.result); };
+      request.onerror = function () { reject(request.error || new Error('Open DB failed')); };
+    });
+
+    try {
+      const readTx = db.transaction('employee_pin_cache', 'readonly');
+      const records = await requestToPromise(readTx.objectStore('employee_pin_cache').getAll());
+      const tx = db.transaction('employee_pin_cache', 'readwrite');
+      const store = tx.objectStore('employee_pin_cache');
+      records.forEach((record) => {
+        record.offlineClockTokenExpiresAt = '2000-01-01T00:00:00.000Z';
+        store.put(record);
+      });
+      await new Promise((resolve) => {
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { resolve(); };
+        tx.onabort = function () { resolve(); };
+      });
+    } finally {
+      db.close();
+    }
+  }, OFFLINE_DB_NAME);
+
+  await page.goto('/direct/');
+  const clockPanel = page.locator('.direct-panel[data-panel-id="clock"]');
+  if (!(await clockPanel.evaluate((node) => window.getComputedStyle(node).display !== 'none'))) {
+    await page.locator('#direct-tab-clock').click();
+  }
+
+  state.employeeVerifyFailuresRemaining = 1;
+  await enterPin(page, '4321');
+  await expect(page.locator('#direct-clock-feedback')).toContainText('no tiene credencial offline disponible');
 });
 
 test('direct route shows the next assigned schedule when check-in is outside any shift', async ({ page }) => {
