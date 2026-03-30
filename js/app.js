@@ -25,6 +25,7 @@ var App = (function () {
         Guia.init();
         Payment.init();
         Admin.init();
+        Contract.init();
         Install.init();
         restoreSession();
         launchScreen = consumeLaunchScreen();
@@ -126,6 +127,9 @@ var App = (function () {
         if (currentScreen === 'screen-schedule') {
             Schedule.hide();
         }
+        if (currentScreen === 'screen-acuerdo') {
+            Contract.hide();
+        }
         if (currentScreen === 'screen-menu' && menuClockTimer) {
             clearInterval(menuClockTimer);
             menuClockTimer = null;
@@ -155,6 +159,7 @@ var App = (function () {
         if (screenId === 'screen-guia') Guia.show();
         if (screenId === 'screen-payment') Payment.show();
         if (screenId === 'screen-admin') Admin.show();
+        if (screenId === 'screen-acuerdo') Contract.show(App._pendingContractId);
     }
 
     function isScreen(screenId) {
@@ -665,8 +670,26 @@ var App = (function () {
         init();
     });
 
+    function navigateToContract(contractId) {
+        var activeSession = getSession();
+        if (!activeSession || activeSession.role !== 'org_admin') {
+            navigate('screen-pin');
+            return;
+        }
+        if (!activeSession.employeeId) {
+            confirm(
+                'Firma no disponible',
+                'Para cofirmar un acuerdo debes entrar con un PIN personal de administrador, no con el PIN general de ajustes.'
+            );
+            return;
+        }
+        App._pendingContractId = contractId;
+        navigate('screen-acuerdo');
+    }
+
     return {
         navigate: navigate,
+        navigateToContract: navigateToContract,
         isScreen: isScreen,
         setSession: setSession,
         getSession: getSession,

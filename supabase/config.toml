@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.kiosk-payment]
 verify_jwt = false
+
+[functions.kiosk-contract]
+verify_jwt = false

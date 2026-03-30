@@ -298,6 +298,66 @@ var Api = (function () {
         }, { requiresAuth: true });
     }
 
+    // ── Acuerdos de participación (RD 2274/1985) ──────────────────────────────
+
+    function getContract(contractId) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-contract', {
+            orgSlug: ORG_SLUG,
+            action: 'get',
+            contractId: contractId
+        }, { requiresAuth: true });
+    }
+
+    function getContractsByEmployee(employeeId) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-contract', {
+            orgSlug: ORG_SLUG,
+            action: 'list',
+            employeeId: employeeId
+        }, { requiresAuth: true });
+    }
+
+    function createContract(data) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-contract', Object.assign({
+            orgSlug: ORG_SLUG,
+            action: 'create'
+        }, data), { requiresAuth: true });
+    }
+
+    function verifyParticipantContractPin(contractId, pin) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-contract', Object.assign({
+            orgSlug: ORG_SLUG,
+            action: 'verify-participant',
+            contractId: contractId,
+            pin: pin
+        }), { requiresAuth: true });
+    }
+
+    function participantSignContract(contractId, verificationToken, participantSignImg) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-contract', {
+            orgSlug: ORG_SLUG,
+            action: 'participant-sign',
+            contractId: contractId,
+            verificationToken: verificationToken,
+            participantSignImg: participantSignImg
+        }, { requiresAuth: true });
+    }
+
+    function adminSignContract(contractId, adminSignImg) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-contract', {
+            orgSlug: ORG_SLUG,
+            action: 'admin-sign',
+            contractId: contractId,
+            adminSignImg: adminSignImg
+        }, { requiresAuth: true });
+    }
+
+    function listAllContracts() {
+        return postJson(FUNCTIONS_BASE + '/kiosk-contract', {
+            orgSlug: ORG_SLUG,
+            action: 'list-all'
+        }, { requiresAuth: true });
+    }
+
     return {
         ORG_SLUG: ORG_SLUG,
         verifyPin: verifyPin,
@@ -319,6 +379,13 @@ var Api = (function () {
         createEmployee: createEmployee,
         updateEmployee: updateEmployee,
         listPaymentMonths: listPaymentMonths,
-        getPaymentSummary: getPaymentSummary
+        getPaymentSummary: getPaymentSummary,
+        getContract: getContract,
+        getContractsByEmployee: getContractsByEmployee,
+        createContract: createContract,
+        verifyParticipantContractPin: verifyParticipantContractPin,
+        participantSignContract: participantSignContract,
+        adminSignContract: adminSignContract,
+        listAllContracts: listAllContracts
     };
 })();

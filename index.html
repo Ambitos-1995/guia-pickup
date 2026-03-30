@@ -327,6 +327,7 @@
                 <nav class="admin-tabs" id="admin-tabs">
                     <button class="admin-tab active" data-tab="admin-payments">Pagos</button>
                     <button class="admin-tab" data-tab="admin-employees">Empleados</button>
+                    <button class="admin-tab" data-tab="admin-acuerdos">Acuerdos</button>
                 </nav>
 
                 <!-- Admin: Payments -->
@@ -426,6 +427,258 @@
                         <p class="loading-text">Cargando empleados...</p>
                     </div>
                 </div>
+
+                <!-- Admin: Acuerdos -->
+                <div class="admin-section hidden" id="admin-acuerdos">
+
+                    <button class="btn-add-emp" id="admin-acuerdo-nuevo" type="button">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Nuevo acuerdo
+                    </button>
+
+                    <div class="admin-acuerdo-form-wrap" id="admin-acuerdo-form-wrap">
+                        <div class="employee-form">
+                            <div class="form-row">
+                                <label for="acuerdo-emp-select">Participante</label>
+                                <select id="acuerdo-emp-select">
+                                    <option value="">Seleccionar participante...</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label for="acuerdo-representante">Representante de la Fundación</label>
+                                <input type="text" id="acuerdo-representante" placeholder="Nombre y cargo">
+                            </div>
+                            <button class="btn-primary btn-full" id="admin-acuerdo-crear" type="button">Crear acuerdo</button>
+                            <div class="employee-form-feedback hidden" id="acuerdo-form-feedback"></div>
+                        </div>
+                    </div>
+
+                    <div class="employee-list" id="admin-acuerdo-list">
+                        <p class="loading-text">Cargando acuerdos...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- SCREEN: ACUERDO DE PARTICIPACIÓN            -->
+        <!-- ============================================ -->
+        <div id="screen-acuerdo" class="screen">
+            <header class="screen-header">
+                <button class="back-btn" id="acuerdo-back-btn" aria-label="Volver">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                </button>
+                <h2 id="acuerdo-header-title">Acuerdo de Participación</h2>
+            </header>
+
+            <div class="acuerdo-steps-bar">
+                <div class="acuerdo-step-dot active current" title="Leer"></div>
+                <div class="acuerdo-step-line"></div>
+                <div class="acuerdo-step-dot" title="Tu firma"></div>
+                <div class="acuerdo-step-line"></div>
+                <div class="acuerdo-step-dot" title="Firma Fundación"></div>
+                <div class="acuerdo-step-line"></div>
+                <div class="acuerdo-step-dot" title="Listo"></div>
+            </div>
+
+            <div class="screen-container acuerdo-container">
+
+                <!-- PASO 1: Resumen del acuerdo -->
+                <div id="acuerdo-step-summary" class="acuerdo-step">
+                    <div class="acuerdo-legal-scroll">
+                        <div class="acuerdo-legal-doc">
+                            <h3 class="acuerdo-legal-title">Acuerdo de Participacion en Actividad Ocupacional</h3>
+
+                            <p class="acuerdo-legal-opening">Entre la Fundacion Ambitos (&laquo;la Fundacion&raquo;) y <strong id="acuerdo-employee-name" class="acuerdo-legal-name">&mdash;</strong> (&laquo;el/la Participante&raquo;), ambas partes acuerdan lo siguiente:</p>
+
+                            <section class="acuerdo-clause">
+                                <h4 class="acuerdo-clause-title">Primera &mdash; Objeto</h4>
+                                <p class="acuerdo-clause-text">El/la Participante se incorpora voluntariamente a la actividad ocupacional de gestion del Punto de Entrega SEUR &mdash; Punto Inclusivo, operado por la Fundacion. Esta actividad forma parte de un programa de terapia ocupacional y no constituye relacion laboral de ningun tipo.</p>
+                            </section>
+
+                            <section class="acuerdo-clause">
+                                <h4 class="acuerdo-clause-title">Segunda &mdash; Marco legal</h4>
+                                <p class="acuerdo-clause-text">La presente actividad se enmarca en el Real Decreto 2274/1985, de 4 de diciembre, por el que se regulan los Centros Ocupacionales para personas con discapacidad, y se desarrolla bajo los principios de la terapia ocupacional como profesion sanitaria regulada por la Ley 44/2003 de Ordenacion de las Profesiones Sanitarias, la Ley 24/2014 del Consejo General de Colegios de Terapeutas Ocupacionales y la Ley 1/2017 de la Comunidad de Madrid.</p>
+                            </section>
+
+                            <section class="acuerdo-clause">
+                                <h4 class="acuerdo-clause-title">Tercera &mdash; Horario</h4>
+                                <p class="acuerdo-clause-text">El/la Participante escoge libremente los turnos en los que desea participar cada semana, de acuerdo con la disponibilidad del punto de entrega. No existe obligacion de asistencia minima.</p>
+                            </section>
+
+                            <section class="acuerdo-clause">
+                                <h4 class="acuerdo-clause-title">Cuarta &mdash; Gratificacion</h4>
+                                <p class="acuerdo-clause-text">El/la Participante recibira mensualmente una gratificacion proporcional a las horas efectivamente realizadas durante ese mes. Esta gratificacion tiene caracter terapeutico-ocupacional y no constituye salario ni retribucion laboral.</p>
+                            </section>
+
+                            <section class="acuerdo-clause">
+                                <h4 class="acuerdo-clause-title">Quinta &mdash; Voluntariedad y baja</h4>
+                                <p class="acuerdo-clause-text">La participacion es completamente voluntaria. Cualquiera de las partes puede dar por finalizado este acuerdo en cualquier momento, sin necesidad de preaviso ni penalizacion.</p>
+                            </section>
+
+                            <section class="acuerdo-clause">
+                                <h4 class="acuerdo-clause-title">Sexta &mdash; Seguro y cobertura</h4>
+                                <p class="acuerdo-clause-text">La Fundacion garantiza que el/la Participante esta cubierto/a por un seguro de responsabilidad civil y accidentes durante el desarrollo de la actividad.</p>
+                            </section>
+
+                            <section class="acuerdo-clause">
+                                <h4 class="acuerdo-clause-title">Septima &mdash; Proteccion de datos</h4>
+                                <p class="acuerdo-clause-text">Los datos personales del Participante se tratan conforme al Reglamento (UE) 2016/679 (RGPD) y la Ley Organica 3/2018 (LOPDGDD). La Fundacion es responsable del tratamiento, con la finalidad exclusiva de gestionar esta actividad ocupacional. El/la Participante puede ejercer sus derechos de acceso, rectificacion, supresion y portabilidad dirigiendose a la Fundacion.</p>
+                            </section>
+
+                            <section class="acuerdo-clause">
+                                <h4 class="acuerdo-clause-title">Octava &mdash; Vigencia</h4>
+                                <p class="acuerdo-clause-text">Este acuerdo tiene una duracion de tres meses desde la fecha de firma, renovable automaticamente por periodos iguales salvo comunicacion en contrario por cualquiera de las partes.</p>
+                            </section>
+
+                            <p class="acuerdo-legal-footer">Ambas partes firman electronicamente a continuacion en senal de conformidad.</p>
+                        </div>
+                    </div>
+                    <button id="acuerdo-btn-go-sign" class="btn-primary btn-full btn-xlarge" type="button">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        Lo entiendo &mdash; Ir a firmar
+                    </button>
+                </div>
+
+                <!-- PASO 2: Validacion PIN participante -->
+                <div id="acuerdo-step-p-pin" class="acuerdo-step hidden">
+                    <div class="sign-instruction">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span>El participante debe introducir su PIN</span>
+                    </div>
+                    <div class="acuerdo-notice">
+                        Validacion del acuerdo para <strong id="acuerdo-pin-target">-</strong>. Este PIN no cambia la sesion del kiosko.
+                    </div>
+                    <div class="acuerdo-pin-panel">
+                        <div class="acuerdo-pin-dots" id="acuerdo-pin-dots" aria-label="PIN del participante">
+                            <span class="acuerdo-pin-dot" data-index="0"></span>
+                            <span class="acuerdo-pin-dot" data-index="1"></span>
+                            <span class="acuerdo-pin-dot" data-index="2"></span>
+                            <span class="acuerdo-pin-dot" data-index="3"></span>
+                            <span class="acuerdo-pin-dot" data-index="4"></span>
+                            <span class="acuerdo-pin-dot" data-index="5"></span>
+                        </div>
+                        <div class="acuerdo-pin-keypad" id="acuerdo-pin-keypad">
+                            <button class="acuerdo-pin-key" data-key="1" type="button">1</button>
+                            <button class="acuerdo-pin-key" data-key="2" type="button">2</button>
+                            <button class="acuerdo-pin-key" data-key="3" type="button">3</button>
+                            <button class="acuerdo-pin-key" data-key="4" type="button">4</button>
+                            <button class="acuerdo-pin-key" data-key="5" type="button">5</button>
+                            <button class="acuerdo-pin-key" data-key="6" type="button">6</button>
+                            <button class="acuerdo-pin-key" data-key="7" type="button">7</button>
+                            <button class="acuerdo-pin-key" data-key="8" type="button">8</button>
+                            <button class="acuerdo-pin-key" data-key="9" type="button">9</button>
+                            <button class="acuerdo-pin-key acuerdo-pin-key--ghost" data-key="clear" type="button">Borrar</button>
+                            <button class="acuerdo-pin-key" data-key="0" type="button">0</button>
+                            <button class="acuerdo-pin-key acuerdo-pin-key--brand" data-key="submit" type="button">Validar</button>
+                        </div>
+                    </div>
+                    <div class="sign-actions">
+                        <button id="acuerdo-btn-pin-clear" class="btn-secondary btn-xlarge" type="button">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
+                            Limpiar
+                        </button>
+                        <button id="acuerdo-btn-pin-verify" class="btn-primary btn-xlarge" type="button" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Validar PIN
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PASO 3: Firma del participante -->
+                <div id="acuerdo-step-p-sign" class="acuerdo-step hidden">
+                    <div class="sign-instruction">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        <span>Firma aquí con tu dedo</span>
+                    </div>
+                    <div class="sign-canvas-wrap">
+                        <canvas id="acuerdo-canvas-participant" class="sign-canvas" aria-label="Área de firma"></canvas>
+                        <div class="sign-guide-line"></div>
+                    </div>
+                    <div class="sign-actions">
+                        <button id="acuerdo-btn-p-clear" class="btn-secondary btn-xlarge">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
+                            Borrar
+                        </button>
+                        <button id="acuerdo-btn-p-confirm" class="btn-primary btn-xlarge" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Confirmar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PASO 3: Vista previa firma participante -->
+                <div id="acuerdo-step-p-preview" class="acuerdo-step hidden">
+                    <p class="preview-question">¿Es esta tu firma?</p>
+                    <div class="preview-img-wrap">
+                        <img id="acuerdo-preview-participant" alt="Tu firma" class="preview-img"/>
+                    </div>
+                    <div class="sign-actions">
+                        <button id="acuerdo-btn-p-redo" class="btn-secondary btn-xlarge">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
+                            No, repetir
+                        </button>
+                        <button id="acuerdo-btn-p-ok" class="btn-primary btn-xlarge">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Sí, es correcta
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PASO 4: Firma del representante -->
+                <div id="acuerdo-step-a-sign" class="acuerdo-step hidden">
+                    <div class="sign-instruction sign-instruction--admin">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        <span>Firma del representante de la Fundación</span>
+                    </div>
+                    <div class="sign-canvas-wrap">
+                        <canvas id="acuerdo-canvas-admin" class="sign-canvas" aria-label="Área de firma representante"></canvas>
+                        <div class="sign-guide-line"></div>
+                    </div>
+                    <div class="sign-actions">
+                        <button id="acuerdo-btn-a-clear" class="btn-secondary btn-xlarge">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
+                            Borrar
+                        </button>
+                        <button id="acuerdo-btn-a-confirm" class="btn-primary btn-xlarge" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Confirmar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PASO 5: Vista previa firma admin -->
+                <div id="acuerdo-step-a-preview" class="acuerdo-step hidden">
+                    <p class="preview-question">¿Es correcta tu firma?</p>
+                    <div class="preview-img-wrap">
+                        <img id="acuerdo-preview-admin" alt="Firma representante" class="preview-img"/>
+                    </div>
+                    <div class="sign-actions">
+                        <button id="acuerdo-btn-a-redo" class="btn-secondary btn-xlarge">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
+                            No, repetir
+                        </button>
+                        <button id="acuerdo-btn-a-ok" class="btn-primary btn-xlarge">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Sí, correcto
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PASO 6: Éxito -->
+                <div id="acuerdo-step-done" class="acuerdo-step hidden">
+                    <div class="acuerdo-success">
+                        <div class="acuerdo-success-icon">
+                            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        </div>
+                        <h3 class="acuerdo-success-title">¡Acuerdo firmado!</h3>
+                        <p class="acuerdo-success-sub">Las dos firmas han quedado guardadas correctamente.</p>
+                        <button id="acuerdo-btn-done" class="btn-primary btn-full btn-xlarge">Volver al inicio</button>
+                    </div>
+                </div>
+
+                <div class="employee-form-feedback hidden" id="acuerdo-feedback"></div>
+
             </div>
         </div>
 
@@ -561,6 +814,8 @@
     <script src="js/payment.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/install.js"></script>
+    <script src="vendor/signature_pad/signature_pad.umd.min.js"></script>
+    <script src="js/contract.js"></script>
     <script src="js/app.js"></script>
     <script src="js/sw-register.js"></script>
 </body>

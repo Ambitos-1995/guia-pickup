@@ -1,5 +1,4 @@
 begin;
-
 create or replace function public.cleanup_expired_tokens()
 returns integer
 language plpgsql
@@ -37,7 +36,6 @@ begin
   return deleted_count;
 end;
 $$;
-
 create or replace function public.verify_employee_pin(
   p_organization_id uuid,
   p_pin text
@@ -93,7 +91,6 @@ begin
     v_last_attendance.timestamp;
 end;
 $$;
-
 create or replace function public.verify_organization_super_admin_pin(
   p_organization_id uuid,
   p_pin text
@@ -119,5 +116,4 @@ begin
   return v_pin_hash = extensions.crypt(p_pin, v_pin_hash);
 end;
 $$;
-
 commit;

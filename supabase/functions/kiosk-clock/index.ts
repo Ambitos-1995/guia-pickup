@@ -13,6 +13,7 @@ import {
   json,
   logAudit,
   logAttendanceAttemptDebug,
+  logDebugEvent,
   madridDateIso,
   requireOfflineClockToken,
   requireSession,
@@ -84,6 +85,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const clockTokenHeader = String(req.headers.get("x-kiosk-clock-token") || "").trim();
     let employeeId = "";
     let actorSessionId: string | null = null;
+    let authMode: "session" | "offline_clock_token" = "session";
 
     if (action === "status" || authHeader.startsWith("Bearer ")) {
       const auth = await requireSession(req, url, serviceRoleKey, ["respondent"]);
@@ -97,6 +99,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       employeeId = auth.session.employee_id;
       actorSessionId = auth.session.id;
+      authMode = "session";
     } else if (clockTokenHeader) {
       const offlineClock = await requireOfflineClockToken(req, orgId);
       if (offlineClock instanceof Response) {
@@ -104,6 +107,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
 
       employeeId = offlineClock.employeeId;
+      authMode = "offline_clock_token";
     } else {
       return json({ success: false, error: "AUTH_REQUIRED", message: "Sesion requerida" }, 401);
     }
@@ -120,10 +124,44 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const employee = employeeRes.ok ? employeeRes.data[0] : null;
     if (!employee) {
+      await logDebugEvent(url, serviceRoleKey, {
+        organizationId: orgId,
+        actorSessionId,
+        source: "edge",
+        scope: "clock",
+        action,
+        outcome: "employee_not_found",
+        message: "Empleado no encontrado para fichaje",
+        metadata: {
+          route: "kiosk-clock",
+          employeeId,
+          clientDate,
+          authMode,
+          clientEventId: clientEventId || null,
+          eventNow: eventNow.toISOString(),
+        },
+      });
       return json({ success: false, message: "Empleado no encontrado" }, 404);
     }
 
     if (!employee.attendance_enabled) {
+      await logDebugEvent(url, serviceRoleKey, {
+        organizationId: orgId,
+        actorSessionId,
+        employeeId: employee.id,
+        source: "edge",
+        scope: "clock",
+        action,
+        outcome: "employee_disabled",
+        message: "Empleado desactivado para fichaje",
+        metadata: {
+          route: "kiosk-clock",
+          clientDate,
+          authMode,
+          clientEventId: clientEventId || null,
+          eventNow: eventNow.toISOString(),
+        },
+      });
       return json({ success: false, message: "Empleado desactivado" }, 403);
     }
 
@@ -199,6 +237,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const nextScheduledSlot = findNextAssignedSlot(employeeSlots, eventNow);
     const eligibleCheckInSlot = findEligibleCheckInSlot(todaySlots, dayState.slotStates, clientDate, eventNow);
     const nextAvailableTodaySlot = findNextAvailableTodaySlot(todaySlots, dayState.slotStates, clientDate, eventNow);
+    const commonDebugMetadata = buildClockDebugMetadata({
+      clientDate,
+      clientTimestamp,
+      clientEventId,
+      eventNow,
+      authMode,
+      currentStatus,
+      dayState,
+      employeeSlots,
+      todaySlots,
+      nextScheduledSlot,
+      nextAvailableTodaySlot,
+      eligibleCheckInSlot,
+    });
 
     // ======================== CHECK-IN ========================
     if (action === "check-in") {
@@ -214,6 +266,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           scheduledStart: dayState.openSlot?.start_time || null,
           scheduledEnd: dayState.openSlot?.end_time || null,
           message: "Ya tienes entrada registrada hoy",
+          metadata: commonDebugMetadata,
         });
         return json({ success: false, message: "Ya tienes entrada registrada hoy" }, 409);
       }
@@ -226,6 +279,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           outcome: "blocked_checked_out",
           clientDate,
           message: "Ya has fichado entrada y salida hoy",
+          metadata: commonDebugMetadata,
         });
         return json({ success: false, message: "Ya has fichado entrada y salida hoy" }, 409);
       }
@@ -239,7 +293,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
           outcome: "blocked_no_schedule",
           clientDate,
           message: buildNoScheduleMessage(nextScheduledSlot),
-          metadata: buildNextSlotData(nextScheduledSlot, "no_schedule"),
+          metadata: {
+            ...commonDebugMetadata,
+            ...buildNextSlotData(nextScheduledSlot, "no_schedule"),
+          },
         });
         return json(
           {
@@ -270,7 +327,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
           scheduledStart: referenceSlot.start_time,
           scheduledEnd: referenceSlot.end_time,
           message: blockedMessage,
-          metadata: blockedData,
+          metadata: {
+            ...commonDebugMetadata,
+            ...blockedData,
+            referenceSlot: summarizeSlot(referenceSlot, clientDate),
+          },
         });
         return json({
           success: false,
@@ -340,6 +401,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         scheduledStart: eligibleCheckInSlot.start_time,
         scheduledEnd: eligibleCheckInSlot.end_time,
         message: `Entrada registrada. El turno conciliara hasta las ${eligibleCheckInSlot.end_time.slice(0, 5)}.`,
+        metadata: {
+          ...commonDebugMetadata,
+          chosenSlot: summarizeSlot(eligibleCheckInSlot, clientDate),
+        },
       });
 
       return json({
@@ -364,6 +429,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           outcome: "blocked_not_checked_in",
           clientDate,
           message: "No tienes entrada registrada hoy",
+          metadata: commonDebugMetadata,
         });
         return json({ success: false, message: "No tienes entrada registrada hoy" }, 409);
       }
@@ -429,6 +495,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         scheduledStart: dayState.openSlot?.start_time || null,
         scheduledEnd: dayState.openSlot?.end_time || null,
         message: "Salida registrada",
+        metadata: {
+          ...commonDebugMetadata,
+          chosenSlot: dayState.openSlot ? summarizeSlot(dayState.openSlot, clientDate) : null,
+        },
       });
 
       const updatedState = await getAttendanceDayState(url, serviceRoleKey, orgId, employee.id, clientDate, eventNow);
@@ -599,6 +669,78 @@ function isInsideCheckInWindow(slot: ScheduleSlotRow, clientDate: string, now: D
 function isBeforeCheckInWindow(slot: ScheduleSlotRow, clientDate: string, now: Date): boolean {
   const windowStart = new Date(buildMadridDateTime(clientDate, slot.start_time).getTime() - 15 * 60000);
   return now < windowStart;
+}
+
+function buildClockDebugMetadata(input: {
+  clientDate: string;
+  clientTimestamp: string;
+  clientEventId: string;
+  eventNow: Date;
+  authMode: "session" | "offline_clock_token";
+  currentStatus: string;
+  dayState: {
+    openSlotId: string | null;
+    todaySlots: ScheduleSlotRow[];
+    slotStates: Record<string, string>;
+    hasCheckOut: boolean;
+  };
+  employeeSlots: ScheduleSlotRow[];
+  todaySlots: ScheduleSlotRow[];
+  nextScheduledSlot: { slot: ScheduleSlotRow; date: Date } | null;
+  nextAvailableTodaySlot: ScheduleSlotRow | null;
+  eligibleCheckInSlot: ScheduleSlotRow | null;
+}): Record<string, unknown> {
+  return {
+    route: "kiosk-clock",
+    clientDate: input.clientDate,
+    clientTimestamp: input.clientTimestamp || null,
+    clientEventId: input.clientEventId || null,
+    eventNow: input.eventNow.toISOString(),
+    authMode: input.authMode,
+    currentStatus: input.currentStatus,
+    openSlotId: input.dayState.openSlotId,
+    hasCheckOut: input.dayState.hasCheckOut,
+    todaySlotCount: input.todaySlots.length,
+    employeeSlotCount: input.employeeSlots.length,
+    slotStates: input.dayState.slotStates,
+    todaySlotIds: input.todaySlots.map((slot) => slot.id),
+    eligibleCheckInSlot: input.eligibleCheckInSlot ? summarizeSlot(input.eligibleCheckInSlot, input.clientDate) : null,
+    nextAvailableTodaySlot: input.nextAvailableTodaySlot ? summarizeSlot(input.nextAvailableTodaySlot, input.clientDate) : null,
+    nextScheduledSlot: input.nextScheduledSlot ? summarizeScheduledSlotRef(input.nextScheduledSlot) : null,
+  };
+}
+
+function summarizeSlot(slot: ScheduleSlotRow, clientDate: string): Record<string, unknown> {
+  const slotStart = buildMadridDateTime(clientDate, slot.start_time);
+  const slotEnd = buildMadridDateTime(clientDate, slot.end_time);
+  const windowStart = new Date(slotStart.getTime() - 15 * 60000);
+
+  return {
+    id: slot.id,
+    clientDate,
+    year: slot.year,
+    week: slot.week,
+    dayOfWeek: slot.day_of_week,
+    startTime: slot.start_time,
+    endTime: slot.end_time,
+    windowStart: windowStart.toISOString(),
+    slotStart: slotStart.toISOString(),
+    slotEnd: slotEnd.toISOString(),
+  };
+}
+
+function summarizeScheduledSlotRef(
+  slotRef: { slot: ScheduleSlotRow; date: Date },
+): Record<string, unknown> {
+  return {
+    id: slotRef.slot.id,
+    date: toDateIso(slotRef.date),
+    year: slotRef.slot.year,
+    week: slotRef.slot.week,
+    dayOfWeek: slotRef.slot.day_of_week,
+    startTime: slotRef.slot.start_time,
+    endTime: slotRef.slot.end_time,
+  };
 }
 
 async function findAttendanceByClientEventId(

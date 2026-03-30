@@ -1,5 +1,3 @@
-begin;
-
 create or replace function public.cleanup_expired_tokens()
 returns integer
 language plpgsql
@@ -92,6 +90,4 @@ begin
     end,
     v_last_attendance.timestamp;
 end;
-$$;
-
-commit;
+$$;;

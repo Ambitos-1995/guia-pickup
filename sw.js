@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pickup-tmg-v69';
+var CACHE_NAME = 'pickup-tmg-v73';
 var FILES_TO_CACHE = [
     './index.html',
     './manifest.json',
@@ -35,6 +35,8 @@ var FILES_TO_CACHE = [
     './js/payment.js',
     './js/admin.js',
     './js/install.js',
+    './vendor/signature_pad/signature_pad.umd.min.js',
+    './js/contract.js',
     './js/app.js',
     './js/sw-register.js'
 ];

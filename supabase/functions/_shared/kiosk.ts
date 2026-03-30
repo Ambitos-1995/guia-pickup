@@ -753,12 +753,12 @@ export async function autoCloseStaleCheckIns(
   clientDate: string,
 ): Promise<void> {
   const [checkInsRes, checkOutsRes] = await Promise.all([
-    fetchJson<Array<{ id: string; employee_id: string; slot_id: string | null; recorded_at: string }>>(
-      `${supabaseUrl}/rest/v1/kiosk_attendance?select=id,employee_id,slot_id,recorded_at&organization_id=eq.${orgId}&client_date=eq.${clientDate}&action=eq.check_in`,
+    fetchJson<Array<{ id: string; employee_id: string; slot_id: string | null; recorded_at: string; client_date: string }>>(
+      `${supabaseUrl}/rest/v1/kiosk_attendance?select=id,employee_id,slot_id,recorded_at,client_date&organization_id=eq.${orgId}&client_date=lte.${clientDate}&action=eq.check_in`,
       { headers: authHeaders(key) },
     ),
-    fetchJson<Array<{ employee_id: string; slot_id: string | null }>>(
-      `${supabaseUrl}/rest/v1/kiosk_attendance?select=employee_id,slot_id&organization_id=eq.${orgId}&client_date=eq.${clientDate}&action=eq.check_out`,
+    fetchJson<Array<{ employee_id: string; slot_id: string | null; client_date: string }>>(
+      `${supabaseUrl}/rest/v1/kiosk_attendance?select=employee_id,slot_id,client_date&organization_id=eq.${orgId}&client_date=lte.${clientDate}&action=eq.check_out`,
       { headers: authHeaders(key) },
     ),
   ]);
@@ -769,7 +769,7 @@ export async function autoCloseStaleCheckIns(
     checkOutsRes.ok
       ? checkOutsRes.data
         .filter((record) => !!record.slot_id)
-        .map((record) => `${record.employee_id}:${record.slot_id}`)
+        .map((record) => `${record.client_date}:${record.employee_id}:${record.slot_id}`)
       : [],
   );
 
@@ -777,7 +777,7 @@ export async function autoCloseStaleCheckIns(
 
   for (const record of checkInsRes.data) {
     if (!record.slot_id) continue;
-    if (checkedOutSet.has(`${record.employee_id}:${record.slot_id}`)) continue;
+    if (checkedOutSet.has(`${record.client_date}:${record.employee_id}:${record.slot_id}`)) continue;
 
     const slotRes = await fetchJson<Array<{ end_time: string }>>(
       `${supabaseUrl}/rest/v1/kiosk_schedule_slots?select=end_time&id=eq.${record.slot_id}&limit=1`,
@@ -787,7 +787,7 @@ export async function autoCloseStaleCheckIns(
     const slot = slotRes.ok ? slotRes.data[0] : null;
     if (!slot) continue;
 
-    const slotEnd = buildMadridDateTime(clientDate, slot.end_time);
+    const slotEnd = buildMadridDateTime(record.client_date, slot.end_time);
     const autoCloseThreshold = new Date(slotEnd.getTime() + AUTO_CLOSE_DELAY_MIN * 60000);
 
     if (now >= autoCloseThreshold) {
@@ -805,7 +805,7 @@ export async function autoCloseStaleCheckIns(
             employee_id: record.employee_id,
             slot_id: record.slot_id,
             action: "check_out",
-            client_date: clientDate,
+            client_date: record.client_date,
             recorded_at: slotEnd.toISOString(),
           }),
         },

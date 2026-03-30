@@ -6,7 +6,9 @@ var Admin = (function () {
 
     var editingEmployee = null;
     var currentYear, currentMonth;
-    var newFormVisible = false;
+    var newFormVisible     = false;
+    var acuerdoFormVisible = false;
+    var employeeSelectCache = null;
 
     var CALC_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="16" y1="18" x2="16" y2="18"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="8" y1="10" x2="16" y2="10"/></svg>';
     var SPINNER_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
@@ -64,6 +66,8 @@ var Admin = (function () {
                         loadPayMonth();
                     } else if (target.id === 'admin-employees') {
                         loadEmployees();
+                    } else if (target.id === 'admin-acuerdos') {
+                        loadAcuerdosList();
                     }
                 }
             });
@@ -101,6 +105,10 @@ var Admin = (function () {
             });
         }
 
+        /* --- Acuerdos --- */
+        Utils.bindPress(document.getElementById('admin-acuerdo-nuevo'), toggleAcuerdoForm);
+        Utils.bindPress(document.getElementById('admin-acuerdo-crear'), createAcuerdo);
+
         /* Active toggle in edit modal */
         var toggleBtn = document.getElementById('edit-emp-active');
         if (toggleBtn) {
@@ -132,8 +140,19 @@ var Admin = (function () {
             return;
         }
 
+        var activeTab = document.querySelector('.admin-tab.active');
+        var activeTabId = activeTab ? activeTab.dataset.tab : 'admin-payments';
+
+        if (activeTabId === 'admin-employees') {
+            loadEmployees();
+            return;
+        }
+        if (activeTabId === 'admin-acuerdos') {
+            loadAcuerdosList();
+            return;
+        }
+
         loadPayMonth();
-        loadEmployees();
     }
 
     /* =========================================================
@@ -326,6 +345,7 @@ var Admin = (function () {
                 if (roleEl) roleEl.value = 'employee';
                 updatePinLabel('employee', 'emp-pin-label', 'emp-pin');
                 showFeedback('emp-feedback', 'success', 'Empleado creado correctamente.', 4000);
+                employeeSelectCache = null;
                 loadEmployees();
                 if (newFormVisible) toggleNewForm();
             } else {
@@ -453,6 +473,7 @@ var Admin = (function () {
     function toggleActive(employeeId, currentState) {
         Api.updateEmployee(employeeId, undefined, undefined, null, !currentState, undefined).then(function (res) {
             if (res && res.success) {
+                employeeSelectCache = null;
                 loadEmployees();
             }
         });
@@ -530,11 +551,171 @@ var Admin = (function () {
 
             if (res && res.success) {
                 closeEditModal();
+                employeeSelectCache = null;
                 loadEmployees();
             } else {
                 showFeedback('edit-emp-feedback', 'error', (res && res.message) || 'Error al guardar.');
             }
         });
+    }
+
+    /* =========================================================
+       ACUERDOS TAB
+       ========================================================= */
+
+    function toggleAcuerdoForm() {
+        acuerdoFormVisible = !acuerdoFormVisible;
+        var wrap = document.getElementById('admin-acuerdo-form-wrap');
+        var btn  = document.getElementById('admin-acuerdo-nuevo');
+        if (wrap) wrap.classList.toggle('open', acuerdoFormVisible);
+        if (btn)  btn.classList.toggle('open', acuerdoFormVisible);
+
+        if (acuerdoFormVisible) {
+            populateEmployeeSelect();
+        }
+    }
+
+    function populateEmployeeSelect() {
+        var select = document.getElementById('acuerdo-emp-select');
+        if (!select) return;
+
+        if (employeeSelectCache) {
+            renderEmployeeOptions(select, employeeSelectCache);
+            return;
+        }
+
+        Api.getEmployees().then(function (res) {
+            if (!res || !res.success || !res.data) return;
+            employeeSelectCache = res.data;
+            renderEmployeeOptions(select, res.data);
+        });
+    }
+
+    function renderEmployeeOptions(select, employees) {
+        while (select.options.length > 1) {
+            select.remove(1);
+        }
+        employees.forEach(function (emp) {
+            if (emp.role === 'admin') return;
+            var opt = document.createElement('option');
+            opt.value       = emp.id;
+            opt.textContent = emp.nombre + ' ' + (emp.apellido || '');
+            select.appendChild(opt);
+        });
+    }
+
+    function createAcuerdo() {
+        var empSelect = document.getElementById('acuerdo-emp-select');
+        var representanteInput = document.getElementById('acuerdo-representante');
+        var empId = empSelect ? String(empSelect.value || '').trim() : '';
+        var representante = representanteInput ? String(representanteInput.value || '').trim() : '';
+
+        hideFeedback('acuerdo-form-feedback');
+
+        if (!empId)         { showFeedback('acuerdo-form-feedback', 'error', 'Selecciona un participante.'); return; }
+        if (!representante) { showFeedback('acuerdo-form-feedback', 'error', 'Escribe el nombre del representante.'); return; }
+
+        var btn = document.getElementById('admin-acuerdo-crear');
+        if (btn) { btn.disabled = true; btn.textContent = 'Creando...'; }
+
+        Api.createContract({
+            employeeId:          empId,
+            activityDescription: 'Gesti\u00f3n del Punto de Entrega SEUR \u2014 Punto Inclusivo',
+            schedule:            'Seg\u00fan turnos elegidos libremente por el/la Participante',
+            validityText:        '3 meses, renovable autom\u00e1ticamente',
+            representativeName:  representante
+        }).then(function (res) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Crear acuerdo'; }
+
+            if (res && res.success) {
+                showFeedback('acuerdo-form-feedback', 'success', 'Acuerdo creado correctamente.', 3000);
+                var s = document.getElementById('acuerdo-emp-select');
+                var r = document.getElementById('acuerdo-representante');
+                if (s) s.value = '';
+                if (r) r.value = '';
+                toggleAcuerdoForm();
+                loadAcuerdosList();
+            } else {
+                showFeedback('acuerdo-form-feedback', 'error', (res && res.message) || 'Error al crear el acuerdo.');
+            }
+        });
+    }
+
+    function loadAcuerdosList() {
+        var list = document.getElementById('admin-acuerdo-list');
+        if (!list) return;
+        list.textContent = '';
+
+        var loading = document.createElement('p');
+        loading.className   = 'loading-text';
+        loading.textContent = 'Cargando acuerdos...';
+        list.appendChild(loading);
+
+        Api.listAllContracts().then(function (res) {
+            list.textContent = '';
+
+            if (!res || !res.success) {
+                renderEmployeeState(list, 'No se pudieron cargar los acuerdos.', true);
+                return;
+            }
+
+            if (!res.contracts || res.contracts.length === 0) {
+                renderEmployeeState(list, 'No hay acuerdos registrados aún.');
+                return;
+            }
+
+            res.contracts.forEach(function (c) {
+                list.appendChild(renderAcuerdoRow(c));
+            });
+        });
+    }
+
+    function renderAcuerdoRow(contract) {
+        var row = document.createElement('div');
+        row.className = 'acuerdo-row';
+
+        var statusLabel = '<span class="acuerdo-status acuerdo-status--pending">Pendiente participante</span>';
+        if (contract.status === 'pending_admin') {
+            statusLabel = '<span class="acuerdo-status acuerdo-status--pending">Pendiente fundacion</span>';
+        } else if (contract.status === 'signed') {
+            statusLabel = '<span class="acuerdo-status acuerdo-status--signed">Firmado</span>';
+        } else if (contract.status === 'cancelled') {
+            statusLabel = '<span class="acuerdo-status acuerdo-status--cancel">Cancelado</span>';
+        }
+
+        var dateStr = contract.created_at
+            ? new Date(contract.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })
+            : '—';
+
+        var info = document.createElement('div');
+        info.className   = 'acuerdo-row-info';
+        info.innerHTML   =
+            '<div class="acuerdo-row-name">' + escapeHtml(contract.employee_name || '—') + '</div>' +
+            '<div class="acuerdo-row-date">' + dateStr + ' · ' + statusLabel + '</div>';
+
+        row.appendChild(info);
+
+        if (contract.status !== 'signed') {
+            var btn = document.createElement('button');
+            btn.className   = 'btn-acuerdo-iniciar';
+            btn.textContent = contract.status === 'pending_admin' ? 'Cofirmar' : 'Iniciar firma';
+            (function (id) {
+                Utils.bindPress(btn, function () {
+                    App.navigateToContract(id);
+                });
+            }(contract.id));
+            row.appendChild(btn);
+        }
+
+        return row;
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
     }
 
     return { init: init, show: show };

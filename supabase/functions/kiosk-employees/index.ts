@@ -6,6 +6,7 @@ import {
   currentAttendanceStatus,
   fetchJson,
   getClientIp,
+  logDebugEvent,
   getSessionSecret,
   getSupabaseConfig,
   getUserAgent,
@@ -25,6 +26,8 @@ import {
 const EMPLOYEE_PIN_REGEX = /^[0-9]{4,6}$/;
 const EMPLOYEE_IDLE_TIMEOUT_SECONDS = 10 * 60;
 const EMPLOYEE_ABSOLUTE_TIMEOUT_SECONDS = 30 * 60;
+const ADMIN_IDLE_TIMEOUT_SECONDS = 5 * 60;
+const ADMIN_ABSOLUTE_TIMEOUT_SECONDS = 15 * 60;
 const OFFLINE_CLOCK_TOKEN_TIMEOUT_SECONDS = 30 * 60;
 const EMPLOYEE_FAILURE_LIMIT = 8;
 const EMPLOYEE_BLOCK_MINUTES = 10;
@@ -106,12 +109,37 @@ async function handleVerify(
 ): Promise<Response> {
   const pin = String(body.pin || "").trim();
   if (!EMPLOYEE_PIN_REGEX.test(pin)) {
+    await logDebugEvent(supabaseUrl, key, {
+      organizationId: orgId,
+      source: "edge",
+      scope: "auth",
+      action: "employee_verify",
+      outcome: "invalid_pin_format",
+      message: "PIN con formato invalido",
+      metadata: buildEmployeeAuthMetadata(req, pin, {
+        reason: "invalid_pin_format",
+      }),
+    });
     return json({ success: false, message: "El PIN debe ser entre 4 y 6 cifras" }, 400);
   }
 
   const ipAddress = getClientIp(req);
+  const userAgent = getUserAgent(req);
   const limiter = await getRateLimitStatus(supabaseUrl, key, orgId, "employee", ipAddress);
   if (limiter.blockedUntil) {
+    await logDebugEvent(supabaseUrl, key, {
+      organizationId: orgId,
+      source: "edge",
+      scope: "auth",
+      action: "employee_verify",
+      outcome: "blocked_rate_limit",
+      message: "Demasiados intentos de PIN",
+      metadata: buildEmployeeAuthMetadata(req, pin, {
+        reason: "rate_limit",
+        failureCount: limiter.failureCount,
+        blockedUntil: limiter.blockedUntil,
+      }),
+    });
     return json({
       success: false,
       error: "TOO_MANY_ATTEMPTS",
@@ -128,33 +156,74 @@ async function handleVerify(
       : null;
 
     await Promise.all([
-      recordAuthAttempt(supabaseUrl, key, orgId, "employee", ipAddress, false, nextFailureCount, blockedUntil),
+      recordAuthAttempt(
+        supabaseUrl,
+        key,
+        orgId,
+        "employee",
+        ipAddress,
+        false,
+        nextFailureCount,
+        blockedUntil,
+        buildEmployeeAuthMetadata(req, pin, {
+          reason: "pin_not_matched",
+          failureCount: nextFailureCount,
+          blockedUntil,
+        }),
+      ),
       logAudit(supabaseUrl, key, {
         organizationId: orgId,
         actorRole: "system",
         action: "employee_login_failed",
-        metadata: { ipAddress, blockedUntil },
+        metadata: buildEmployeeAuthMetadata(req, pin, {
+          reason: "pin_not_matched",
+          failureCount: nextFailureCount,
+          blockedUntil,
+        }),
+      }),
+      logDebugEvent(supabaseUrl, key, {
+        organizationId: orgId,
+        source: "edge",
+        scope: "auth",
+        action: "employee_verify",
+        outcome: "failure",
+        message: "PIN incorrecto",
+        metadata: buildEmployeeAuthMetadata(req, pin, {
+          reason: "pin_not_matched",
+          failureCount: nextFailureCount,
+          blockedUntil,
+        }),
       }),
     ]);
 
     return json({ success: false, message: "PIN incorrecto" }, 401);
   }
 
-  if (employee.role === "admin") {
-    return json({ success: false, message: "Los administradores deben usar el engranaje de ajustes" }, 403);
-  }
+  const isAdmin = employee.role === "admin";
 
-  if (!employee.attendance_enabled) {
+  if (!isAdmin && !employee.attendance_enabled) {
+    await logDebugEvent(supabaseUrl, key, {
+      organizationId: orgId,
+      employeeId: employee.id,
+      source: "edge",
+      scope: "auth",
+      action: "employee_verify",
+      outcome: "blocked_employee_disabled",
+      message: "Empleado desactivado",
+      metadata: buildEmployeeAuthMetadata(req, pin, {
+        reason: "employee_disabled",
+        employeeRole: employee.role,
+      }),
+    });
     return json({ success: false, message: "Empleado desactivado" }, 403);
   }
 
-  const userAgent = getUserAgent(req);
   const today = madridDateIso();
-  const currentStatus = await currentAttendanceStatus(supabaseUrl, key, orgId, employee.id, today);
+  const currentStatus = isAdmin ? "not_checked_in" : await currentAttendanceStatus(supabaseUrl, key, orgId, employee.id, today);
 
-  const sessionRole = "respondent";
-  const idleTimeout = EMPLOYEE_IDLE_TIMEOUT_SECONDS;
-  const absoluteTimeout = EMPLOYEE_ABSOLUTE_TIMEOUT_SECONDS;
+  const sessionRole = isAdmin ? "org_admin" : "respondent";
+  const idleTimeout = isAdmin ? ADMIN_IDLE_TIMEOUT_SECONDS : EMPLOYEE_IDLE_TIMEOUT_SECONDS;
+  const absoluteTimeout = isAdmin ? ADMIN_ABSOLUTE_TIMEOUT_SECONDS : EMPLOYEE_ABSOLUTE_TIMEOUT_SECONDS;
 
   const issued = await issueSession(supabaseUrl, key, {
     organizationId: orgId,
@@ -172,14 +241,50 @@ async function handleVerify(
   });
 
   await Promise.all([
-    recordAuthAttempt(supabaseUrl, key, orgId, "employee", ipAddress, true, 0, null),
+    recordAuthAttempt(
+      supabaseUrl,
+      key,
+      orgId,
+      "employee",
+      ipAddress,
+      true,
+      0,
+      null,
+      buildEmployeeAuthMetadata(req, pin, {
+        reason: "login_success",
+        employeeId: employee.id,
+        employeeRole: employee.role,
+        currentStatus,
+      }),
+    ),
     logAudit(supabaseUrl, key, {
       organizationId: orgId,
       actorSessionId: issued.session.id,
       actorRole: sessionRole,
       employeeId: employee.id,
       action: "employee_login_success",
-      metadata: { ipAddress, employeeRole: employee.role },
+      metadata: buildEmployeeAuthMetadata(req, pin, {
+        reason: "login_success",
+        employeeId: employee.id,
+        employeeRole: employee.role,
+        currentStatus,
+      }),
+    }),
+    logDebugEvent(supabaseUrl, key, {
+      organizationId: orgId,
+      actorSessionId: issued.session.id,
+      employeeId: employee.id,
+      source: "edge",
+      scope: "auth",
+      action: "employee_verify",
+      outcome: "success",
+      message: "Login de empleado correcto",
+      metadata: buildEmployeeAuthMetadata(req, pin, {
+        reason: "login_success",
+        employeeId: employee.id,
+        employeeRole: employee.role,
+        currentStatus,
+      }),
     }),
   ]);
 
@@ -455,4 +560,18 @@ function getRestErrorMessage(
   }
 
   return message || details || fallback;
+}
+
+function buildEmployeeAuthMetadata(
+  req: Request,
+  pin: string,
+  extras: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    route: "kiosk-employees.verify",
+    pinLength: pin.length,
+    ipAddress: getClientIp(req),
+    userAgent: getUserAgent(req),
+    ...extras,
+  };
 }

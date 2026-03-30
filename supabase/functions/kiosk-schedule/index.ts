@@ -217,6 +217,7 @@ async function handleAssign(
     slotId,
     action: session.role === "org_admin" && slot.employee_id ? "schedule_slot_reassigned" : "schedule_slot_assigned",
     metadata: {
+      actorEmployeeId: session.employee_id,
       targetEmployeeId: target.employeeId,
       targetEmployeeName: target.employeeName,
       previousEmployeeId: slot.employee_id,
@@ -301,6 +302,16 @@ async function handleRelease(
     employeeId: slot.employee_id,
     slotId,
     action: "schedule_slot_released",
+    metadata: {
+      actorEmployeeId: session.employee_id,
+      releasedEmployeeId: slot.employee_id,
+      releasedByRole: session.role,
+      year: slot.year,
+      week: slot.week,
+      dayOfWeek: slot.day_of_week,
+      startTime: slot.start_time,
+      endTime: slot.end_time,
+    },
   });
   await logScheduleMutationDebug(url, key, {
     organizationId: session.organization_id,
@@ -610,6 +621,7 @@ async function handleCreateAndAssign(
     slotId: insert.data[0].id,
     action: "schedule_slot_created_and_assigned",
     metadata: {
+      actorEmployeeId: session.employee_id,
       year,
       week,
       dayOfWeek,
