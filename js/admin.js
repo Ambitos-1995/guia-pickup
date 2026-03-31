@@ -818,15 +818,20 @@ var Admin = (function () {
         y += closingLines.length * lineH + 12;
 
         // Signatures
-        checkPage(55);
+        checkPage(70);
         var colW = cw / 2 - 5;
         var rightX = margin + colW + 10;
+
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(0.3);
+        doc.line(margin, y, margin + cw, y);
+        y += 8;
 
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.text('El/la Participante:', margin, y);
         doc.text('Por la Fundacion:', rightX, y);
-        y += 3;
+        y += 6;
 
         if (data.participant_sign_base64) {
             try { doc.addImage(data.participant_sign_base64, 'PNG', margin, y, colW, 22); } catch (_e) { /* skip */ }
@@ -834,7 +839,7 @@ var Admin = (function () {
         if (data.admin_sign_base64) {
             try { doc.addImage(data.admin_sign_base64, 'PNG', rightX, y, colW, 22); } catch (_e) { /* skip */ }
         }
-        y += 24;
+        y += 28;
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
@@ -844,7 +849,7 @@ var Admin = (function () {
         if (data.admin_signed_at) {
             doc.text(formatPdfDate(data.admin_signed_at), rightX, y);
         }
-        y += 5;
+        y += 6;
         doc.text(data.employee_name || '', margin, y);
         doc.text(data.representative_name || '', rightX, y);
         y += 5;
