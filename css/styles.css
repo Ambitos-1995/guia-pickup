@@ -4112,3 +4112,26 @@ body {
     flex-shrink: 0;
     font-family: var(--font);
 }
+.btn-acuerdo-descargar {
+    background: #166534;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    min-height: 48px;
+    min-width: 80px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-family: var(--font);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.btn-acuerdo-descargar:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

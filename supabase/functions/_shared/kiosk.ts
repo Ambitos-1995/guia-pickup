@@ -860,6 +860,26 @@ async function insertDebugRow(
   }
 }
 
+export async function logUnhandledEdgeError(
+  supabaseUrl: string,
+  key: string,
+  functionName: string,
+  error: unknown,
+  extra?: { organizationId?: string | null; requestMethod?: string; requestUrl?: string; metadata?: Record<string, unknown> },
+): Promise<void> {
+  if (!supabaseUrl || !key) return;
+  const err = error instanceof Error ? error : new Error(String(error));
+  await insertDebugRow(supabaseUrl, key, "kiosk_edge_errors", {
+    function_name: functionName,
+    organization_id: extra?.organizationId ?? null,
+    error_message: err.message,
+    error_stack: err.stack ?? null,
+    request_method: extra?.requestMethod ?? null,
+    request_url: extra?.requestUrl ?? null,
+    metadata: extra?.metadata ?? {},
+  });
+}
+
 export function isoWeekToDate(year: number, week: number, dayOfWeek: number): Date {
   const jan4 = new Date(Date.UTC(year, 0, 4));
   const jan4Dow = jan4.getUTCDay() || 7;

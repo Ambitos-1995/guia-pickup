@@ -12,6 +12,7 @@ import {
   getUserAgent,
   json,
   logAudit,
+  logUnhandledEdgeError,
   recordAuthAttempt,
   requireSession,
   resolveEmployeeByPin,
@@ -82,6 +83,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ success: false, message: "Metodo no permitido" }, 405);
   }
 
+  let errUrl = "";
+  let errKey = "";
   try {
     getSessionSecret();
     const body = await req.json() as RequestBody;
@@ -93,6 +96,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const { url, serviceRoleKey } = getSupabaseConfig();
+    errUrl = url; errKey = serviceRoleKey;
     const orgId = await resolveOrgId(url, serviceRoleKey, orgSlug);
     if (!orgId) {
       return json({ success: false, message: "Organizacion no encontrada" }, 404);
@@ -132,8 +136,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return await handleAdminSign(url, serviceRoleKey, orgId, body, auth.session.id, auth.session.employee_id);
     }
 
+    if (action === "get-pdf-data") {
+      return await handleGetPdfData(url, serviceRoleKey, orgId, body);
+    }
+
     return json({ success: false, message: `Accion desconocida: ${action}` }, 400);
   } catch (err) {
+    await logUnhandledEdgeError(errUrl, errKey, "kiosk-contract", err, { requestMethod: req.method });
     console.error("[kiosk-contract] Unexpected error:", err);
     return json({ success: false, message: "Error interno del servidor" }, 500);
   }
@@ -873,6 +882,91 @@ function decodeSignatureImage(
       errorCode: "SIGNATURE_INVALID_BASE64",
       status: 400,
     };
+  }
+}
+
+async function handleGetPdfData(
+  url: string,
+  key: string,
+  orgId: string,
+  body: RequestBody,
+): Promise<Response> {
+  const contractId = String(body.contractId || "").trim();
+  if (!contractId) return json({ success: false, message: "Falta contractId" }, 400);
+
+  const contract = await fetchContract(url, key, orgId, contractId, true);
+  if (!contract) {
+    return json({ success: false, message: "Acuerdo no encontrado" }, 404);
+  }
+  if (contract.status !== "signed") {
+    return json({ success: false, message: "El acuerdo aun no esta firmado" }, 409);
+  }
+
+  const supabaseAdmin = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const [participantSignBase64, adminSignBase64] = await Promise.all([
+    contract.participant_sign_url
+      ? downloadSignatureAsBase64(supabaseAdmin, contract.participant_sign_url)
+      : Promise.resolve(null),
+    contract.admin_sign_url
+      ? downloadSignatureAsBase64(supabaseAdmin, contract.admin_sign_url)
+      : Promise.resolve(null),
+  ]);
+
+  let adminSignerName = "";
+  if (contract.admin_employee_id) {
+    const adminRes = await fetchJson<{ nombre: string; apellido: string }[]>(
+      `${url}/rest/v1/kiosk_employees?id=eq.${encodeURIComponent(contract.admin_employee_id)}&organization_id=eq.${encodeURIComponent(orgId)}&select=nombre,apellido&limit=1`,
+      { headers: authHeaders(key) },
+    );
+    if (adminRes.ok && adminRes.data?.[0]) {
+      adminSignerName = `${adminRes.data[0].nombre} ${adminRes.data[0].apellido}`.trim();
+    }
+  }
+
+  const emp = contract.kiosk_employees;
+  const employeeName = emp ? `${emp.nombre} ${emp.apellido}`.trim() : "";
+
+  return json({
+    success: true,
+    data: {
+      id: contract.id,
+      title: contract.title,
+      employee_name: employeeName,
+      representative_name: contract.representative_name,
+      admin_signer_name: adminSignerName,
+      activity_description: contract.activity_description,
+      schedule: contract.schedule,
+      validity_text: contract.validity_text,
+      participant_signed_at: contract.participant_signed_at,
+      admin_signed_at: contract.admin_signed_at,
+      participant_sign_base64: participantSignBase64,
+      admin_sign_base64: adminSignBase64,
+      document_hash: contract.document_hash,
+    },
+  });
+}
+
+async function downloadSignatureAsBase64(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  storagePath: string,
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabaseAdmin.storage
+      .from("contract-signatures")
+      .download(storagePath);
+    if (error || !data) return null;
+    const arrayBuffer = await data.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    const chunks: string[] = [];
+    for (let i = 0; i < bytes.length; i += 8192) {
+      chunks.push(String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 8192))));
+    }
+    return "data:image/png;base64," + btoa(chunks.join(""));
+  } catch (_err) {
+    return null;
   }
 }
 

@@ -14,6 +14,7 @@ import {
   logAudit,
   logAttendanceAttemptDebug,
   logDebugEvent,
+  logUnhandledEdgeError,
   madridDateIso,
   requireOfflineClockToken,
   requireSession,
@@ -58,6 +59,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ success: false, message: "Metodo no permitido" }, 405);
   }
 
+  let errUrl = "";
+  let errKey = "";
   try {
     const body = await req.json() as ClockBody;
     const orgSlug = String(body.orgSlug || "").trim();
@@ -76,6 +79,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const { url, serviceRoleKey } = getSupabaseConfig();
+    errUrl = url; errKey = serviceRoleKey;
     const orgId = await resolveOrgId(url, serviceRoleKey, orgSlug);
     if (!orgId) {
       return json({ success: false, message: "Organizacion no encontrada" }, 404);
@@ -512,6 +516,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     return json({ success: false, message: "Accion no valida" }, 400);
   } catch (error) {
+    await logUnhandledEdgeError(errUrl, errKey, "kiosk-clock", error, { requestMethod: req.method });
     console.error("kiosk-clock error", error);
     return json({ success: false, message: "Error interno" }, 500);
   }

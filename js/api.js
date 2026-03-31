@@ -358,6 +358,33 @@ var Api = (function () {
         }, { requiresAuth: true });
     }
 
+    function getContractPdfData(contractId) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-contract', {
+            orgSlug: ORG_SLUG,
+            action: 'get-pdf-data',
+            contractId: contractId
+        }, { requiresAuth: true });
+    }
+
+    function reportClientError(payload) {
+        var session = (typeof App !== 'undefined' && App.getSession) ? App.getSession() : null;
+        return postJson(FUNCTIONS_BASE + '/kiosk-report', {
+            orgSlug: ORG_SLUG,
+            route: (window.location && window.location.pathname) || '',
+            appVersion: (typeof App !== 'undefined' && App.getVersion) ? App.getVersion() : '',
+            deviceLabel: navigator.userAgent.slice(0, 256),
+            reportType: payload.reportType || 'client_error',
+            payload: {
+                message: payload.message || '',
+                stack: payload.stack || null,
+                source: payload.source || null,
+                lineno: payload.lineno || null,
+                colno: payload.colno || null,
+                employeeId: session ? (session.employeeId || null) : null
+            }
+        });
+    }
+
     return {
         ORG_SLUG: ORG_SLUG,
         verifyPin: verifyPin,
@@ -386,6 +413,8 @@ var Api = (function () {
         verifyParticipantContractPin: verifyParticipantContractPin,
         participantSignContract: participantSignContract,
         adminSignContract: adminSignContract,
-        listAllContracts: listAllContracts
+        listAllContracts: listAllContracts,
+        getContractPdfData: getContractPdfData,
+        reportClientError: reportClientError
     };
 })();

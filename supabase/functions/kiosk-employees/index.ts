@@ -16,6 +16,7 @@ import {
   issueSession,
   json,
   logAudit,
+  logUnhandledEdgeError,
   madridDateIso,
   recordAuthAttempt,
   requireSession,
@@ -52,6 +53,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ success: false, message: "Metodo no permitido" }, 405);
   }
 
+  let errUrl = "";
+  let errKey = "";
   try {
     getSessionSecret();
     const body = await req.json() as RequestBody;
@@ -63,6 +66,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const { url, serviceRoleKey } = getSupabaseConfig();
+    errUrl = url; errKey = serviceRoleKey;
     const orgId = await resolveOrgId(url, serviceRoleKey, orgSlug);
     if (!orgId) {
       return json({ success: false, message: "Organizacion no encontrada" }, 404);
@@ -95,6 +99,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     return json({ success: false, message: "Accion no valida" }, 400);
   } catch (error) {
+    await logUnhandledEdgeError(errUrl, errKey, "kiosk-employees", error, { requestMethod: req.method });
     console.error("kiosk-employees error", error);
     return json({ success: false, message: "Error interno" }, 500);
   }

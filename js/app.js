@@ -666,6 +666,47 @@ var App = (function () {
         }
     }
 
+    // Global error capture — max 5 reports/page-load, dedup by message+source (capped at 50 keys)
+    var _errorReportCount = 0;
+    var _errorReportedMessages = {};
+    var _errorReportedKeys = 0;
+
+    function maybeReportError(payload) {
+        if (_errorReportCount >= 5) return;
+        var key = (payload.message || '') + ':' + (payload.source || '');
+        if (_errorReportedMessages[key]) return;
+        if (_errorReportedKeys >= 50) { _errorReportedMessages = {}; _errorReportedKeys = 0; }
+        _errorReportedMessages[key] = true;
+        _errorReportedKeys++;
+        _errorReportCount++;
+        try {
+            if (typeof Api !== 'undefined' && Api.reportClientError) {
+                Api.reportClientError(payload);
+            }
+        } catch (e) { /* best-effort */ }
+    }
+
+    window.addEventListener('error', function (e) {
+        maybeReportError({
+            reportType: 'js_error',
+            message: e.message || 'Unknown error',
+            source: e.filename || null,
+            lineno: e.lineno || null,
+            colno: e.colno || null,
+            stack: (e.error && e.error.stack) ? e.error.stack : null
+        });
+    });
+
+    window.addEventListener('unhandledrejection', function (e) {
+        var reason = e.reason;
+        var message = reason instanceof Error ? reason.message : String(reason || 'Unhandled promise rejection');
+        maybeReportError({
+            reportType: 'unhandled_rejection',
+            message: message,
+            stack: (reason instanceof Error && reason.stack) ? reason.stack : null
+        });
+    });
+
     document.addEventListener('DOMContentLoaded', function () {
         init();
     });

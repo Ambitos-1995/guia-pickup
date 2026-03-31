@@ -10,6 +10,7 @@ import {
   issueSession,
   json,
   logAudit,
+  logUnhandledEdgeError,
   recordAuthAttempt,
   resolveEmployeeByPin,
   resolveOrgId,
@@ -37,6 +38,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ success: false, error: "METHOD_NOT_ALLOWED", message: "Metodo no permitido" }, 405);
   }
 
+  let errUrl = "";
+  let errKey = "";
   try {
     getSessionSecret();
     const body = await req.json() as VerifyBody;
@@ -61,6 +64,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const { url, serviceRoleKey } = getSupabaseConfig();
+    errUrl = url; errKey = serviceRoleKey;
     const resolvedOrganizationId = organizationId || await resolveOrgId(url, serviceRoleKey, orgSlug);
     if (!resolvedOrganizationId) {
       return json({
@@ -185,6 +189,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       },
     });
   } catch (error) {
+    await logUnhandledEdgeError(errUrl, errKey, "kiosk-admin-verify", error, { requestMethod: req.method });
     console.error("kiosk-admin-verify exception", error);
     return json({
       success: false,

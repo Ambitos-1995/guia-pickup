@@ -12,6 +12,7 @@ var Admin = (function () {
 
     var CALC_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="16" y1="18" x2="16" y2="18"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="8" y1="10" x2="16" y2="10"/></svg>';
     var SPINNER_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
+    var DOWNLOAD_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 
     /* --- Shared feedback helper --- */
     function showFeedback(elementId, type, message, autoHideMs) {
@@ -695,7 +696,17 @@ var Admin = (function () {
 
         row.appendChild(info);
 
-        if (contract.status !== 'signed') {
+        if (contract.status === 'signed') {
+            var dlBtn = document.createElement('button');
+            dlBtn.className = 'btn-acuerdo-descargar';
+            dlBtn.innerHTML = DOWNLOAD_ICON + ' PDF';
+            (function (id) {
+                Utils.bindPress(dlBtn, function () {
+                    downloadContractPdf(id, dlBtn);
+                });
+            }(contract.id));
+            row.appendChild(dlBtn);
+        } else {
             var btn = document.createElement('button');
             btn.className   = 'btn-acuerdo-iniciar';
             btn.textContent = contract.status === 'pending_admin' ? 'Cofirmar' : 'Iniciar firma';
@@ -716,6 +727,190 @@ var Admin = (function () {
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    // ── PDF download ────────────────────────────────────────────────────────
+
+    function downloadContractPdf(contractId, btnEl) {
+        if (btnEl) {
+            btnEl.disabled = true;
+            btnEl.textContent = 'Generando\u2026';
+        }
+        function resetBtn() {
+            if (btnEl) {
+                btnEl.disabled = false;
+                btnEl.innerHTML = DOWNLOAD_ICON + ' PDF';
+            }
+        }
+        Api.getContractPdfData(contractId).then(function (res) {
+            resetBtn();
+            if (!res || !res.success || !res.data) {
+                App.showToast('No se pudo obtener el acuerdo', 'error');
+                return;
+            }
+            generateContractPdf(res.data);
+        }).catch(function () {
+            resetBtn();
+            App.showToast('Error de conexion', 'error');
+        });
+    }
+
+    function generateContractPdf(data) {
+        var jsPDF = window.jspdf && window.jspdf.jsPDF;
+        if (!jsPDF) {
+            App.showToast('Error: libreria PDF no disponible', 'error');
+            return;
+        }
+
+        var doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        var pw = 210;
+        var margin = 20;
+        var cw = pw - 2 * margin;
+        var y = margin;
+        var lineH = 5;
+
+        function checkPage(needed) {
+            if (y + needed > 277) {
+                doc.addPage();
+                y = margin;
+            }
+        }
+
+        // Title
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ACUERDO DE PARTICIPACION EN ACTIVIDAD OCUPACIONAL', pw / 2, y, { align: 'center' });
+        y += 12;
+
+        // Opening
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        var opening = 'Entre la Fundacion Ambitos (\u00abla Fundacion\u00bb) y ' + (data.employee_name || '\u2014') + ' (\u00abel/la Participante\u00bb), ambas partes acuerdan lo siguiente:';
+        var openLines = doc.splitTextToSize(opening, cw);
+        checkPage(openLines.length * lineH + 8);
+        doc.text(openLines, margin, y);
+        y += openLines.length * lineH + 8;
+
+        // Clauses
+        var clauses = getContractClauses();
+        doc.setFontSize(10);
+        for (var i = 0; i < clauses.length; i++) {
+            var cl = clauses[i];
+            var titleLines = doc.splitTextToSize(cl.title, cw);
+            var textLines = doc.splitTextToSize(cl.text, cw);
+            var needed = titleLines.length * lineH + textLines.length * lineH + 8;
+            checkPage(needed);
+
+            doc.setFont('helvetica', 'bold');
+            doc.text(titleLines, margin, y);
+            y += titleLines.length * lineH + 2;
+            doc.setFont('helvetica', 'normal');
+            doc.text(textLines, margin, y);
+            y += textLines.length * lineH + 6;
+        }
+
+        // Closing
+        doc.setFont('helvetica', 'italic');
+        var closing = 'Ambas partes firman electronicamente a continuacion en senal de conformidad.';
+        var closingLines = doc.splitTextToSize(closing, cw);
+        checkPage(closingLines.length * lineH + 8);
+        doc.text(closingLines, margin, y);
+        y += closingLines.length * lineH + 12;
+
+        // Signatures
+        checkPage(55);
+        var colW = cw / 2 - 5;
+        var rightX = margin + colW + 10;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text('El/la Participante:', margin, y);
+        doc.text('Por la Fundacion:', rightX, y);
+        y += 3;
+
+        if (data.participant_sign_base64) {
+            try { doc.addImage(data.participant_sign_base64, 'PNG', margin, y, colW, 22); } catch (_e) { /* skip */ }
+        }
+        if (data.admin_sign_base64) {
+            try { doc.addImage(data.admin_sign_base64, 'PNG', rightX, y, colW, 22); } catch (_e) { /* skip */ }
+        }
+        y += 24;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        if (data.participant_signed_at) {
+            doc.text(formatPdfDate(data.participant_signed_at), margin, y);
+        }
+        if (data.admin_signed_at) {
+            doc.text(formatPdfDate(data.admin_signed_at), rightX, y);
+        }
+        y += 5;
+        doc.text(data.employee_name || '', margin, y);
+        doc.text(data.representative_name || '', rightX, y);
+        y += 5;
+        if (data.admin_signer_name) {
+            doc.text('Firmado por: ' + data.admin_signer_name, rightX, y);
+            y += 5;
+        }
+
+        // Hash
+        y += 4;
+        doc.setFontSize(7);
+        doc.setTextColor(120, 120, 120);
+        if (data.document_hash) {
+            doc.text('Hash del documento: ' + data.document_hash, margin, y);
+        }
+
+        // Download
+        var safeName = (data.employee_name || 'acuerdo').replace(/[^a-zA-Z0-9\u00c0-\u017f]/g, '_').replace(/_+/g, '_');
+        doc.save('Acuerdo_' + safeName + '.pdf');
+    }
+
+    function getContractClauses() {
+        return [
+            {
+                title: 'Primera \u2014 Objeto',
+                text: 'El/la Participante se incorpora voluntariamente a la actividad ocupacional de gestion del Punto de Entrega SEUR \u2014 Punto Inclusivo, operado por la Fundacion. Esta actividad forma parte de un programa de terapia ocupacional y no constituye relacion laboral de ningun tipo.'
+            },
+            {
+                title: 'Segunda \u2014 Marco legal',
+                text: 'La presente actividad se enmarca en el Real Decreto 2274/1985, de 4 de diciembre, por el que se regulan los Centros Ocupacionales para personas con discapacidad, y se desarrolla bajo los principios de la terapia ocupacional como profesion sanitaria regulada por la Ley 44/2003 de Ordenacion de las Profesiones Sanitarias, la Ley 24/2014 del Consejo General de Colegios de Terapeutas Ocupacionales y la Ley 1/2017 de la Comunidad de Madrid.'
+            },
+            {
+                title: 'Tercera \u2014 Horario',
+                text: 'El/la Participante escoge libremente los turnos en los que desea participar cada semana, de acuerdo con la disponibilidad del punto de entrega. No existe obligacion de asistencia minima.'
+            },
+            {
+                title: 'Cuarta \u2014 Gratificacion',
+                text: 'El/la Participante recibira mensualmente una gratificacion proporcional a las horas efectivamente realizadas durante ese mes. Esta gratificacion tiene caracter terapeutico-ocupacional y no constituye salario ni retribucion laboral. La retribucion se empleara para reforzar las actividades de ocio y tiempo libre.'
+            },
+            {
+                title: 'Quinta \u2014 Voluntariedad y baja',
+                text: 'La participacion es completamente voluntaria. Cualquiera de las partes puede dar por finalizado este acuerdo en cualquier momento, sin necesidad de preaviso ni penalizacion.'
+            },
+            {
+                title: 'Sexta \u2014 Seguro y cobertura',
+                text: 'La Fundacion garantiza que el/la Participante esta cubierto/a por un seguro de responsabilidad civil y accidentes durante el desarrollo de la actividad.'
+            },
+            {
+                title: 'Septima \u2014 Proteccion de datos',
+                text: 'Los datos personales del Participante se tratan conforme al Reglamento (UE) 2016/679 (RGPD) y la Ley Organica 3/2018 (LOPDGDD). La Fundacion es responsable del tratamiento, con la finalidad exclusiva de gestionar esta actividad ocupacional. El/la Participante puede ejercer sus derechos de acceso, rectificacion, supresion y portabilidad dirigiendose a la Fundacion.'
+            },
+            {
+                title: 'Octava \u2014 Vigencia',
+                text: 'Este acuerdo tiene una duracion de tres meses desde la fecha de firma, renovable automaticamente por periodos iguales salvo comunicacion en contrario por cualquiera de las partes.'
+            }
+        ];
+    }
+
+    function formatPdfDate(isoStr) {
+        try {
+            var d = new Date(isoStr);
+            return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+                ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        } catch (_e) {
+            return isoStr || '';
+        }
     }
 
     return { init: init, show: show };
