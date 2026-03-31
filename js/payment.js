@@ -267,30 +267,9 @@ var Payment = (function () {
 
     function startReceiptSigning() {
         if (!currentReceipt) return;
+        receiptVerificationToken = '';
         hideReceiptFeedback();
-
-        if (!receiptPinPad) {
-            receiptPinPad = PinPad.create({
-                dotsEl: document.getElementById('receipt-pin-dots'),
-                keypadEl: document.getElementById('receipt-pin-keypad'),
-                maxLength: 6,
-                allowKeyboard: true,
-                captureWhen: function () {
-                    var el = document.getElementById('receipt-step-pin');
-                    return el && !el.classList.contains('hidden');
-                },
-                onComplete: function () {
-                    verifyReceiptPin();
-                }
-            });
-
-            /* Manual keypad binding for acuerdo-pin-key buttons
-               (PinPad looks for .key-btn; receipt keypad uses .acuerdo-pin-key) */
-            bindReceiptKeypad();
-        }
-
-        receiptPinPad.clear();
-        showReceiptStep('pin');
+        goToReceiptSign();
     }
 
     function bindReceiptKeypad() {
@@ -366,11 +345,6 @@ var Payment = (function () {
     /* ─────────────────────────────────────────────────── */
 
     function goToReceiptSign() {
-        if (!receiptVerificationToken) {
-            showReceiptPinFeedback('Primero valida tu PIN.');
-            showReceiptStep('pin');
-            return;
-        }
         receiptSignDataUrl = '';
         hideReceiptFeedback();
         showReceiptStep('sign');
@@ -442,11 +416,6 @@ var Payment = (function () {
 
     function submitReceiptSignature() {
         if (!currentReceipt || !receiptSignPad || receiptSignPad.isEmpty()) return;
-        if (!receiptVerificationToken) {
-            showReceiptSignFeedback('La validacion del PIN ha caducado. Vuelve a introducir tu PIN.');
-            showReceiptStep('pin');
-            return;
-        }
         if (receiptSigningInFlight) return;
 
         receiptSigningInFlight = true;
@@ -471,11 +440,6 @@ var Payment = (function () {
             }
 
             showReceiptSignFeedback((res && res.message) || 'No se pudo guardar la firma.');
-            if (res && (res.error === 'VERIFICATION_TOKEN_INVALID' || res.error === 'VERIFICATION_TOKEN_MISMATCH')) {
-                receiptVerificationToken = '';
-                if (receiptPinPad) receiptPinPad.clear();
-                showReceiptStep('pin');
-            }
         }).catch(function () {
             receiptSigningInFlight = false;
             setReceiptButtonState('receipt-btn-submit', false, 'Confirmar y firmar');

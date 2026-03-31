@@ -12,6 +12,7 @@ const swRegister = fs.readFileSync(path.join(root, 'js', 'sw-register.js'), 'utf
 const apiJs = fs.readFileSync(path.join(root, 'js', 'api.js'), 'utf8');
 const offlineQueueJs = fs.readFileSync(path.join(root, 'js', 'offline-clock-queue.js'), 'utf8');
 const guiaJs = fs.readFileSync(path.join(root, 'js', 'guia.js'), 'utf8');
+const paymentJs = fs.readFileSync(path.join(root, 'js', 'payment.js'), 'utf8');
 const clockFunction = fs.readFileSync(path.join(root, 'supabase', 'functions', 'kiosk-clock', 'index.ts'), 'utf8');
 const supabaseConfig = fs.readFileSync(path.join(root, 'supabase', 'config.toml'), 'utf8');
 const queuedRecordSource = offlineQueueJs.slice(
@@ -177,4 +178,15 @@ test('supabase function config includes kiosk payment receipt endpoint', () => {
   );
   assert.match(supabaseConfig, /\[functions\.kiosk-payment-receipt\]/);
   assert.match(supabaseConfig, /\[functions\.kiosk-payment-receipt\][\s\S]*verify_jwt\s*=\s*false/);
+});
+
+test('receipt signing reuses the authenticated user session without asking for the PIN again', () => {
+  const startSigningSource = paymentJs.slice(
+    paymentJs.indexOf('function startReceiptSigning()'),
+    paymentJs.indexOf('function bindReceiptKeypad()')
+  );
+  assert.match(startSigningSource, /goToReceiptSign\(\);/);
+  assert.doesNotMatch(startSigningSource, /showReceiptStep\('pin'\)/);
+  assert.doesNotMatch(startSigningSource, /verifyReceiptPin\(\)/);
+  assert.doesNotMatch(paymentJs, /La validacion del PIN ha caducado/);
 });

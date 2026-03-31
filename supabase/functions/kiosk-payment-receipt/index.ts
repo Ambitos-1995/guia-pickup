@@ -136,7 +136,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (auth.session.organization_id !== orgId || !auth.session.employee_id) {
         return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
       }
-      return await handleSign(url, serviceRoleKey, orgId, body, auth.session.id);
+      return await handleSign(url, serviceRoleKey, orgId, body, auth.session.id, auth.session.employee_id);
     }
 
     // --- Admin-session actions ---
@@ -496,31 +496,13 @@ async function handleSign(
   orgId: string,
   body: RequestBody,
   actorSessionId: string,
+  actorEmployeeId: string,
 ): Promise<Response> {
   const receiptId = String(body.receiptId || "").trim();
   const verificationToken = String(body.verificationToken || "").trim();
 
   if (!receiptId) return json({ success: false, message: "Falta receiptId" }, 400);
-  if (!verificationToken) return json({ success: false, message: "Falta verificationToken" }, 400);
   if (!body.signatureImg) return json({ success: false, message: "Falta signatureImg" }, 400);
-
-  // Verify token
-  const tokenPayload = await verifyVerificationToken(verificationToken, "receipt_employee_verify");
-  if (!tokenPayload) {
-    return json({
-      success: false,
-      error: "VERIFICATION_TOKEN_INVALID",
-      message: "La validacion del PIN ha caducado. Vuelve a introducir el PIN.",
-    }, 401);
-  }
-
-  if (tokenPayload.receiptId !== receiptId) {
-    return json({
-      success: false,
-      error: "VERIFICATION_TOKEN_MISMATCH",
-      message: "La validacion del PIN no corresponde a este recibo.",
-    }, 403);
-  }
 
   // Fetch receipt
   const receiptRes = await fetchJson<ReceiptRow[]>(
@@ -533,11 +515,31 @@ async function handleSign(
     return json({ success: false, message: "Recibo no encontrado" }, 404);
   }
 
-  if (tokenPayload.employeeId !== receipt.employee_id) {
+  let employeeVerifiedAt = new Date().toISOString();
+  if (verificationToken) {
+    const tokenPayload = await verifyVerificationToken(verificationToken, "receipt_employee_verify");
+    if (!tokenPayload) {
+      return json({
+        success: false,
+        error: "VERIFICATION_TOKEN_INVALID",
+        message: "La validacion del PIN ha caducado. Vuelve a introducir el PIN.",
+      }, 401);
+    }
+
+    if (tokenPayload.receiptId !== receiptId || tokenPayload.employeeId !== receipt.employee_id) {
+      return json({
+        success: false,
+        error: "VERIFICATION_TOKEN_MISMATCH",
+        message: "La validacion del PIN no corresponde a este recibo.",
+      }, 403);
+    }
+
+    employeeVerifiedAt = new Date(tokenPayload.iat * 1000).toISOString();
+  } else if (actorEmployeeId !== receipt.employee_id) {
     return json({
       success: false,
-      error: "VERIFICATION_TOKEN_MISMATCH",
-      message: "La validacion del PIN no corresponde a este recibo.",
+      error: "RECEIPT_FORBIDDEN",
+      message: "No puedes firmar el recibo de otra persona.",
     }, 403);
   }
 
@@ -579,7 +581,6 @@ async function handleSign(
 
   const signaturePath = `${orgId}/${receiptId}/employee.png`;
   const now = new Date().toISOString();
-  const employeeVerifiedAt = new Date(tokenPayload.iat * 1000).toISOString();
 
   const documentSnapshot: Record<string, unknown> = {
     schema_version: 1,
