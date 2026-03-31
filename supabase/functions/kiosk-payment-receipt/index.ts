@@ -952,7 +952,7 @@ async function buildReceiptPdf(
   y -= 18;
 
   // Fields card
-  const fieldsCardHeight = 142;
+  const fieldsCardHeight = 118;
   const fieldsCardY = y - fieldsCardHeight + 10;
   page.drawRectangle({
     x: margin,
@@ -972,8 +972,7 @@ async function buildReceiptPdf(
     ["PARTICIPANTE", participantName, false],
     ["PERIODO", periodo, false],
     ["HORAS TRABAJADAS", String(Number(receipt.hours_worked || 0)) + "h", false],
-    ["TARIFA/HORA", `${Number(receipt.hourly_rate || 0).toFixed(2)} EUR`, false],
-    ["GRATIFICACION TOTAL", amountLabel, true],
+    ["IMPORTE DEL RECIBO", amountLabel, true],
   ];
 
   for (const [label, value, isHighlight] of fields) {

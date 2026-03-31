@@ -234,8 +234,7 @@ var Payment = (function () {
         html += '<div class="receipt-field"><span class="receipt-field-label">Participante</span><span class="receipt-field-value">' + employeeLabel + '</span></div>';
         html += '<div class="receipt-field"><span class="receipt-field-label">Periodo</span><span class="receipt-field-value">' + Utils.escapeHtml(monthLabel) + '</span></div>';
         html += '<div class="receipt-field"><span class="receipt-field-label">Horas trabajadas</span><span class="receipt-field-value">' + Utils.escapeHtml(String(receipt.hours_worked || 0)) + 'h</span></div>';
-        html += '<div class="receipt-field"><span class="receipt-field-label">Tarifa/hora</span><span class="receipt-field-value">' + Number(receipt.hourly_rate || 0).toFixed(2) + ' \u20AC</span></div>';
-        html += '<div class="receipt-field receipt-field--highlight"><span class="receipt-field-label">Gratificacion total</span><span class="receipt-field-value">' + Number(receipt.amount_earned || 0).toFixed(2) + ' \u20AC</span></div>';
+        html += '<div class="receipt-field receipt-field--highlight"><span class="receipt-field-label">Importe del recibo</span><span class="receipt-field-value">' + Number(receipt.amount_earned || 0).toFixed(2) + ' \u20AC</span></div>';
         html += '</div>';
         html += '<p class="receipt-doc-paragraph">' + Utils.escapeHtml(content.confirmation_text || '') + '</p>';
         if (receipt.status === 'signed') {

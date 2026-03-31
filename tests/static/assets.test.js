@@ -211,6 +211,19 @@ test('receipt legal copy uses the rehabilitacion template for new documents', ()
   assert.doesNotMatch(indexHtml, /Real Decreto 2274\/1985/);
 });
 
+test('participant receipt document hides the hourly rate and keeps only hours plus amount', () => {
+  assert.doesNotMatch(paymentJs, /Tarifa\/hora/);
+  assert.match(paymentJs, /Horas trabajadas/);
+  assert.match(paymentJs, /Importe del recibo/);
+  assert.doesNotMatch(receiptFunction, /TARIFA\/HORA/);
+  assert.match(receiptFunction, /IMPORTE DEL RECIBO/);
+});
+
+test('payment summary uses the same participant-facing amount wording across the screen', () => {
+  assert.match(indexHtml, /Importe recibido/);
+  assert.doesNotMatch(indexHtml, /Total ganado/);
+});
+
 test('signature images are cropped and placed in pdfs without forced distortion', () => {
   assert.match(utilsJs, /findInkBounds/);
   assert.match(utilsJs, /getImageData\(0,\s*0,\s*sourceCanvas\.width,\s*sourceCanvas\.height\)/);
