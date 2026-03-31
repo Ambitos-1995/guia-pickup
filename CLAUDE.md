@@ -31,6 +31,7 @@ supabase functions deploy kiosk-clock
 supabase functions deploy kiosk-schedule
 supabase functions deploy kiosk-payment
 supabase functions deploy kiosk-contract
+supabase functions deploy kiosk-payment-receipt
 supabase functions deploy kiosk-report
 supabase functions deploy gdpr-retention
 ```
@@ -113,7 +114,7 @@ Hosted on **Vercel** as a static site (no build command). `vercel.json` sets cac
 | Clock | `js/clock.js` | Check-in / check-out with shift display |
 | Schedule | `js/schedule.js` | Weekly grid, PIN-based slot assign/release |
 | Guía | `js/guia.js` | Step-by-step operational flows with images |
-| Payment | `js/payment.js` | Read-only monthly payment summary |
-| Admin | `js/admin.js` | Employee management + monthly payment calculation |
+| Payment | `js/payment.js` | Monthly payment summary + receipt signing flow |
+| Admin | `js/admin.js` | Employee management, payment calculation, contracts, receipt management |
 | Contract | `js/contract.js` | Participant agreement signing (dual-signature flow) |
 | Direct | `direct/direct.js` | Standalone shared-tablet schedule + clock-in view |

@@ -1112,18 +1112,18 @@ async function importHmacKey(secret: string): Promise<CryptoKey> {
   );
 }
 
-function base64UrlEncode(value: string): string {
+export function base64UrlEncode(value: string): string {
   return base64UrlEncodeBytes(new TextEncoder().encode(value));
 }
 
-function base64UrlEncodeBytes(bytes: Uint8Array): string {
+export function base64UrlEncodeBytes(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes))
     .replaceAll("+", "-")
     .replaceAll("/", "_")
     .replaceAll("=", "");
 }
 
-function base64UrlDecode(value: string): string {
+export function base64UrlDecode(value: string): string {
   return new TextDecoder().decode(base64UrlDecodeBytes(value));
 }
 
@@ -1143,4 +1143,74 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
     diff |= a[index] ^ b[index];
   }
   return diff === 0;
+}
+
+// ─── Shared crypto / JWT utilities ──────────────────────────────────────────
+
+export async function computeSha256(input: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export async function signHmac(input: string): Promise<string> {
+  const secret = getSessionSecret();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(input));
+  return base64UrlEncodeBytes(new Uint8Array(signature));
+}
+
+// ─── Generic verification tokens (JWT-like, scope-gated) ───────────────────
+
+export interface VerificationTokenPayload {
+  scope: string;
+  orgId: string;
+  employeeId: string;
+  iat: number;
+  exp: number;
+  ver: 1;
+  [key: string]: unknown;
+}
+
+export async function signVerificationToken(
+  payload: VerificationTokenPayload,
+): Promise<string> {
+  const header = { alg: "HS256", typ: "JWT" };
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signature = await signHmac(`${encodedHeader}.${encodedPayload}`);
+  return `${encodedHeader}.${encodedPayload}.${signature}`;
+}
+
+export async function verifyVerificationToken(
+  token: string,
+  expectedScope: string,
+): Promise<VerificationTokenPayload | null> {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+
+  const [encodedHeader, encodedPayload, signature] = parts;
+  const expectedSignature = await signHmac(`${encodedHeader}.${encodedPayload}`);
+  if (signature !== expectedSignature) return null;
+
+  try {
+    const payload = JSON.parse(base64UrlDecode(encodedPayload)) as VerificationTokenPayload;
+    const now = Math.floor(Date.now() / 1000);
+
+    if (payload.scope !== expectedScope) return null;
+    if (payload.ver !== 1) return null;
+    if (typeof payload.exp !== "number" || payload.exp <= now) return null;
+    if (typeof payload.iat !== "number" || payload.iat > now + 30) return null;
+    return payload;
+  } catch (_error) {
+    return null;
+  }
 }

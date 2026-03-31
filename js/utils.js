@@ -176,6 +176,35 @@ var Utils = (function () {
         };
     }
 
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function resizeCanvas(canvas) {
+        if (!canvas || !canvas.offsetWidth || !canvas.offsetHeight) return;
+        var ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = canvas.offsetWidth * ratio;
+        canvas.height = canvas.offsetHeight * ratio;
+        var ctx = canvas.getContext('2d');
+        ctx.scale(ratio, ratio);
+    }
+
+    function getNormalizedSignatureDataUrl(pad) {
+        if (!pad || typeof pad.toDataURL !== 'function') return '';
+        var dataUrl = String(pad.toDataURL('image/png') || '').trim();
+        var commaIndex = dataUrl.indexOf(',');
+        if (commaIndex === -1) return dataUrl;
+        var prefix = dataUrl.slice(0, commaIndex + 1);
+        var base64 = dataUrl.slice(commaIndex + 1).replace(/\s+/g, '');
+        return prefix + base64;
+    }
+
     return {
         DAY_NAMES: DAY_NAMES,
         DAY_SHORT: DAY_SHORT,
@@ -197,6 +226,9 @@ var Utils = (function () {
         matches: matches,
         closest: closest,
         bindPress: bindPress,
-        delegatePress: delegatePress
+        delegatePress: delegatePress,
+        escapeHtml: escapeHtml,
+        resizeCanvas: resizeCanvas,
+        getNormalizedSignatureDataUrl: getNormalizedSignatureDataUrl
     };
 })();

@@ -1,11 +1,24 @@
 /* =====================================================
-   PAYMENT - Employee payment summary
+   PAYMENT - Employee payment summary + receipt signing
    ===================================================== */
 var Payment = (function () {
     'use strict';
 
     var currentYear, currentMonth;
     var labelEl, hoursEl, totalEl, noteEl, statusEl;
+
+    /* ── Receipt signing state ── */
+    var currentReceipt = null;
+    var receiptSignPad = null;
+    var receiptVerificationToken = '';
+    var receiptSignDataUrl = '';
+    var receiptPinPad = null;
+    var receiptSigningInFlight = false;
+    var receiptResizeBound = false;
+
+    /* ─────────────────────────────────────────────────── */
+    /*  Init & show                                        */
+    /* ─────────────────────────────────────────────────── */
 
     function init() {
         labelEl = document.getElementById('pay-month-label');
@@ -19,6 +32,27 @@ var Payment = (function () {
         });
         Utils.bindPress(document.getElementById('pay-month-next'), function () {
             changeMonth(1);
+        });
+
+        /* Receipt button bindings */
+        Utils.bindPress(document.getElementById('receipt-btn-sign'), function () {
+            startReceiptSigning();
+        });
+        Utils.bindPress(document.getElementById('receipt-btn-clear'), function () {
+            if (receiptSignPad) receiptSignPad.clear();
+            updateReceiptConfirmState();
+        });
+        Utils.bindPress(document.getElementById('receipt-btn-confirm'), function () {
+            goToReceiptPreview();
+        });
+        Utils.bindPress(document.getElementById('receipt-btn-redo'), function () {
+            goToReceiptSign();
+        });
+        Utils.bindPress(document.getElementById('receipt-btn-submit'), function () {
+            submitReceiptSignature();
+        });
+        Utils.bindPress(document.getElementById('receipt-btn-done'), function () {
+            showReceiptStep('banner');
         });
     }
 
@@ -36,7 +70,12 @@ var Payment = (function () {
         loadMonth();
     }
 
+    /* ─────────────────────────────────────────────────── */
+    /*  Month navigation & loading                         */
+    /* ─────────────────────────────────────────────────── */
+
     function changeMonth(delta) {
+        resetReceiptState();
         currentMonth += delta;
         if (currentMonth < 1) {
             currentYear--;
@@ -94,6 +133,8 @@ var Payment = (function () {
             animateValue(totalEl, Number(data.amount_earned || 0).toFixed(2) + ' \u20AC', 700);
             renderStatus(data.status, data.notes || '');
         });
+
+        loadReceipt();
     }
 
     function renderStatus(status, notes) {
@@ -115,6 +156,388 @@ var Payment = (function () {
             statusEl.className = 'payment-status payment-status-pending';
             noteEl.textContent = 'Todavia no hay liquidacion cerrada para este mes.';
         }
+    }
+
+    /* ─────────────────────────────────────────────────── */
+    /*  Receipt loading & banner                           */
+    /* ─────────────────────────────────────────────────── */
+
+    function loadReceipt() {
+        var sectionEl = document.getElementById('receipt-section');
+        var bannerEl = document.getElementById('receipt-banner');
+        if (sectionEl) sectionEl.classList.add('hidden');
+        if (bannerEl) bannerEl.classList.add('hidden');
+
+        Api.getMyReceipt(currentYear, currentMonth).then(function (res) {
+            if (!res || !res.success || !res.data) {
+                currentReceipt = null;
+                return;
+            }
+            currentReceipt = res.data;
+            if (sectionEl) sectionEl.classList.remove('hidden');
+            showReceiptBanner(currentReceipt);
+            renderReceiptDocument(currentReceipt);
+        }).catch(function () {
+            currentReceipt = null;
+        });
+    }
+
+    function showReceiptBanner(receipt) {
+        var bannerEl = document.getElementById('receipt-banner');
+        var iconEl = document.getElementById('receipt-banner-icon');
+        var textEl = document.getElementById('receipt-banner-text');
+        var signBtn = document.getElementById('receipt-btn-sign');
+        var docEl = document.getElementById('receipt-document');
+
+        if (!bannerEl) return;
+
+        bannerEl.classList.remove('hidden', 'receipt-banner--pending', 'receipt-banner--signed');
+
+        if (receipt.status === 'signed') {
+            bannerEl.classList.add('receipt-banner--signed');
+            var signedDate = receipt.employee_signed_at ? formatDate(receipt.employee_signed_at) : '';
+            textEl.textContent = signedDate
+                ? 'Recibo firmado el ' + signedDate
+                : 'Recibo firmado';
+            if (signBtn) signBtn.classList.add('hidden');
+            if (iconEl) iconEl.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+        } else {
+            bannerEl.classList.add('receipt-banner--pending');
+            textEl.textContent = 'Tienes un recibo pendiente de firmar (' + Number(receipt.amount_earned || 0).toFixed(2) + ' \u20AC)';
+            if (signBtn) signBtn.classList.remove('hidden');
+            if (iconEl) iconEl.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>';
+        }
+
+        if (docEl) docEl.classList.remove('hidden');
+        showReceiptStep('banner');
+    }
+
+    function renderReceiptDocument(receipt) {
+        var bodyEl = document.getElementById('receipt-doc-body');
+        if (!bodyEl) return;
+
+        var monthLabel = Utils.MONTH_NAMES[currentMonth - 1] + ' ' + currentYear;
+        var html = '';
+        html += '<div class="receipt-field"><span class="receipt-field-label">Participante</span><span class="receipt-field-value">' + Utils.escapeHtml(receipt.employee_name_snapshot || '-') + '</span></div>';
+        html += '<div class="receipt-field"><span class="receipt-field-label">Periodo</span><span class="receipt-field-value">' + Utils.escapeHtml(monthLabel) + '</span></div>';
+        html += '<div class="receipt-field"><span class="receipt-field-label">Horas trabajadas</span><span class="receipt-field-value">' + Utils.escapeHtml(String(receipt.hours_worked || 0)) + 'h</span></div>';
+        html += '<div class="receipt-field"><span class="receipt-field-label">Tarifa/hora</span><span class="receipt-field-value">' + Number(receipt.hourly_rate || 0).toFixed(2) + ' \u20AC</span></div>';
+        html += '<div class="receipt-field"><span class="receipt-field-label">Gratificacion total</span><span class="receipt-field-value">' + Number(receipt.amount_earned || 0).toFixed(2) + ' \u20AC</span></div>';
+
+        bodyEl.innerHTML = html;
+    }
+
+    function formatDate(isoStr) {
+        if (!isoStr) return '';
+        var d = new Date(isoStr);
+        if (isNaN(d.getTime())) return '';
+        var dd = String(d.getDate()).padStart(2, '0');
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        var yyyy = d.getFullYear();
+        return dd + '/' + mm + '/' + yyyy;
+    }
+
+    /* ─────────────────────────────────────────────────── */
+    /*  Receipt step navigation                            */
+    /* ─────────────────────────────────────────────────── */
+
+    function showReceiptStep(step) {
+        var bannerEl = document.getElementById('receipt-banner');
+        var docEl = document.getElementById('receipt-document');
+        var pinEl = document.getElementById('receipt-step-pin');
+        var signEl = document.getElementById('receipt-step-sign');
+        var previewEl = document.getElementById('receipt-step-preview');
+        var doneEl = document.getElementById('receipt-step-done');
+
+        if (bannerEl) bannerEl.classList.toggle('hidden', step !== 'banner');
+        if (docEl) docEl.classList.toggle('hidden', step !== 'banner');
+        if (pinEl) pinEl.classList.toggle('hidden', step !== 'pin');
+        if (signEl) signEl.classList.toggle('hidden', step !== 'sign');
+        if (previewEl) previewEl.classList.toggle('hidden', step !== 'preview');
+        if (doneEl) doneEl.classList.toggle('hidden', step !== 'done');
+
+        if (step === 'sign') {
+            initReceiptSignaturePad();
+        }
+    }
+
+    /* ─────────────────────────────────────────────────── */
+    /*  Receipt PIN verification                           */
+    /* ─────────────────────────────────────────────────── */
+
+    function startReceiptSigning() {
+        if (!currentReceipt) return;
+        hideReceiptFeedback();
+
+        if (!receiptPinPad) {
+            receiptPinPad = PinPad.create({
+                dotsEl: document.getElementById('receipt-pin-dots'),
+                keypadEl: document.getElementById('receipt-pin-keypad'),
+                maxLength: 6,
+                allowKeyboard: true,
+                captureWhen: function () {
+                    var el = document.getElementById('receipt-step-pin');
+                    return el && !el.classList.contains('hidden');
+                },
+                onComplete: function () {
+                    verifyReceiptPin();
+                }
+            });
+
+            /* Manual keypad binding for acuerdo-pin-key buttons
+               (PinPad looks for .key-btn; receipt keypad uses .acuerdo-pin-key) */
+            bindReceiptKeypad();
+        }
+
+        receiptPinPad.clear();
+        showReceiptStep('pin');
+    }
+
+    function bindReceiptKeypad() {
+        var keypadEl = document.getElementById('receipt-pin-keypad');
+        if (!keypadEl) return;
+
+        Utils.each(keypadEl.querySelectorAll('[data-key]'), function (btn) {
+            Utils.bindPress(btn, function () {
+                if (!receiptPinPad) return;
+                var key = btn.getAttribute('data-key');
+                if (!key) return;
+
+                if (key === 'clear') {
+                    receiptPinPad.clear();
+                    return;
+                }
+                if (key === 'submit') {
+                    verifyReceiptPin();
+                    return;
+                }
+                /* Digit key — append via setValue */
+                var current = receiptPinPad.getValue();
+                if (current.length < 6) {
+                    receiptPinPad.setValue(current + key);
+                }
+            });
+        });
+    }
+
+    function verifyReceiptPin() {
+        if (!currentReceipt || !receiptPinPad) return;
+        var pin = receiptPinPad.getValue();
+        if (pin.length < 4) {
+            showReceiptPinFeedback('Introduce tu PIN completo.');
+            return;
+        }
+
+        hideReceiptFeedback();
+        receiptPinPad.setBusy(true);
+
+        Api.verifyReceiptPin(currentReceipt.id, pin).then(function (res) {
+            receiptPinPad.setBusy(false);
+
+            if (res && res.success && res.verificationToken) {
+                receiptVerificationToken = res.verificationToken;
+                receiptPinPad.clear();
+                goToReceiptSign();
+                return;
+            }
+
+            receiptVerificationToken = '';
+            receiptPinPad.clear();
+            receiptPinPad.shake();
+            showReceiptPinFeedback((res && res.message) || 'No se pudo validar el PIN.');
+        }).catch(function () {
+            receiptPinPad.setBusy(false);
+            receiptVerificationToken = '';
+            receiptPinPad.clear();
+            receiptPinPad.shake();
+            showReceiptPinFeedback('Error al validar el PIN.');
+        });
+    }
+
+    function showReceiptPinFeedback(msg) {
+        var el = document.getElementById('receipt-pin-feedback');
+        if (!el) return;
+        el.textContent = msg;
+        el.className = 'employee-form-feedback feedback-error';
+    }
+
+    /* ─────────────────────────────────────────────────── */
+    /*  Receipt signature canvas                           */
+    /* ─────────────────────────────────────────────────── */
+
+    function goToReceiptSign() {
+        if (!receiptVerificationToken) {
+            showReceiptPinFeedback('Primero valida tu PIN.');
+            showReceiptStep('pin');
+            return;
+        }
+        receiptSignDataUrl = '';
+        hideReceiptFeedback();
+        showReceiptStep('sign');
+        resizeReceiptCanvas();
+        if (receiptSignPad) receiptSignPad.clear();
+        updateReceiptConfirmState();
+    }
+
+    function initReceiptSignaturePad() {
+        if (typeof SignaturePad === 'undefined') {
+            console.warn('[Payment] SignaturePad no disponible');
+            return;
+        }
+
+        var canvas = document.getElementById('receipt-canvas');
+        if (!canvas) return;
+
+        resizeReceiptCanvas();
+
+        if (!receiptSignPad) {
+            receiptSignPad = new SignaturePad(canvas, {
+                minWidth: 2,
+                maxWidth: 4,
+                penColor: '#000000',
+                backgroundColor: 'rgba(0,0,0,0)'
+            });
+            receiptSignPad.addEventListener('endStroke', updateReceiptConfirmState);
+        }
+
+        if (!receiptResizeBound) {
+            window.addEventListener('resize', function () {
+                resizeReceiptCanvas();
+                if (receiptSignPad) receiptSignPad.clear();
+                updateReceiptConfirmState();
+            });
+            receiptResizeBound = true;
+        }
+
+        updateReceiptConfirmState();
+    }
+
+    function resizeReceiptCanvas() {
+        Utils.resizeCanvas(document.getElementById('receipt-canvas'));
+    }
+
+    function updateReceiptConfirmState() {
+        var btn = document.getElementById('receipt-btn-confirm');
+        if (!btn) return;
+        btn.disabled = !receiptSignPad || receiptSignPad.isEmpty();
+    }
+
+    /* ─────────────────────────────────────────────────── */
+    /*  Receipt signature preview & submit                 */
+    /* ─────────────────────────────────────────────────── */
+
+    function goToReceiptPreview() {
+        if (!receiptSignPad || receiptSignPad.isEmpty()) return;
+        receiptSignDataUrl = getNormalizedSignatureDataUrl(receiptSignPad);
+        if (!receiptSignDataUrl) {
+            showReceiptSignFeedback('Error al capturar la firma. Por favor, repite la firma.');
+            goToReceiptSign();
+            return;
+        }
+        var previewImg = document.getElementById('receipt-preview-img');
+        if (previewImg) previewImg.setAttribute('src', receiptSignDataUrl);
+        hideReceiptFeedback();
+        showReceiptStep('preview');
+    }
+
+    function submitReceiptSignature() {
+        if (!currentReceipt || !receiptSignPad || receiptSignPad.isEmpty()) return;
+        if (!receiptVerificationToken) {
+            showReceiptSignFeedback('La validacion del PIN ha caducado. Vuelve a introducir tu PIN.');
+            showReceiptStep('pin');
+            return;
+        }
+        if (receiptSigningInFlight) return;
+
+        receiptSigningInFlight = true;
+        setReceiptButtonState('receipt-btn-submit', true, 'Guardando...');
+        hideReceiptFeedback();
+
+        Api.signReceipt(
+            currentReceipt.id,
+            receiptVerificationToken,
+            receiptSignDataUrl
+        ).then(function (res) {
+            receiptSigningInFlight = false;
+            setReceiptButtonState('receipt-btn-submit', false, 'Confirmar y firmar');
+
+            if (res && res.success) {
+                receiptVerificationToken = '';
+                currentReceipt.status = 'signed';
+                currentReceipt.employee_signed_at = new Date().toISOString();
+                showReceiptStep('done');
+                return;
+            }
+
+            showReceiptSignFeedback((res && res.message) || 'No se pudo guardar la firma.');
+            if (res && (res.error === 'VERIFICATION_TOKEN_INVALID' || res.error === 'VERIFICATION_TOKEN_MISMATCH')) {
+                receiptVerificationToken = '';
+                if (receiptPinPad) receiptPinPad.clear();
+                showReceiptStep('pin');
+            }
+        }).catch(function () {
+            receiptSigningInFlight = false;
+            setReceiptButtonState('receipt-btn-submit', false, 'Confirmar y firmar');
+            showReceiptSignFeedback('Error al guardar la firma.');
+        });
+    }
+
+    /* ─────────────────────────────────────────────────── */
+    /*  Receipt helpers                                    */
+    /* ─────────────────────────────────────────────────── */
+
+    var getNormalizedSignatureDataUrl = Utils.getNormalizedSignatureDataUrl;
+
+    function setReceiptButtonState(id, disabled, label) {
+        var btn = document.getElementById(id);
+        if (!btn) return;
+        btn.disabled = !!disabled;
+        if (label) {
+            var svg = btn.querySelector('svg');
+            if (svg) {
+                btn.innerHTML = svg.outerHTML + ' ' + Utils.escapeHtml(label);
+            } else {
+                btn.textContent = label;
+            }
+        }
+    }
+
+    function showReceiptSignFeedback(msg) {
+        var el = document.getElementById('receipt-sign-feedback');
+        if (!el) return;
+        el.textContent = msg;
+        el.className = 'employee-form-feedback feedback-error';
+    }
+
+    function hideReceiptFeedback() {
+        var pinFb = document.getElementById('receipt-pin-feedback');
+        var signFb = document.getElementById('receipt-sign-feedback');
+        if (pinFb) { pinFb.textContent = ''; pinFb.className = 'employee-form-feedback hidden'; }
+        if (signFb) { signFb.textContent = ''; signFb.className = 'employee-form-feedback hidden'; }
+    }
+
+    function resetReceiptState() {
+        currentReceipt = null;
+        receiptVerificationToken = '';
+        receiptSignDataUrl = '';
+        receiptSigningInFlight = false;
+
+        if (receiptSignPad) {
+            receiptSignPad.clear();
+        }
+
+        if (receiptPinPad) {
+            receiptPinPad.destroy();
+            receiptPinPad = null;
+        }
+
+        var previewImg = document.getElementById('receipt-preview-img');
+        if (previewImg) previewImg.removeAttribute('src');
+
+        hideReceiptFeedback();
+
+        var sectionEl = document.getElementById('receipt-section');
+        if (sectionEl) sectionEl.classList.add('hidden');
     }
 
     return { init: init, show: show };

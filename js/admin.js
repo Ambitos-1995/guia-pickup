@@ -6,6 +6,7 @@ var Admin = (function () {
 
     var editingEmployee = null;
     var currentYear, currentMonth;
+    var receiptYear, receiptMonth;
     var newFormVisible     = false;
     var acuerdoFormVisible = false;
     var employeeSelectCache = null;
@@ -69,6 +70,8 @@ var Admin = (function () {
                         loadEmployees();
                     } else if (target.id === 'admin-acuerdos') {
                         loadAcuerdosList();
+                    } else if (target.id === 'admin-recibos') {
+                        loadReceiptMonth();
                     }
                 }
             });
@@ -110,6 +113,12 @@ var Admin = (function () {
         Utils.bindPress(document.getElementById('admin-acuerdo-nuevo'), toggleAcuerdoForm);
         Utils.bindPress(document.getElementById('admin-acuerdo-crear'), createAcuerdo);
 
+        /* --- Recibos --- */
+        Utils.bindPress(document.getElementById('admin-receipt-prev'), function () { changeReceiptMonth(-1); });
+        Utils.bindPress(document.getElementById('admin-receipt-next'), function () { changeReceiptMonth(1); });
+        Utils.bindPress(document.getElementById('admin-receipt-generate'), function () { generateReceipts(); });
+        Utils.bindPress(document.getElementById('admin-receipt-bulk-pdf'), function () { downloadBulkPdf(); });
+
         /* Active toggle in edit modal */
         var toggleBtn = document.getElementById('edit-emp-active');
         if (toggleBtn) {
@@ -150,6 +159,10 @@ var Admin = (function () {
         }
         if (activeTabId === 'admin-acuerdos') {
             loadAcuerdosList();
+            return;
+        }
+        if (activeTabId === 'admin-recibos') {
+            loadReceiptMonth();
             return;
         }
 
@@ -916,6 +929,249 @@ var Admin = (function () {
         } catch (_e) {
             return isoStr || '';
         }
+    }
+
+    /* =========================================================
+       RECIBOS TAB
+       ========================================================= */
+
+    function initReceiptMonth() {
+        var now = new Date();
+        receiptYear = now.getFullYear();
+        receiptMonth = now.getMonth() + 1;
+        updateReceiptLabel();
+    }
+
+    function updateReceiptLabel() {
+        var label = document.getElementById('admin-receipt-month-label');
+        if (label) label.textContent = Utils.MONTH_NAMES[receiptMonth - 1] + ' ' + receiptYear;
+    }
+
+    function changeReceiptMonth(delta) {
+        if (!receiptYear) initReceiptMonth();
+        receiptMonth += delta;
+        if (receiptMonth < 1) { receiptYear--; receiptMonth = 12; }
+        else if (receiptMonth > 12) { receiptYear++; receiptMonth = 1; }
+        loadReceiptMonth();
+    }
+
+    function loadReceiptMonth() {
+        if (!receiptYear) initReceiptMonth();
+        updateReceiptLabel();
+
+        var list = document.getElementById('admin-receipt-list');
+        list.textContent = '';
+
+        var loading = document.createElement('p');
+        loading.className = 'loading-text';
+        loading.textContent = 'Cargando recibos...';
+        list.appendChild(loading);
+
+        hideFeedback('admin-receipt-feedback');
+
+        Api.listReceipts(receiptYear, receiptMonth).then(function (res) {
+            list.textContent = '';
+
+            if (!res || !res.success) {
+                renderEmployeeState(list, (res && res.message) || 'No se pudieron cargar los recibos.', true);
+                return;
+            }
+
+            renderReceiptList(res.receipts || []);
+        }).catch(function () {
+            list.textContent = '';
+            renderEmployeeState(list, 'Error de conexion al cargar recibos.', true);
+        });
+    }
+
+    function renderReceiptList(receipts) {
+        var list = document.getElementById('admin-receipt-list');
+        list.textContent = '';
+
+        var summaryEl = document.getElementById('admin-receipt-summary');
+        var counterEl = document.getElementById('admin-receipt-counter');
+        var generateBtn = document.getElementById('admin-receipt-generate');
+        var bulkBtn = document.getElementById('admin-receipt-bulk-pdf');
+
+        if (!receipts || receipts.length === 0) {
+            renderEmployeeState(list, 'No hay recibos para este mes.');
+            if (summaryEl) summaryEl.classList.add('hidden');
+            if (generateBtn) generateBtn.innerHTML = CALC_ICON + ' Generar recibos';
+            if (bulkBtn) bulkBtn.classList.add('hidden');
+            return;
+        }
+
+        var signed = 0;
+        receipts.forEach(function (r) {
+            if (r.status === 'signed') signed++;
+        });
+
+        /* Summary */
+        if (summaryEl) summaryEl.classList.remove('hidden');
+        if (counterEl) counterEl.textContent = signed + ' de ' + receipts.length + ' firmados';
+
+        /* Generate button label */
+        if (generateBtn) {
+            generateBtn.innerHTML = CALC_ICON + ' Regenerar pendientes';
+        }
+
+        /* Bulk PDF button */
+        if (bulkBtn) {
+            if (signed > 0) {
+                bulkBtn.classList.remove('hidden');
+            } else {
+                bulkBtn.classList.add('hidden');
+            }
+        }
+
+        /* Render rows */
+        receipts.forEach(function (receipt) {
+            list.appendChild(renderReceiptRow(receipt));
+        });
+    }
+
+    function renderReceiptRow(receipt) {
+        var row = document.createElement('div');
+        row.className = 'receipt-row';
+
+        var info = document.createElement('div');
+        info.className = 'receipt-row-info';
+
+        var name = receipt.employee_name || receipt.employee_name_snapshot || '\u2014';
+        var statusLbl, statusClass;
+        if (receipt.status === 'signed') {
+            statusClass = 'receipt-status--signed';
+            var dateStr = receipt.employee_signed_at
+                ? new Date(receipt.employee_signed_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                : '';
+            statusLbl = 'Firmado' + (dateStr ? ' ' + dateStr : '');
+        } else {
+            statusClass = 'receipt-status--pending';
+            statusLbl = 'Pendiente';
+        }
+
+        info.innerHTML =
+            '<div class="receipt-row-name">' + escapeHtml(name) + '</div>' +
+            '<div class="receipt-row-meta">' +
+                escapeHtml(Number(receipt.hours_worked || 0).toFixed(1)) + 'h \u00b7 ' +
+                escapeHtml(Number(receipt.amount_earned || 0).toFixed(2)) + ' \u20ac \u00b7 ' +
+                '<span class="receipt-status ' + statusClass + '">' + statusLbl + '</span>' +
+            '</div>';
+        row.appendChild(info);
+
+        if (receipt.status === 'signed') {
+            var dlBtn = document.createElement('button');
+            dlBtn.className = 'btn-receipt-pdf';
+            dlBtn.innerHTML = DOWNLOAD_ICON + ' PDF';
+            (function (id) {
+                Utils.bindPress(dlBtn, function () { downloadReceiptPdf(id, dlBtn); });
+            })(receipt.id);
+            row.appendChild(dlBtn);
+        }
+
+        return row;
+    }
+
+    function generateReceipts() {
+        if (!receiptYear) initReceiptMonth();
+        var btn = document.getElementById('admin-receipt-generate');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = SPINNER_ICON + ' Generando...';
+        }
+        hideFeedback('admin-receipt-feedback');
+
+        Api.generateReceipts(receiptYear, receiptMonth).then(function (res) {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = CALC_ICON + ' Generar recibos';
+            }
+
+            if (res && res.success) {
+                var msg = 'Recibos generados: ' + (res.generated || 0);
+                if (res.skippedSigned) msg += ' (omitidos firmados: ' + res.skippedSigned + ')';
+                showFeedback('admin-receipt-feedback', 'success', msg, 5000);
+                loadReceiptMonth();
+            } else {
+                showFeedback('admin-receipt-feedback', 'error', (res && res.message) || 'No se pudieron generar los recibos.', 5000);
+            }
+        }).catch(function () {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = CALC_ICON + ' Generar recibos';
+            }
+            showFeedback('admin-receipt-feedback', 'error', 'Error de conexion.', 5000);
+        });
+    }
+
+    function downloadReceiptPdf(receiptId, btnEl) {
+        if (btnEl) {
+            btnEl.disabled = true;
+            btnEl.textContent = 'Generando\u2026';
+        }
+        function resetBtn() {
+            if (btnEl) {
+                btnEl.disabled = false;
+                btnEl.innerHTML = DOWNLOAD_ICON + ' PDF';
+            }
+        }
+
+        Api.getReceiptPdf(receiptId).then(function (res) {
+            resetBtn();
+            if (!res || !res.success || !res.pdfBase64) {
+                showFeedback('admin-receipt-feedback', 'error', (res && res.message) || 'No se pudo descargar el recibo.', 4000);
+                return;
+            }
+            triggerPdfDownload(res.pdfBase64, 'Recibo_' + receiptId + '.pdf');
+        }).catch(function () {
+            resetBtn();
+            showFeedback('admin-receipt-feedback', 'error', 'Error de conexion.', 4000);
+        });
+    }
+
+    function downloadBulkPdf() {
+        if (!receiptYear) initReceiptMonth();
+        var btn = document.getElementById('admin-receipt-bulk-pdf');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = SPINNER_ICON + ' Generando...';
+        }
+
+        Api.getBulkReceiptPdf(receiptYear, receiptMonth).then(function (res) {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = DOWNLOAD_ICON + ' Descargar todos';
+            }
+
+            if (!res || !res.success || !res.pdfBase64) {
+                showFeedback('admin-receipt-feedback', 'error', (res && res.message) || 'No se pudo generar el PDF.', 4000);
+                return;
+            }
+
+            var filename = res.filename || ('Recibos_' + receiptYear + '_' + String(receiptMonth).padStart(2, '0') + '.pdf');
+            triggerPdfDownload(res.pdfBase64, filename);
+        }).catch(function () {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = DOWNLOAD_ICON + ' Descargar todos';
+            }
+            showFeedback('admin-receipt-feedback', 'error', 'Error de conexion.', 4000);
+        });
+    }
+
+    function triggerPdfDownload(base64, filename) {
+        var binary = atob(base64);
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        var blob = new Blob([bytes], { type: 'application/pdf' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     return { init: init, show: show };

@@ -366,6 +366,71 @@ var Api = (function () {
         }, { requiresAuth: true });
     }
 
+    // ── Recibos de pago mensuales ──────────────────────────────────────────
+
+    function generateReceipts(year, month) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-payment-receipt', {
+            action: 'generate',
+            orgSlug: ORG_SLUG,
+            year: year,
+            month: month
+        }, { requiresAuth: true });
+    }
+
+    function getMyReceipt(year, month) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-payment-receipt', {
+            action: 'my-receipt',
+            orgSlug: ORG_SLUG,
+            year: year,
+            month: month
+        }, { requiresAuth: true });
+    }
+
+    function verifyReceiptPin(receiptId, pin) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-payment-receipt', {
+            action: 'verify-pin',
+            orgSlug: ORG_SLUG,
+            receiptId: receiptId,
+            pin: pin
+        }, { requiresAuth: true });
+    }
+
+    function signReceipt(receiptId, verificationToken, signatureImg) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-payment-receipt', {
+            action: 'sign',
+            orgSlug: ORG_SLUG,
+            receiptId: receiptId,
+            verificationToken: verificationToken,
+            signatureImg: signatureImg
+        }, { requiresAuth: true });
+    }
+
+    function listReceipts(year, month) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-payment-receipt', {
+            action: 'list',
+            orgSlug: ORG_SLUG,
+            year: year,
+            month: month
+        }, { requiresAuth: true });
+    }
+
+    function getReceiptPdf(receiptId) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-payment-receipt', {
+            action: 'pdf',
+            orgSlug: ORG_SLUG,
+            receiptId: receiptId
+        }, { requiresAuth: true });
+    }
+
+    function getBulkReceiptPdf(year, month) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-payment-receipt', {
+            action: 'bulk-pdf',
+            orgSlug: ORG_SLUG,
+            year: year,
+            month: month
+        }, { requiresAuth: true });
+    }
+
     function reportClientError(payload) {
         var session = (typeof App !== 'undefined' && App.getSession) ? App.getSession() : null;
         return postJson(FUNCTIONS_BASE + '/kiosk-report', {
@@ -415,6 +480,13 @@ var Api = (function () {
         adminSignContract: adminSignContract,
         listAllContracts: listAllContracts,
         getContractPdfData: getContractPdfData,
+        generateReceipts: generateReceipts,
+        getMyReceipt: getMyReceipt,
+        verifyReceiptPin: verifyReceiptPin,
+        signReceipt: signReceipt,
+        listReceipts: listReceipts,
+        getReceiptPdf: getReceiptPdf,
+        getBulkReceiptPdf: getBulkReceiptPdf,
         reportClientError: reportClientError
     };
 })();

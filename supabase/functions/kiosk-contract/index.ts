@@ -3,6 +3,10 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 import {
   authHeaders,
+  base64UrlDecode,
+  base64UrlEncode,
+  base64UrlEncodeBytes,
+  computeSha256,
   corsHeaders,
   fetchJson,
   getClientIp,
@@ -17,6 +21,9 @@ import {
   requireSession,
   resolveEmployeeByPin,
   resolveOrgId,
+  signHmac,
+  signVerificationToken,
+  verifyVerificationToken,
 } from "../_shared/kiosk.ts";
 
 const PARTICIPANT_PIN_REGEX = /^[0-9]{4,6}$/;
@@ -64,15 +71,6 @@ interface ContractRow {
   kiosk_employees?: { nombre: string; apellido: string } | null;
 }
 
-interface ParticipantVerificationTokenPayload {
-  contractId: string;
-  orgId: string;
-  employeeId: string;
-  scope: "contract_participant_verify";
-  iat: number;
-  exp: number;
-  ver: 1;
-}
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -441,7 +439,7 @@ async function handleVerifyParticipant(
     },
   );
 
-  const verificationToken = await signParticipantVerificationToken({
+  const verificationToken = await signVerificationToken({
     contractId: contract.id,
     orgId,
     employeeId: contract.employee_id,
@@ -491,7 +489,7 @@ async function handleParticipantSign(
     }, 409);
   }
 
-  const tokenPayload = await verifyParticipantVerificationToken(verificationToken);
+  const tokenPayload = await verifyVerificationToken(verificationToken, "contract_participant_verify");
   if (!tokenPayload) {
     return json({
       success: false,
@@ -998,74 +996,3 @@ function buildSignedDocumentSnapshot(
   };
 }
 
-async function computeSha256(input: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function signParticipantVerificationToken(
-  payload: ParticipantVerificationTokenPayload,
-): Promise<string> {
-  const header = { alg: "HS256", typ: "JWT" };
-  const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
-  const signature = await signHmac(`${encodedHeader}.${encodedPayload}`);
-  return `${encodedHeader}.${encodedPayload}.${signature}`;
-}
-
-async function verifyParticipantVerificationToken(
-  token: string,
-): Promise<ParticipantVerificationTokenPayload | null> {
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-
-  const [encodedHeader, encodedPayload, signature] = parts;
-  const expectedSignature = await signHmac(`${encodedHeader}.${encodedPayload}`);
-  if (signature !== expectedSignature) return null;
-
-  try {
-    const payload = JSON.parse(base64UrlDecode(encodedPayload)) as ParticipantVerificationTokenPayload;
-    const now = Math.floor(Date.now() / 1000);
-
-    if (payload.scope !== "contract_participant_verify") return null;
-    if (payload.ver !== 1) return null;
-    if (typeof payload.exp !== "number" || payload.exp <= now) return null;
-    if (typeof payload.iat !== "number" || payload.iat > now + 30) return null;
-    return payload;
-  } catch (_error) {
-    return null;
-  }
-}
-
-async function signHmac(input: string): Promise<string> {
-  const secret = getSessionSecret();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(input));
-  return base64UrlEncodeBytes(new Uint8Array(signature));
-}
-
-function base64UrlEncode(input: string): string {
-  return base64UrlEncodeBytes(new TextEncoder().encode(input));
-}
-
-function base64UrlEncodeBytes(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function base64UrlDecode(input: string): string {
-  const padded = input.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - input.length % 4) % 4);
-  return atob(padded);
-}
