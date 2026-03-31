@@ -791,42 +791,54 @@ var Admin = (function () {
             }
         }
 
+        var content = resolveContractPdfContent(data);
+
         // Title
         doc.setFontSize(13);
         doc.setFont('helvetica', 'bold');
-        doc.text('ACUERDO DE PARTICIPACION EN ACTIVIDAD OCUPACIONAL', pw / 2, y, { align: 'center' });
+        doc.text(String(content.title || 'ACUERDO DE PARTICIPACION EN ACTIVIDAD OCUPACIONAL').toUpperCase(), pw / 2, y, { align: 'center' });
         y += 12;
 
         // Opening
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        var opening = 'Entre la Fundacion Ambitos (\u00abla Fundacion\u00bb) y ' + (data.employee_name || '\u2014') + ' (\u00abel/la Participante\u00bb), ambas partes acuerdan lo siguiente:';
+        var opening = String(content.opening || ('Entre la Fundacion Ambitos (\u00abla Fundacion\u00bb) y ' + (data.employee_name || '\u2014') + ' (\u00abel/la Participante\u00bb), ambas partes acuerdan lo siguiente:'));
         var openLines = doc.splitTextToSize(opening, cw);
         checkPage(openLines.length * lineH + 8);
         doc.text(openLines, margin, y);
         y += openLines.length * lineH + 8;
 
         // Clauses
-        var clauses = getContractClauses();
+        var clauses = content.clauses || [];
         doc.setFontSize(10);
         for (var i = 0; i < clauses.length; i++) {
             var cl = clauses[i];
             var titleLines = doc.splitTextToSize(cl.title, cw);
-            var textLines = doc.splitTextToSize(cl.text, cw);
-            var needed = titleLines.length * lineH + textLines.length * lineH + 8;
+            var paragraphs = splitContractParagraphs(cl.text);
+            var paragraphLines = [];
+            var needed = titleLines.length * lineH + 2;
+            for (var p = 0; p < paragraphs.length; p++) {
+                var lines = doc.splitTextToSize(paragraphs[p], cw);
+                paragraphLines.push(lines);
+                needed += lines.length * lineH + 3;
+            }
+            needed += 3;
             checkPage(needed);
 
             doc.setFont('helvetica', 'bold');
             doc.text(titleLines, margin, y);
             y += titleLines.length * lineH + 2;
             doc.setFont('helvetica', 'normal');
-            doc.text(textLines, margin, y);
-            y += textLines.length * lineH + 6;
+            for (var j = 0; j < paragraphLines.length; j++) {
+                doc.text(paragraphLines[j], margin, y);
+                y += paragraphLines[j].length * lineH + 3;
+            }
+            y += 3;
         }
 
         // Closing
         doc.setFont('helvetica', 'italic');
-        var closing = 'Ambas partes firman electronicamente a continuacion en senal de conformidad.';
+        var closing = String(content.closing || 'Ambas partes firman electronicamente a continuacion en senal de conformidad.');
         var closingLines = doc.splitTextToSize(closing, cw);
         checkPage(closingLines.length * lineH + 8);
         doc.text(closingLines, margin, y);
@@ -891,41 +903,18 @@ var Admin = (function () {
         doc.save('Acuerdo_' + safeName + '.pdf');
     }
 
-    function getContractClauses() {
-        return [
-            {
-                title: 'Primera \u2014 Objeto',
-                text: 'El/la Participante se incorpora voluntariamente a la actividad ocupacional de gestion del Punto de Entrega SEUR \u2014 Punto Inclusivo, operado por la Fundacion. Esta actividad forma parte de un programa de terapia ocupacional y no constituye relacion laboral de ningun tipo.'
-            },
-            {
-                title: 'Segunda \u2014 Marco legal',
-                text: 'La presente actividad se enmarca en el Real Decreto 2274/1985, de 4 de diciembre, por el que se regulan los Centros Ocupacionales para personas con discapacidad, y se desarrolla bajo los principios de la terapia ocupacional como profesion sanitaria regulada por la Ley 44/2003 de Ordenacion de las Profesiones Sanitarias, la Ley 24/2014 del Consejo General de Colegios de Terapeutas Ocupacionales y la Ley 1/2017 de la Comunidad de Madrid.'
-            },
-            {
-                title: 'Tercera \u2014 Horario',
-                text: 'El/la Participante escoge libremente los turnos en los que desea participar cada semana, de acuerdo con la disponibilidad del punto de entrega. No existe obligacion de asistencia minima.'
-            },
-            {
-                title: 'Cuarta \u2014 Gratificacion',
-                text: 'El/la Participante recibira mensualmente una gratificacion proporcional a las horas efectivamente realizadas durante ese mes. Esta gratificacion tiene caracter terapeutico-ocupacional y no constituye salario ni retribucion laboral. La retribucion se empleara para reforzar las actividades de ocio y tiempo libre.'
-            },
-            {
-                title: 'Quinta \u2014 Voluntariedad y baja',
-                text: 'La participacion es completamente voluntaria. Cualquiera de las partes puede dar por finalizado este acuerdo en cualquier momento, sin necesidad de preaviso ni penalizacion.'
-            },
-            {
-                title: 'Sexta \u2014 Seguro y cobertura',
-                text: 'La Fundacion garantiza que el/la Participante esta cubierto/a por un seguro de responsabilidad civil y accidentes durante el desarrollo de la actividad.'
-            },
-            {
-                title: 'Septima \u2014 Proteccion de datos',
-                text: 'Los datos personales del Participante se tratan conforme al Reglamento (UE) 2016/679 (RGPD) y la Ley Organica 3/2018 (LOPDGDD). La Fundacion es responsable del tratamiento, con la finalidad exclusiva de gestionar esta actividad ocupacional. El/la Participante puede ejercer sus derechos de acceso, rectificacion, supresion y portabilidad dirigiendose a la Fundacion.'
-            },
-            {
-                title: 'Octava \u2014 Vigencia',
-                text: 'Este acuerdo tiene una duracion de tres meses desde la fecha de firma, renovable automaticamente por periodos iguales salvo comunicacion en contrario por cualquiera de las partes.'
-            }
-        ];
+    function resolveContractPdfContent(data) {
+        if (data && data.rendered_content && data.rendered_content.clauses) {
+            return data.rendered_content;
+        }
+        if (window.LegalTemplates && window.LegalTemplates.buildLegacyContractContent) {
+            return window.LegalTemplates.buildLegacyContractContent(data && data.employee_name ? data.employee_name : '—');
+        }
+        return { title: '', opening: '', clauses: [], closing: '' };
+    }
+
+    function splitContractParagraphs(text) {
+        return String(text || '').split(/\n\n+/).filter(Boolean);
     }
 
     function formatPdfDate(isoStr) {

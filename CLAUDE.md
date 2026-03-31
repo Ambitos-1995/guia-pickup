@@ -20,6 +20,20 @@ npx serve .
 
 No compilation, transpilation, or install step required.
 
+## Testing
+
+```bash
+npm test                  # Run all tests (static + e2e)
+npm run test:static       # Static assertions only (Node.js test runner, no browser)
+npm run test:e2e          # Playwright e2e tests (auto-starts server on :4173)
+npm run test:e2e:headed   # E2e tests with visible browser
+npm run test:install      # Install Playwright browsers (run once after clone)
+```
+
+**Static tests** (`tests/static/`) use Node.js built-in `node:test` — they read source files and assert structural invariants (script load order, SW cache entries, branding, asset existence). No server needed.
+
+**E2E tests** (`tests/e2e/`) use Playwright against Chromium (desktop + mobile) and WebKit. Playwright auto-launches `scripts/test-server.js` on port 4173. All Supabase API calls are intercepted by `tests/e2e/helpers/mock-api.js` — no real backend needed. Mock PINs: `1234` (employee Ismael), `4321` (employee Lucia), `5555` (employee Nora), `123456` (admin Marta).
+
 ## Backend: Supabase
 
 ### Edge Functions (Deno/TypeScript)
@@ -88,7 +102,7 @@ All API calls go through **Supabase Edge Functions** at `https://mzuvkinwebqgmnu
 Multi-step flow: summary → participant PIN → participant signature canvas → preview → admin signature canvas → preview → done. Uses `vendor/signature_pad/signature_pad.umd.min.js` for canvas-based signatures.
 
 ### Service Worker (`sw.js`)
-Cache version is hardcoded (currently `pickup-tmg-v75`). **Increment the cache version number** whenever static assets change to force cache invalidation on existing clients. SW registration is in `js/sw-register.js`. The app checks for updates every 5 minutes and on visibility change; the user confirms activation with the on-screen update button.
+Cache version is hardcoded (currently `pickup-tmg-v77`). **Increment the cache version number** whenever static assets change to force cache invalidation on existing clients. SW registration is in `js/sw-register.js`. The app checks for updates every 5 minutes and on visibility change; the user confirms activation with the on-screen update button.
 
 ### Web Awesome Components
 UI components (dialogs, buttons, inputs, selects) come from Web Awesome, loaded from `vendor/webawesome/dist-cdn/`. Import declarations are in `js/webawesome-init.js` (the only `type="module"` script).
@@ -104,6 +118,8 @@ Hosted on **Vercel** as a static site (no build command). `vercel.json` sets cac
 - **No ES modules in app code**: `webawesome-init.js` is the only `type="module"` script. All other JS uses IIFE pattern with `var`.
 - **New static assets**: When adding files that should work offline, add them to `FILES_TO_CACHE` in `sw.js` and increment the cache version.
 - **Idle timeouts**: Employee screens auto-logout after 10 min; admin screens after 5 min.
+- **Timezone**: All backend date/time logic uses `Europe/Madrid` (`APP_TIME_ZONE` in `_shared/kiosk.ts`). The frontend displays times as received from the server.
+- **Session auth**: Edge functions use server-side session tokens (not JWTs). Sessions are created on PIN verify, carry a role (`org_admin` | `respondent`), and have both idle and absolute timeouts. Clock operations also support an `X-Kiosk-Clock-Token` header for offline replay.
 
 ## Screens / Modules Reference
 

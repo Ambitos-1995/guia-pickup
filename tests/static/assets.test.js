@@ -87,6 +87,7 @@ test('service worker uses network-first for app shell requests', () => {
   assert.doesNotMatch(sw, /direct\/manifest\.json/);
   assert.doesNotMatch(sw, /fotos-con-circulos\/\d+\.(png|webp)/);
   [
+    './js/legal-templates.js',
     './js/pin-pad.js',
     './js/pin.js',
     './js/schedule.js',
@@ -203,6 +204,13 @@ test('signed receipts render an internal signed mark and explain that the docume
   assert.match(stylesCss, /\.receipt-doc-mark-title/);
 });
 
+test('receipt legal copy uses the rehabilitacion template for new documents', () => {
+  assert.match(paymentJs, /buildCurrentReceiptContent/);
+  assert.match(indexHtml, /receipt-doc-header-title/);
+  assert.match(indexHtml, /js\/legal-templates\.js/);
+  assert.doesNotMatch(indexHtml, /Real Decreto 2274\/1985/);
+});
+
 test('signature images are cropped and placed in pdfs without forced distortion', () => {
   assert.match(utilsJs, /findInkBounds/);
   assert.match(utilsJs, /getImageData\(0,\s*0,\s*sourceCanvas\.width,\s*sourceCanvas\.height\)/);
@@ -211,4 +219,7 @@ test('signature images are cropped and placed in pdfs without forced distortion'
   assert.doesNotMatch(adminJs, /addImage\(data\.participant_sign_base64, 'PNG', margin, y, colW, 22\)/);
   assert.match(receiptFunction, /containImage/);
   assert.match(receiptFunction, /Firma del participante/);
+  assert.match(receiptFunction, /DOCUMENTO MENSUAL/);
+  assert.match(receiptFunction, /FIRMA REGISTRADA/);
+  assert.match(receiptFunction, /Recibo validado electronicamente por/);
 });

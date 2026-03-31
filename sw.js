@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pickup-tmg-v77';
+var CACHE_NAME = 'pickup-tmg-v78';
 var FILES_TO_CACHE = [
     './index.html',
     './manifest.json',
@@ -24,6 +24,7 @@ var FILES_TO_CACHE = [
     './direct/direct.js',
     './css/styles.css',
     './js/utils.js',
+    './js/legal-templates.js',
     './js/pin-pad.js',
     './js/api.js',
     './js/offline-clock-queue.js',

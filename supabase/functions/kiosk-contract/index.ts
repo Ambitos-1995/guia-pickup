@@ -6,7 +6,6 @@ import {
   base64UrlDecode,
   base64UrlEncode,
   base64UrlEncodeBytes,
-  computeSha256,
   corsHeaders,
   fetchJson,
   getClientIp,
@@ -25,6 +24,11 @@ import {
   signVerificationToken,
   verifyVerificationToken,
 } from "../_shared/kiosk.ts";
+import {
+  buildCurrentContractSnapshot,
+  canonicalJsonStringify,
+  resolveContractRenderedContent,
+} from "../_shared/legal-documents.ts";
 
 const PARTICIPANT_PIN_REGEX = /^[0-9]{4,6}$/;
 const PARTICIPANT_FAILURE_LIMIT = 8;
@@ -323,7 +327,7 @@ async function handleVerifyParticipant(
     return json({ success: false, message: "El PIN del participante debe tener entre 4 y 6 cifras." }, 400);
   }
 
-  const contract = await fetchContract(url, key, orgId, contractId);
+  const contract = await fetchContract(url, key, orgId, contractId, true);
   if (!contract) {
     return json({ success: false, message: "Acuerdo no encontrado" }, 404);
   }
@@ -630,8 +634,11 @@ async function handleAdminSign(
   const adminSignUrl = adminUploadResult.path;
 
   const adminSignedAt = new Date().toISOString();
-  const signedDocument = buildSignedDocumentSnapshot(
+  const employee = contract.kiosk_employees;
+  const employeeName = employee ? `${employee.nombre} ${employee.apellido}`.trim() : "";
+  const signedDocument = buildCurrentContractSnapshot(
     contract,
+    employeeName,
     adminEmployeeId,
     adminSignUrl,
     adminSignedAt,
@@ -651,7 +658,12 @@ async function handleAdminSign(
     }, documentUploadResult.status);
   }
 
-  const documentHash = await computeSha256(JSON.stringify(signedDocument));
+  const documentHash = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(canonicalJsonStringify(signedDocument)),
+  ).then((buffer) =>
+    Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("")
+  );
 
   const updateRes = await fetchJson(
     `${url}/rest/v1/kiosk_contracts?id=eq.${encodeURIComponent(contract.id)}&organization_id=eq.${encodeURIComponent(orgId)}`,
@@ -749,7 +761,7 @@ async function uploadSignature(
     const path = `${orgId}/${contractId}/${role}.png`;
     const uploadResult = await supabaseAdmin.storage
       .from("contract-signatures")
-      .upload(path, new Blob([bytes], { type: "image/png" }), {
+      .upload(path, new Blob([toArrayBuffer(bytes)], { type: "image/png" }), {
         contentType: "image/png",
         upsert: true,
       });
@@ -943,12 +955,25 @@ async function handleGetPdfData(
       participant_sign_base64: participantSignBase64,
       admin_sign_base64: adminSignBase64,
       document_hash: contract.document_hash,
+      schema_version: contract.document_snapshot_json &&
+          typeof contract.document_snapshot_json.schema_version === "number"
+        ? contract.document_snapshot_json.schema_version
+        : 1,
+      template_version: contract.document_snapshot_json &&
+          typeof contract.document_snapshot_json.template_version === "string"
+        ? contract.document_snapshot_json.template_version
+        : null,
+      rendered_content: resolveContractRenderedContent(
+        contract.document_snapshot_json,
+        employeeName,
+      ),
+      document_snapshot_json: contract.document_snapshot_json,
     },
   });
 }
 
 async function downloadSignatureAsBase64(
-  supabaseAdmin: ReturnType<typeof createClient>,
+  supabaseAdmin: any,
   storagePath: string,
 ): Promise<string | null> {
   try {
@@ -968,31 +993,9 @@ async function downloadSignatureAsBase64(
   }
 }
 
-function buildSignedDocumentSnapshot(
-  contract: ContractRow,
-  adminEmployeeId: string,
-  adminSignUrl: string,
-  adminSignedAt: string,
-): Record<string, unknown> {
-  return {
-    schema_version: 1,
-    contract_id: contract.id,
-    organization_id: contract.organization_id,
-    employee_id: contract.employee_id,
-    title: contract.title,
-    activity_description: contract.activity_description,
-    schedule: contract.schedule,
-    validity_text: contract.validity_text,
-    representative_name: contract.representative_name,
-    status: "signed",
-    participant_pin_verified: !!contract.employee_pin_verified,
-    participant_verified_at: contract.participant_verified_at,
-    participant_signed_at: contract.participant_signed_at,
-    participant_sign_url: contract.participant_sign_url,
-    admin_employee_id: adminEmployeeId,
-    admin_signed_at: adminSignedAt,
-    admin_sign_url: adminSignUrl,
-    signed_at: adminSignedAt,
-  };
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
 }
-

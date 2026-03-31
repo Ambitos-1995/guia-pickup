@@ -252,8 +252,8 @@ test('employee can read the payment receipt before signing and it stays blocked 
   await page.locator('#card-payment').click();
   await expect(page.locator('#screen-payment.active')).toBeVisible();
   await expect(page.locator('#receipt-document')).toBeVisible();
-  await expect(page.locator('#receipt-doc-body')).toContainText('Recibo personal de gratificacion mensual');
-  await expect(page.locator('#receipt-doc-body')).toContainText('Con tu firma electronica confirmas');
+  await expect(page.locator('#receipt-doc-body')).toContainText('Recibo personal de gratificacion terapeutico-ocupacional');
+  await expect(page.locator('#receipt-doc-body')).toContainText("programa de rehabilitacion psicosocial 'Punto Inclusivo' de Fundacion Ambitos");
 
   await page.locator('#receipt-btn-sign').click();
   await expect(page.locator('#receipt-document')).toBeVisible();

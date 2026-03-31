@@ -140,9 +140,37 @@ var Contract = (function () {
 
     function renderContractSummary(data) {
         var name = data.employee_name || '-';
-        setText('acuerdo-employee-name', name);
         setText('acuerdo-header-title', name !== '-' ? ('Acuerdo - ' + name) : 'Acuerdo de Participacion');
         setText('acuerdo-pin-target', name);
+        renderContractLegalDoc(name);
+    }
+
+    function renderContractLegalDoc(employeeName) {
+        var docEl = document.getElementById('acuerdo-legal-doc');
+        if (!docEl || !window.LegalTemplates || !window.LegalTemplates.buildCurrentContractContent) return;
+
+        var content = window.LegalTemplates.buildCurrentContractContent(employeeName || '—');
+        var html = '<h3 class="acuerdo-legal-title">' + escapeHtml(content.title || '') + '</h3>';
+        html += '<p class="acuerdo-legal-opening">' + escapeHtml(content.opening || '') + '</p>';
+
+        (content.clauses || []).forEach(function (clause) {
+            html += '<section class="acuerdo-clause">';
+            html += '<h4 class="acuerdo-clause-title">' + escapeHtml(clause.title || '') + '</h4>';
+            html += renderMultilineClauseText(clause.text || '');
+            html += '</section>';
+        });
+
+        html += '<p class="acuerdo-legal-footer">' + escapeHtml(content.closing || '') + '</p>';
+        docEl.innerHTML = html;
+    }
+
+    function renderMultilineClauseText(text) {
+        return String(text || '')
+            .split(/\n\n+/)
+            .map(function (paragraph) {
+                return '<p class="acuerdo-clause-text">' + escapeHtml(paragraph) + '</p>';
+            })
+            .join('');
     }
 
     function bindPinPad() {

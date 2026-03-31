@@ -312,6 +312,17 @@
                 <!-- ── Recibo de pago mensual ── -->
                 <div class="receipt-section hidden" id="receipt-section">
 
+                    <!-- Documento legible -->
+                    <div class="receipt-document hidden" id="receipt-document">
+                        <div class="receipt-doc-header">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <span id="receipt-doc-header-title">Recibo de Gratificacion Terapeutico-Ocupacional</span>
+                        </div>
+                        <div class="receipt-doc-body" id="receipt-doc-body">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
                     <!-- Banner: pendiente o firmado -->
                     <div class="receipt-banner hidden" id="receipt-banner">
                         <div class="receipt-banner-icon" id="receipt-banner-icon">
@@ -322,17 +333,6 @@
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                             Firmar recibo
                         </button>
-                    </div>
-
-                    <!-- Documento legible -->
-                    <div class="receipt-document hidden" id="receipt-document">
-                        <div class="receipt-doc-header">
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            <span>Recibo de Gratificacion</span>
-                        </div>
-                        <div class="receipt-doc-body" id="receipt-doc-body">
-                            <!-- Populated by JS -->
-                        </div>
                     </div>
 
                     <!-- Paso 1: PIN -->
@@ -634,52 +634,8 @@
                 <!-- PASO 1: Resumen del acuerdo -->
                 <div id="acuerdo-step-summary" class="acuerdo-step">
                     <div class="acuerdo-legal-scroll">
-                        <div class="acuerdo-legal-doc">
-                            <h3 class="acuerdo-legal-title">Acuerdo de Participacion en Actividad Ocupacional</h3>
-
-                            <p class="acuerdo-legal-opening">Entre la Fundacion Ambitos (&laquo;la Fundacion&raquo;) y <strong id="acuerdo-employee-name" class="acuerdo-legal-name">&mdash;</strong> (&laquo;el/la Participante&raquo;), ambas partes acuerdan lo siguiente:</p>
-
-                            <section class="acuerdo-clause">
-                                <h4 class="acuerdo-clause-title">Primera &mdash; Objeto</h4>
-                                <p class="acuerdo-clause-text">El/la Participante se incorpora voluntariamente a la actividad ocupacional de gestion del Punto de Entrega SEUR &mdash; Punto Inclusivo, operado por la Fundacion. Esta actividad forma parte de un programa de terapia ocupacional y no constituye relacion laboral de ningun tipo.</p>
-                            </section>
-
-                            <section class="acuerdo-clause">
-                                <h4 class="acuerdo-clause-title">Segunda &mdash; Marco legal</h4>
-                                <p class="acuerdo-clause-text">La presente actividad se enmarca en el Real Decreto 2274/1985, de 4 de diciembre, por el que se regulan los Centros Ocupacionales para personas con discapacidad, y se desarrolla bajo los principios de la terapia ocupacional como profesion sanitaria regulada por la Ley 44/2003 de Ordenacion de las Profesiones Sanitarias, la Ley 24/2014 del Consejo General de Colegios de Terapeutas Ocupacionales y la Ley 1/2017 de la Comunidad de Madrid.</p>
-                            </section>
-
-                            <section class="acuerdo-clause">
-                                <h4 class="acuerdo-clause-title">Tercera &mdash; Horario</h4>
-                                <p class="acuerdo-clause-text">El/la Participante escoge libremente los turnos en los que desea participar cada semana, de acuerdo con la disponibilidad del punto de entrega. No existe obligacion de asistencia minima.</p>
-                            </section>
-
-                            <section class="acuerdo-clause">
-                                <h4 class="acuerdo-clause-title">Cuarta &mdash; Gratificacion</h4>
-                                <p class="acuerdo-clause-text">El/la Participante recibira mensualmente una gratificacion proporcional a las horas efectivamente realizadas durante ese mes. Esta gratificacion tiene caracter terapeutico-ocupacional y no constituye salario ni retribucion laboral. La retribucion se empleara para reforzar las actividades de ocio y tiempo libre.</p>
-                            </section>
-
-                            <section class="acuerdo-clause">
-                                <h4 class="acuerdo-clause-title">Quinta &mdash; Voluntariedad y baja</h4>
-                                <p class="acuerdo-clause-text">La participacion es completamente voluntaria. Cualquiera de las partes puede dar por finalizado este acuerdo en cualquier momento, sin necesidad de preaviso ni penalizacion.</p>
-                            </section>
-
-                            <section class="acuerdo-clause">
-                                <h4 class="acuerdo-clause-title">Sexta &mdash; Seguro y cobertura</h4>
-                                <p class="acuerdo-clause-text">La Fundacion garantiza que el/la Participante esta cubierto/a por un seguro de responsabilidad civil y accidentes durante el desarrollo de la actividad.</p>
-                            </section>
-
-                            <section class="acuerdo-clause">
-                                <h4 class="acuerdo-clause-title">Septima &mdash; Proteccion de datos</h4>
-                                <p class="acuerdo-clause-text">Los datos personales del Participante se tratan conforme al Reglamento (UE) 2016/679 (RGPD) y la Ley Organica 3/2018 (LOPDGDD). La Fundacion es responsable del tratamiento, con la finalidad exclusiva de gestionar esta actividad ocupacional. El/la Participante puede ejercer sus derechos de acceso, rectificacion, supresion y portabilidad dirigiendose a la Fundacion.</p>
-                            </section>
-
-                            <section class="acuerdo-clause">
-                                <h4 class="acuerdo-clause-title">Octava &mdash; Vigencia</h4>
-                                <p class="acuerdo-clause-text">Este acuerdo tiene una duracion de tres meses desde la fecha de firma, renovable automaticamente por periodos iguales salvo comunicacion en contrario por cualquiera de las partes.</p>
-                            </section>
-
-                            <p class="acuerdo-legal-footer">Ambas partes firman electronicamente a continuacion en senal de conformidad.</p>
+                        <div class="acuerdo-legal-doc" id="acuerdo-legal-doc">
+                            <!-- Populated by JS -->
                         </div>
                     </div>
                     <button id="acuerdo-btn-go-sign" class="btn-primary btn-full btn-xlarge" type="button">
@@ -952,6 +908,7 @@
     <!-- JS Modules (loaded in order, no ES modules for max compat) -->
     <script type="module" src="js/webawesome-init.js"></script>
     <script src="js/utils.js"></script>
+    <script src="js/legal-templates.js"></script>
     <script src="js/pin-pad.js"></script>
     <script src="js/api.js"></script>
     <script src="js/offline-clock-queue.js"></script>

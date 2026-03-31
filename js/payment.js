@@ -196,14 +196,14 @@ var Payment = (function () {
         if (receipt.status === 'signed') {
             bannerEl.classList.add('receipt-banner--signed');
             var signedDate = receipt.employee_signed_at ? formatDate(receipt.employee_signed_at) : '';
-            textEl.textContent = signedDate
-                ? 'Recibo firmado el ' + signedDate
-                : 'Recibo firmado';
+            textEl.innerHTML = signedDate
+                ? '<strong>Recibo firmado</strong>Registrado el ' + signedDate + '. El documento ha quedado cerrado y disponible para consulta.'
+                : '<strong>Recibo firmado</strong>El documento ha quedado cerrado y disponible para consulta.';
             if (signBtn) signBtn.classList.add('hidden');
             if (iconEl) iconEl.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
         } else {
             bannerEl.classList.add('receipt-banner--pending');
-            textEl.textContent = 'Tienes un recibo pendiente de firmar (' + Number(receipt.amount_earned || 0).toFixed(2) + ' \u20AC)';
+            textEl.innerHTML = '<strong>Lee el recibo y firma al final</strong>Tienes un recibo pendiente de firmar por ' + Number(receipt.amount_earned || 0).toFixed(2) + ' \u20AC.';
             if (signBtn) {
                 signBtn.classList.remove('hidden');
                 signBtn.disabled = false;
@@ -222,9 +222,14 @@ var Payment = (function () {
         var monthLabel = Utils.MONTH_NAMES[currentMonth - 1] + ' ' + currentYear;
         var signedLabel = receipt.employee_signed_at ? formatDate(receipt.employee_signed_at) : '';
         var employeeLabel = Utils.escapeHtml(receipt.employee_name_snapshot || 'Participante');
+        var stateLabel = receipt.status === 'signed' ? 'Firmado' : 'Pendiente de firma';
+        var stateClass = receipt.status === 'signed' ? 'receipt-doc-chip receipt-doc-chip--signed' : 'receipt-doc-chip receipt-doc-chip--pending';
+        var content = getReceiptTemplateContent(receipt);
         var html = '';
-        html += '<div class="receipt-doc-title">Recibo personal de gratificacion mensual</div>';
-        html += '<p class="receipt-doc-paragraph">La persona participante declara haber revisado este documento antes de firmarlo y confirma que los datos mostrados corresponden a su actividad ocupacional en el Punto de Entrega SEUR - Punto Inclusivo.</p>';
+        updateReceiptDocumentHeader(content.header_title || 'Recibo');
+        html += '<div class="receipt-doc-meta"><span class="receipt-doc-kicker">Documento mensual</span><span class="' + stateClass + '">' + stateLabel + '</span></div>';
+        html += '<div class="receipt-doc-title">' + Utils.escapeHtml(content.document_title || 'Recibo') + '</div>';
+        html += '<p class="receipt-doc-paragraph">' + Utils.escapeHtml(content.intro_text || '') + '</p>';
         html += '<div class="receipt-doc-grid">';
         html += '<div class="receipt-field"><span class="receipt-field-label">Participante</span><span class="receipt-field-value">' + employeeLabel + '</span></div>';
         html += '<div class="receipt-field"><span class="receipt-field-label">Periodo</span><span class="receipt-field-value">' + Utils.escapeHtml(monthLabel) + '</span></div>';
@@ -232,7 +237,7 @@ var Payment = (function () {
         html += '<div class="receipt-field"><span class="receipt-field-label">Tarifa/hora</span><span class="receipt-field-value">' + Number(receipt.hourly_rate || 0).toFixed(2) + ' \u20AC</span></div>';
         html += '<div class="receipt-field receipt-field--highlight"><span class="receipt-field-label">Gratificacion total</span><span class="receipt-field-value">' + Number(receipt.amount_earned || 0).toFixed(2) + ' \u20AC</span></div>';
         html += '</div>';
-        html += '<p class="receipt-doc-paragraph">Con tu firma electronica confirmas haber recibido la gratificacion indicada, correspondiente a las horas efectivamente realizadas durante el periodo mostrado, dentro del programa ocupacional regulado por el Real Decreto 2274/1985.</p>';
+        html += '<p class="receipt-doc-paragraph">' + Utils.escapeHtml(content.confirmation_text || '') + '</p>';
         if (receipt.status === 'signed') {
             html += '<div class="receipt-doc-mark" role="status" aria-label="Documento firmado">';
             html += '<div class="receipt-doc-mark-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 9 18l-5-5"/></svg></div>';
@@ -253,6 +258,30 @@ var Payment = (function () {
         html += '</div>';
 
         bodyEl.innerHTML = html;
+    }
+
+    function getReceiptTemplateContent(receipt) {
+        if (window.LegalTemplates) {
+            if (receipt && receipt.status === 'signed' && window.LegalTemplates.resolveReceiptContent) {
+                return window.LegalTemplates.resolveReceiptContent(receipt.document_snapshot_json || null);
+            }
+            if (window.LegalTemplates.buildCurrentReceiptContent) {
+                return window.LegalTemplates.buildCurrentReceiptContent();
+            }
+        }
+        return {
+            header_title: 'Recibo de Gratificacion',
+            document_title: 'Recibo',
+            intro_text: '',
+            confirmation_text: ''
+        };
+    }
+
+    function updateReceiptDocumentHeader(title) {
+        var headerEl = document.getElementById('receipt-doc-header-title');
+        if (headerEl) {
+            headerEl.textContent = title || 'Recibo';
+        }
     }
 
     function formatDate(isoStr) {

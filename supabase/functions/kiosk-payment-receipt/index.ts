@@ -22,6 +22,11 @@ import {
   signVerificationToken,
   verifyVerificationToken,
 } from "../_shared/kiosk.ts";
+import {
+  buildCurrentReceiptSnapshot,
+  canonicalJsonStringify,
+  resolveReceiptRenderedContent,
+} from "../_shared/legal-documents.ts";
 
 const PIN_REGEX = /^[0-9]{4,6}$/;
 const FAILURE_LIMIT = 8;
@@ -317,7 +322,7 @@ async function handleMyReceipt(
   }
 
   const res = await fetchJson<ReceiptRow[]>(
-    `${url}/rest/v1/kiosk_payment_receipts?select=id,status,employee_name_snapshot,hours_worked,hourly_rate,amount_earned,employee_signed_at&organization_id=eq.${orgId}&employee_id=eq.${employeeId}&year=eq.${year}&month=eq.${month}&status=in.(pending,signed)&limit=1`,
+    `${url}/rest/v1/kiosk_payment_receipts?select=id,status,employee_name_snapshot,hours_worked,hourly_rate,amount_earned,employee_signed_at,document_snapshot_json,document_hash&organization_id=eq.${orgId}&employee_id=eq.${employeeId}&year=eq.${year}&month=eq.${month}&status=in.(pending,signed)&limit=1`,
     { headers: authHeaders(key) },
   );
 
@@ -340,6 +345,8 @@ async function handleMyReceipt(
       hourly_rate: Number(receipt.hourly_rate || 0),
       amount_earned: Number(receipt.amount_earned || 0),
       employee_signed_at: receipt.employee_signed_at,
+      document_snapshot_json: receipt.document_snapshot_json,
+      document_hash: receipt.document_hash,
     },
   });
 }
@@ -582,28 +589,13 @@ async function handleSign(
   const signaturePath = `${orgId}/${receiptId}/employee.png`;
   const now = new Date().toISOString();
 
-  const documentSnapshot: Record<string, unknown> = {
-    schema_version: 1,
-    receipt_id: receipt.id,
-    organization_id: receipt.organization_id,
-    employee_id: receipt.employee_id,
-    settlement_id: receipt.settlement_id,
-    year: receipt.year,
-    month: receipt.month,
-    employee_name_snapshot: receipt.employee_name_snapshot,
-    hours_worked: Number(receipt.hours_worked || 0),
-    hourly_rate: Number(receipt.hourly_rate || 0),
-    amount_earned: Number(receipt.amount_earned || 0),
-    worked_minutes: Number(receipt.worked_minutes || 0),
-    slot_count: Number(receipt.slot_count || 0),
-    employee_pin_verified: true,
-    employee_verified_at: employeeVerifiedAt,
-    employee_signed_at: now,
-    signature_storage_path: signaturePath,
-    signed_at: now,
-  };
-
-  const documentJsonStr = JSON.stringify(documentSnapshot);
+  const documentSnapshot = buildCurrentReceiptSnapshot(
+    receipt,
+    signaturePath,
+    employeeVerifiedAt,
+    now,
+  );
+  const documentJsonStr = canonicalJsonStringify(documentSnapshot);
   const documentHash = await computeSha256(documentJsonStr);
   const documentPath = `${orgId}/${receiptId}/signed-receipt.json`;
 
@@ -611,7 +603,7 @@ async function handleSign(
   const [uploadResult, docUploadResult] = await Promise.all([
     supabaseAdmin.storage
       .from("receipt-signatures")
-      .upload(signaturePath, new Blob([signatureBytes], { type: "image/png" }), {
+      .upload(signaturePath, new Blob([toArrayBuffer(signatureBytes)], { type: "image/png" }), {
         contentType: "image/png",
         upsert: true,
       }),
@@ -746,7 +738,7 @@ async function handlePdf(
   if (!receiptId) return json({ success: false, message: "Falta receiptId" }, 400);
 
   const receiptRes = await fetchJson<ReceiptRow[]>(
-    `${url}/rest/v1/kiosk_payment_receipts?select=id,organization_id,employee_id,year,month,status,employee_name_snapshot,hours_worked,hourly_rate,amount_earned,employee_signed_at,signature_storage_path,document_hash&id=eq.${encodeURIComponent(receiptId)}&organization_id=eq.${orgId}&limit=1`,
+    `${url}/rest/v1/kiosk_payment_receipts?select=id,organization_id,employee_id,year,month,status,employee_name_snapshot,hours_worked,hourly_rate,amount_earned,employee_signed_at,signature_storage_path,document_hash,document_snapshot_json&id=eq.${encodeURIComponent(receiptId)}&organization_id=eq.${orgId}&limit=1`,
     { headers: authHeaders(key) },
   );
 
@@ -791,7 +783,7 @@ async function handleBulkPdf(
   }
 
   const receiptsRes = await fetchJson<ReceiptRow[]>(
-    `${url}/rest/v1/kiosk_payment_receipts?select=id,organization_id,employee_id,year,month,status,employee_name_snapshot,hours_worked,hourly_rate,amount_earned,employee_signed_at,signature_storage_path,document_hash&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}&status=eq.signed&order=employee_name_snapshot.asc`,
+    `${url}/rest/v1/kiosk_payment_receipts?select=id,organization_id,employee_id,year,month,status,employee_name_snapshot,hours_worked,hourly_rate,amount_earned,employee_signed_at,signature_storage_path,document_hash,document_snapshot_json&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}&status=eq.signed&order=employee_name_snapshot.asc`,
     { headers: authHeaders(key) },
   );
 
@@ -853,109 +845,262 @@ async function buildReceiptPdf(
 
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const renderedContent = resolveReceiptRenderedContent(receipt.document_snapshot_json);
 
   const margin = 50;
+  const contentWidth = width - 2 * margin;
   let y = height - margin;
+  const monthName = MONTH_NAMES[(receipt.month || 1) - 1] || "";
+  const periodo = `${monthName} ${receipt.year}`;
+  const participantName = receipt.employee_name_snapshot || "la persona participante";
+  const amountLabel = `${Number(receipt.amount_earned || 0).toFixed(2)} EUR`;
+  const signedDateLabel = receipt.employee_signed_at
+    ? new Date(receipt.employee_signed_at).toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Madrid",
+    })
+    : "";
+  const isSigned = receipt.status === "signed";
 
-  // Title
-  const titleText = "FUNDACION AMBITOS";
-  const titleSize = 18;
-  const titleWidth = fontBold.widthOfTextAtSize(titleText, titleSize);
-  page.drawText(titleText, {
-    x: (width - titleWidth) / 2,
-    y,
-    size: titleSize,
+  // Top document band
+  const headerHeight = 42;
+  page.drawRectangle({
+    x: margin,
+    y: y - headerHeight,
+    width: contentWidth,
+    height: headerHeight,
+    color: rgb(0.12, 0.3, 0.71),
+  });
+  page.drawText(String(renderedContent.header_title || "Recibo de Gratificacion"), {
+    x: margin + 18,
+    y: y - 27,
+    size: 14,
     font: fontBold,
-    color: rgb(0, 0, 0),
+    color: rgb(1, 1, 1),
+  });
+  const tagWidth = 88;
+  page.drawRectangle({
+    x: width - margin - tagWidth - 14,
+    y: y - 30,
+    width: tagWidth,
+    height: 18,
+    color: rgb(0.34, 0.51, 0.9),
+  });
+  page.drawText("LECTURA PREVIA", {
+    x: width - margin - tagWidth - 6,
+    y: y - 24,
+    size: 8,
+    font: fontBold,
+    color: rgb(1, 1, 1),
+  });
+  y -= 62;
+
+  // Meta row
+  page.drawText("DOCUMENTO MENSUAL", {
+    x: margin,
+    y,
+    size: 9,
+    font: fontBold,
+    color: rgb(0.39, 0.46, 0.55),
+  });
+  const chipLabel = isSigned ? "FIRMADO" : "PENDIENTE DE FIRMA";
+  const chipWidth = fontBold.widthOfTextAtSize(chipLabel, 8) + 22;
+  page.drawRectangle({
+    x: width - margin - chipWidth,
+    y: y - 5,
+    width: chipWidth,
+    height: 18,
+    color: isSigned ? rgb(0.86, 0.97, 0.9) : rgb(1, 0.97, 0.93),
+  });
+  page.drawText(chipLabel, {
+    x: width - margin - chipWidth + 10,
+    y,
+    size: 8,
+    font: fontBold,
+    color: isSigned ? rgb(0.09, 0.4, 0.2) : rgb(0.76, 0.25, 0.05),
   });
   y -= 28;
 
-  // Subtitle
-  const subtitleText = "Recibo de Gratificacion Mensual";
-  const subtitleSize = 14;
-  const subtitleWidth = fontBold.widthOfTextAtSize(subtitleText, subtitleSize);
-  page.drawText(subtitleText, {
-    x: (width - subtitleWidth) / 2,
+  page.drawText(String(renderedContent.document_title || "Recibo personal de gratificacion mensual"), {
+    x: margin,
     y,
-    size: subtitleSize,
+    size: 18,
     font: fontBold,
-    color: rgb(0.2, 0.2, 0.2),
+    color: rgb(0.06, 0.09, 0.16),
   });
-  y -= 20;
+  y -= 24;
 
-  // Horizontal line separator
-  page.drawLine({
-    start: { x: margin, y },
-    end: { x: width - margin, y },
-    thickness: 1,
-    color: rgb(0.6, 0.6, 0.6),
-  });
-  y -= 30;
-
-  // Fields
-  const fieldSize = 12;
-  const lineHeight = 22;
-  const monthName = MONTH_NAMES[(receipt.month || 1) - 1] || "";
-  const periodo = `${monthName} ${receipt.year}`;
-
-  const fields: Array<[string, string]> = [
-    ["Participante:", receipt.employee_name_snapshot || ""],
-    ["Periodo:", periodo],
-    ["Horas realizadas:", String(Number(receipt.hours_worked || 0))],
-    ["Tarifa por hora:", `${Number(receipt.hourly_rate || 0).toFixed(2)} EUR`],
-    ["Gratificacion total:", `${Number(receipt.amount_earned || 0).toFixed(2)} EUR`],
-  ];
-
-  for (const [label, value] of fields) {
-    page.drawText(label, {
+  const introText = String(
+    renderedContent.intro_text ||
+      "La persona participante declara haber revisado este documento antes de firmarlo.",
+  );
+  const introLines = wrapText(introText, fontRegular, 10.5, contentWidth);
+  for (const line of introLines) {
+    page.drawText(line, {
       x: margin,
       y,
-      size: fieldSize,
-      font: fontBold,
-      color: rgb(0, 0, 0),
-    });
-    page.drawText(value, {
-      x: margin + 160,
-      y,
-      size: fieldSize,
+      size: 10.5,
       font: fontRegular,
-      color: rgb(0, 0, 0),
+      color: rgb(0.29, 0.35, 0.45),
     });
-    y -= lineHeight;
+    y -= 15;
   }
+  y -= 18;
 
-  y -= 10;
+  // Fields card
+  const fieldsCardHeight = 142;
+  const fieldsCardY = y - fieldsCardHeight + 10;
+  page.drawRectangle({
+    x: margin,
+    y: fieldsCardY,
+    width: contentWidth,
+    height: fieldsCardHeight,
+    color: rgb(0.97, 0.98, 0.99),
+    borderColor: rgb(0.88, 0.91, 0.94),
+    borderWidth: 1,
+  });
+
+  const fieldLabelSize = 9;
+  const fieldValueSize = 12;
+  const lineHeight = 24;
+  let fieldY = y - 10;
+  const fields: Array<[string, string, boolean]> = [
+    ["PARTICIPANTE", participantName, false],
+    ["PERIODO", periodo, false],
+    ["HORAS TRABAJADAS", String(Number(receipt.hours_worked || 0)) + "h", false],
+    ["TARIFA/HORA", `${Number(receipt.hourly_rate || 0).toFixed(2)} EUR`, false],
+    ["GRATIFICACION TOTAL", amountLabel, true],
+  ];
+
+  for (const [label, value, isHighlight] of fields) {
+    if (isHighlight) {
+      page.drawRectangle({
+        x: margin + 12,
+        y: fieldY - 14,
+        width: contentWidth - 24,
+        height: 28,
+        color: rgb(0.99, 0.95, 0.95),
+        borderColor: rgb(0.95, 0.84, 0.84),
+        borderWidth: 0.8,
+      });
+    } else {
+      page.drawLine({
+        start: { x: margin + 14, y: fieldY - 10 },
+        end: { x: width - margin - 14, y: fieldY - 10 },
+        thickness: 0.7,
+        color: rgb(0.9, 0.92, 0.95),
+      });
+    }
+
+    page.drawText(label, {
+      x: margin + 16,
+      y: fieldY,
+      size: fieldLabelSize,
+      font: fontBold,
+      color: rgb(0.39, 0.46, 0.55),
+    });
+    const valueWidth = fontBold.widthOfTextAtSize(value, fieldValueSize);
+    page.drawText(value, {
+      x: width - margin - 16 - valueWidth,
+      y: fieldY - 1,
+      size: fieldValueSize,
+      font: fontBold,
+      color: isHighlight ? rgb(0.44, 0.13, 0.13) : rgb(0.12, 0.16, 0.23),
+    });
+    fieldY -= lineHeight;
+  }
+  y = fieldsCardY - 26;
 
   // Legal text
-  const legalText =
-    "El/la participante confirma haber recibido la gratificacion indicada, correspondiente a su participacion en la actividad ocupacional del Punto de Entrega SEUR - Punto Inclusivo, conforme al Real Decreto 2274/1985.";
-  const legalSize = 10;
-  const legalLines = wrapText(legalText, fontRegular, legalSize, width - 2 * margin);
+  const legalText = String(
+    renderedContent.pdf_confirmation_text ||
+      renderedContent.confirmation_text ||
+      "Con tu firma electronica confirmas haber recibido la gratificacion indicada.",
+  );
+  const legalSize = 10.2;
+  const legalLines = wrapText(legalText, fontRegular, legalSize, contentWidth);
   for (const line of legalLines) {
     page.drawText(line, {
       x: margin,
       y,
       size: legalSize,
       font: fontRegular,
-      color: rgb(0.2, 0.2, 0.2),
+      color: rgb(0.29, 0.35, 0.45),
     });
     y -= 16;
   }
 
   y -= 14;
 
+  if (isSigned) {
+    const markHeight = 64;
+    page.drawRectangle({
+      x: margin,
+      y: y - markHeight,
+      width: contentWidth,
+      height: markHeight,
+      color: rgb(0.92, 0.98, 0.94),
+      borderColor: rgb(0.76, 0.91, 0.8),
+      borderWidth: 1,
+    });
+    page.drawText("FIRMA REGISTRADA", {
+      x: margin + 16,
+      y: y - 16,
+      size: 9,
+      font: fontBold,
+      color: rgb(0.09, 0.4, 0.2),
+    });
+    page.drawText(`Recibo validado electronicamente por ${participantName}`, {
+      x: margin + 16,
+      y: y - 32,
+      size: 11,
+      font: fontBold,
+      color: rgb(0.08, 0.22, 0.12),
+    });
+    const markMeta = signedDateLabel
+      ? `Este documento quedo bloqueado tras la firma del ${signedDateLabel} y ya no admite una nueva firma.`
+      : "Este documento quedo bloqueado tras la firma registrada y ya no admite una nueva firma.";
+    const markLines = wrapText(markMeta, fontRegular, 9, contentWidth - 32);
+    let markY = y - 47;
+    for (const line of markLines.slice(0, 2)) {
+      page.drawText(line, {
+        x: margin + 16,
+        y: markY,
+        size: 9,
+        font: fontRegular,
+        color: rgb(0.11, 0.36, 0.2),
+      });
+      markY -= 12;
+    }
+    y -= markHeight + 18;
+  }
+
   page.drawText("Firma del participante", {
     x: margin,
     y,
     size: 11,
     font: fontBold,
-    color: rgb(0, 0, 0),
+    color: rgb(0.06, 0.09, 0.16),
   });
   y -= 12;
 
   const signatureBoxWidth = 220;
   const signatureBoxHeight = 68;
   const signatureBoxY = y - signatureBoxHeight + 4;
+
+  page.drawRectangle({
+    x: margin,
+    y: signatureBoxY - 2,
+    width: signatureBoxWidth,
+    height: signatureBoxHeight,
+    color: rgb(0.995, 0.996, 0.998),
+    borderColor: rgb(0.84, 0.88, 0.92),
+    borderWidth: 1,
+  });
 
   // Signature image
   if (signatureBytes) {
@@ -979,22 +1124,13 @@ async function buildReceiptPdf(
     start: { x: margin, y },
     end: { x: margin + signatureBoxWidth, y },
     thickness: 0.8,
-    color: rgb(0.65, 0.65, 0.65),
+    color: rgb(0.65, 0.69, 0.74),
   });
   y -= 18;
 
   // Signed date
-  if (receipt.employee_signed_at) {
-    const signedDate = new Date(receipt.employee_signed_at);
-    const dateStr = signedDate.toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "Europe/Madrid",
-    });
-    page.drawText(`Firmado: ${dateStr}`, {
+  if (signedDateLabel) {
+    page.drawText(`Firmado: ${signedDateLabel}`, {
       x: margin,
       y,
       size: 10,
@@ -1025,7 +1161,7 @@ async function buildReceiptPdf(
 
 function wrapText(
   text: string,
-  font: ReturnType<typeof StandardFonts.Helvetica extends infer T ? () => T : never>,
+  font: { widthOfTextAtSize(text: string, fontSize: number): number },
   fontSize: number,
   maxWidth: number,
 ): string[] {
@@ -1117,4 +1253,11 @@ function bytesToBase64(bytes: Uint8Array): string {
     chunks.push(String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 8192))));
   }
   return btoa(chunks.join(""));
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
 }

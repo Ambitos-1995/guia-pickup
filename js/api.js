@@ -298,7 +298,7 @@ var Api = (function () {
         }, { requiresAuth: true });
     }
 
-    // ── Acuerdos de participación (RD 2274/1985) ──────────────────────────────
+    // ── Acuerdos de participacion Punto Inclusivo ─────────────────────────────
 
     function getContract(contractId) {
         return postJson(FUNCTIONS_BASE + '/kiosk-contract', {
