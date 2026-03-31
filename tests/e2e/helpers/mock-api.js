@@ -42,6 +42,15 @@ function buildState(overrides = {}) {
       status: 'calculated',
       notes: ''
     },
+    myReceipt: {
+      id: 'receipt-1',
+      status: 'pending',
+      employee_name_snapshot: 'Ismael Perez',
+      hours_worked: 24,
+      hourly_rate: 13.02,
+      amount_earned: 312.5,
+      employee_signed_at: null
+    },
     scheduleSlots: [
       {
         id: 'slot-1',
@@ -63,6 +72,7 @@ function buildState(overrides = {}) {
       }
     ],
     createCalls: [],
+    receiptSignCalls: [],
     scheduleActionCalls: [],
     clockActionCalls: [],
     clockStatus: 'not_checked_in',
@@ -245,6 +255,27 @@ async function setupMockApi(page, overrides = {}) {
           org_keeps: 0
         };
         return fulfillJson(route, { success: true, data: state.paymentSummary });
+      }
+    }
+
+    if (url.pathname.endsWith('/kiosk-payment-receipt')) {
+      if (body.action === 'my-receipt') {
+        return fulfillJson(route, { success: true, data: state.myReceipt });
+      }
+
+      if (body.action === 'sign') {
+        state.receiptSignCalls.push(body);
+        if (!state.myReceipt || state.myReceipt.status !== 'pending') {
+          return fulfillJson(route, { success: false, message: 'El recibo ya esta firmado o no esta disponible.' }, 409);
+        }
+
+        state.myReceipt = {
+          ...state.myReceipt,
+          status: 'signed',
+          employee_signed_at: '2026-03-31T11:08:00.000Z'
+        };
+
+        return fulfillJson(route, { success: true });
       }
     }
 

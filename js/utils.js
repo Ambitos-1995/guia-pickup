@@ -197,12 +197,81 @@ var Utils = (function () {
 
     function getNormalizedSignatureDataUrl(pad) {
         if (!pad || typeof pad.toDataURL !== 'function') return '';
-        var dataUrl = String(pad.toDataURL('image/png') || '').trim();
+        var sourceCanvas = pad.canvas || (pad._ctx && pad._ctx.canvas) || null;
+        var dataUrl = '';
+        if (sourceCanvas && sourceCanvas.width && sourceCanvas.height) {
+            var ctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+            if (ctx) {
+                var imageData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+                var bounds = findInkBounds(imageData.data, sourceCanvas.width, sourceCanvas.height);
+                if (bounds) {
+                    var padX = Math.max(12, Math.round(bounds.width * 0.08));
+                    var padY = Math.max(10, Math.round(bounds.height * 0.2));
+                    var left = Math.max(0, bounds.left - padX);
+                    var top = Math.max(0, bounds.top - padY);
+                    var right = Math.min(sourceCanvas.width, bounds.right + padX);
+                    var bottom = Math.min(sourceCanvas.height, bounds.bottom + padY);
+                    var cropWidth = Math.max(1, right - left);
+                    var cropHeight = Math.max(1, bottom - top);
+                    var croppedCanvas = document.createElement('canvas');
+                    croppedCanvas.width = cropWidth;
+                    croppedCanvas.height = cropHeight;
+                    var croppedCtx = croppedCanvas.getContext('2d');
+                    if (croppedCtx) {
+                        croppedCtx.drawImage(
+                            sourceCanvas,
+                            left,
+                            top,
+                            cropWidth,
+                            cropHeight,
+                            0,
+                            0,
+                            cropWidth,
+                            cropHeight
+                        );
+                        dataUrl = String(croppedCanvas.toDataURL('image/png') || '').trim();
+                    }
+                }
+            }
+        }
+
+        if (!dataUrl) {
+            dataUrl = String(pad.toDataURL('image/png') || '').trim();
+        }
         var commaIndex = dataUrl.indexOf(',');
         if (commaIndex === -1) return dataUrl;
         var prefix = dataUrl.slice(0, commaIndex + 1);
         var base64 = dataUrl.slice(commaIndex + 1).replace(/\s+/g, '');
         return prefix + base64;
+    }
+
+    function findInkBounds(pixels, width, height) {
+        var minX = width;
+        var minY = height;
+        var maxX = -1;
+        var maxY = -1;
+
+        for (var y = 0; y < height; y++) {
+            for (var x = 0; x < width; x++) {
+                var alpha = pixels[(y * width + x) * 4 + 3];
+                if (alpha <= 8) continue;
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+                if (x > maxX) maxX = x;
+                if (y > maxY) maxY = y;
+            }
+        }
+
+        if (maxX < minX || maxY < minY) return null;
+
+        return {
+            left: minX,
+            top: minY,
+            right: maxX + 1,
+            bottom: maxY + 1,
+            width: maxX - minX + 1,
+            height: maxY - minY + 1
+        };
     }
 
     return {

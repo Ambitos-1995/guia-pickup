@@ -12,9 +12,13 @@ const swRegister = fs.readFileSync(path.join(root, 'js', 'sw-register.js'), 'utf
 const apiJs = fs.readFileSync(path.join(root, 'js', 'api.js'), 'utf8');
 const offlineQueueJs = fs.readFileSync(path.join(root, 'js', 'offline-clock-queue.js'), 'utf8');
 const guiaJs = fs.readFileSync(path.join(root, 'js', 'guia.js'), 'utf8');
+const stylesCss = fs.readFileSync(path.join(root, 'css', 'styles.css'), 'utf8');
 const paymentJs = fs.readFileSync(path.join(root, 'js', 'payment.js'), 'utf8');
+const adminJs = fs.readFileSync(path.join(root, 'js', 'admin.js'), 'utf8');
+const utilsJs = fs.readFileSync(path.join(root, 'js', 'utils.js'), 'utf8');
 const clockFunction = fs.readFileSync(path.join(root, 'supabase', 'functions', 'kiosk-clock', 'index.ts'), 'utf8');
 const supabaseConfig = fs.readFileSync(path.join(root, 'supabase', 'config.toml'), 'utf8');
+const receiptFunction = fs.readFileSync(path.join(root, 'supabase', 'functions', 'kiosk-payment-receipt', 'index.ts'), 'utf8');
 const queuedRecordSource = offlineQueueJs.slice(
   offlineQueueJs.indexOf('function buildQueuedRecord'),
   offlineQueueJs.indexOf('function generateClientEventId')
@@ -189,4 +193,22 @@ test('receipt signing reuses the authenticated user session without asking for t
   assert.doesNotMatch(startSigningSource, /showReceiptStep\('pin'\)/);
   assert.doesNotMatch(startSigningSource, /verifyReceiptPin\(\)/);
   assert.doesNotMatch(paymentJs, /La validacion del PIN ha caducado/);
+});
+
+test('signed receipts render an internal signed mark and explain that the document is blocked', () => {
+  assert.match(paymentJs, /receipt-doc-mark/);
+  assert.match(paymentJs, /Firma registrada/);
+  assert.match(paymentJs, /ya no admite una nueva firma/);
+  assert.match(stylesCss, /\.receipt-doc-mark/);
+  assert.match(stylesCss, /\.receipt-doc-mark-title/);
+});
+
+test('signature images are cropped and placed in pdfs without forced distortion', () => {
+  assert.match(utilsJs, /findInkBounds/);
+  assert.match(utilsJs, /getImageData\(0,\s*0,\s*sourceCanvas\.width,\s*sourceCanvas\.height\)/);
+  assert.match(adminJs, /drawContainedSignature/);
+  assert.match(adminJs, /cropSignatureDataUrl/);
+  assert.doesNotMatch(adminJs, /addImage\(data\.participant_sign_base64, 'PNG', margin, y, colW, 22\)/);
+  assert.match(receiptFunction, /containImage/);
+  assert.match(receiptFunction, /Firma del participante/);
 });

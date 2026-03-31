@@ -505,13 +505,7 @@ var Contract = (function () {
     }
 
     function getNormalizedSignatureDataUrl(pad) {
-        if (!pad || typeof pad.toDataURL !== 'function') return '';
-        var dataUrl = String(pad.toDataURL('image/png') || '').trim();
-        var commaIndex = dataUrl.indexOf(',');
-        if (commaIndex === -1) return dataUrl;
-        var prefix = dataUrl.slice(0, commaIndex + 1);
-        var base64 = dataUrl.slice(commaIndex + 1).replace(/\s+/g, '');
-        return prefix + base64;
+        return Utils.getNormalizedSignatureDataUrl(pad);
     }
 
     function showFeedback(message) {

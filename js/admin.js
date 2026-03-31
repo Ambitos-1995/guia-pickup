@@ -761,14 +761,16 @@ var Admin = (function () {
                 App.showToast('No se pudo obtener el acuerdo', 'error');
                 return;
             }
-            generateContractPdf(res.data);
+            generateContractPdf(res.data).catch(function () {
+                App.showToast('No se pudo generar el PDF del acuerdo', 'error');
+            });
         }).catch(function () {
             resetBtn();
             App.showToast('Error de conexion', 'error');
         });
     }
 
-    function generateContractPdf(data) {
+    async function generateContractPdf(data) {
         var jsPDF = window.jspdf && window.jspdf.jsPDF;
         if (!jsPDF) {
             App.showToast('Error: libreria PDF no disponible', 'error');
@@ -831,9 +833,12 @@ var Admin = (function () {
         y += closingLines.length * lineH + 12;
 
         // Signatures
-        checkPage(70);
+        checkPage(84);
         var colW = cw / 2 - 5;
         var rightX = margin + colW + 10;
+        var signatureBoxHeight = 26;
+        var participantSignature = await cropSignatureDataUrl(data.participant_sign_base64);
+        var adminSignature = await cropSignatureDataUrl(data.admin_sign_base64);
 
         doc.setDrawColor(180, 180, 180);
         doc.setLineWidth(0.3);
@@ -844,15 +849,17 @@ var Admin = (function () {
         doc.setFontSize(10);
         doc.text('El/la Participante:', margin, y);
         doc.text('Por la Fundacion:', rightX, y);
-        y += 6;
+        y += 7;
 
-        if (data.participant_sign_base64) {
-            try { doc.addImage(data.participant_sign_base64, 'PNG', margin, y, colW, 22); } catch (_e) { /* skip */ }
-        }
-        if (data.admin_sign_base64) {
-            try { doc.addImage(data.admin_sign_base64, 'PNG', rightX, y, colW, 22); } catch (_e) { /* skip */ }
-        }
-        y += 28;
+        drawContainedSignature(doc, participantSignature, margin, y, colW, signatureBoxHeight);
+        drawContainedSignature(doc, adminSignature, rightX, y, colW, signatureBoxHeight);
+        y += signatureBoxHeight + 4;
+
+        doc.setDrawColor(170, 170, 170);
+        doc.setLineWidth(0.25);
+        doc.line(margin, y, margin + colW, y);
+        doc.line(rightX, y, rightX + colW, y);
+        y += 7;
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
@@ -929,6 +936,118 @@ var Admin = (function () {
         } catch (_e) {
             return isoStr || '';
         }
+    }
+
+    function drawContainedSignature(doc, dataUrl, x, y, width, height) {
+        if (!dataUrl) return;
+
+        try {
+            var props = doc.getImageProperties(dataUrl);
+            if (!props || !props.width || !props.height) return;
+
+            var innerPadX = 4;
+            var innerPadY = 2;
+            var scale = Math.min(
+                (width - innerPadX * 2) / props.width,
+                (height - innerPadY * 2) / props.height,
+                2.4
+            );
+            var drawWidth = props.width * scale;
+            var drawHeight = props.height * scale;
+            var drawX = x + (width - drawWidth) / 2;
+            var drawY = y + (height - drawHeight) / 2;
+
+            doc.addImage(dataUrl, 'PNG', drawX, drawY, drawWidth, drawHeight);
+        } catch (_e) {
+            /* skip */
+        }
+    }
+
+    function cropSignatureDataUrl(dataUrl) {
+        return new Promise(function (resolve) {
+            var raw = String(dataUrl || '').trim();
+            if (!raw) {
+                resolve('');
+                return;
+            }
+
+            var img = new Image();
+            img.onload = function () {
+                try {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth || img.width;
+                    canvas.height = img.naturalHeight || img.height;
+                    var ctx = canvas.getContext('2d', { willReadFrequently: true });
+                    if (!ctx) {
+                        resolve(raw);
+                        return;
+                    }
+
+                    ctx.drawImage(img, 0, 0);
+                    var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    var bounds = findSignatureBounds(imageData.data, canvas.width, canvas.height);
+                    if (!bounds) {
+                        resolve(raw);
+                        return;
+                    }
+
+                    var padX = Math.max(12, Math.round(bounds.width * 0.08));
+                    var padY = Math.max(10, Math.round(bounds.height * 0.2));
+                    var left = Math.max(0, bounds.left - padX);
+                    var top = Math.max(0, bounds.top - padY);
+                    var right = Math.min(canvas.width, bounds.right + padX);
+                    var bottom = Math.min(canvas.height, bounds.bottom + padY);
+                    var cropWidth = Math.max(1, right - left);
+                    var cropHeight = Math.max(1, bottom - top);
+                    var cropped = document.createElement('canvas');
+                    cropped.width = cropWidth;
+                    cropped.height = cropHeight;
+                    var croppedCtx = cropped.getContext('2d');
+                    if (!croppedCtx) {
+                        resolve(raw);
+                        return;
+                    }
+
+                    croppedCtx.drawImage(canvas, left, top, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+                    resolve(cropped.toDataURL('image/png'));
+                } catch (_e) {
+                    resolve(raw);
+                }
+            };
+            img.onerror = function () {
+                resolve(raw);
+            };
+            img.src = raw;
+        });
+    }
+
+    function findSignatureBounds(pixels, width, height) {
+        var minX = width;
+        var minY = height;
+        var maxX = -1;
+        var maxY = -1;
+
+        for (var row = 0; row < height; row++) {
+            for (var col = 0; col < width; col++) {
+                var alpha = pixels[(row * width + col) * 4 + 3];
+                if (alpha <= 8) continue;
+                if (col < minX) minX = col;
+                if (row < minY) minY = row;
+                if (col > maxX) maxX = col;
+                if (row > maxY) maxY = row;
+            }
+        }
+
+        if (maxX < minX || maxY < minY) return null;
+
+        return {
+            left: minX,
+            top: minY,
+            right: maxX + 1,
+            bottom: maxY + 1,
+            width: maxX - minX + 1,
+            height: maxY - minY + 1
+        };
     }
 
     /* =========================================================

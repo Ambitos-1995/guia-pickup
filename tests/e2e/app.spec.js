@@ -244,6 +244,50 @@ test('employee session persists after reload while still valid', async ({ page }
   await expect(page.locator('#menu-login-btn')).toBeHidden();
 });
 
+test('employee can read the payment receipt before signing and it stays blocked after signing', async ({ page }) => {
+  const state = await setupMockApi(page);
+  await page.goto('/');
+  await enterPin(page, '1234');
+
+  await page.locator('#card-payment').click();
+  await expect(page.locator('#screen-payment.active')).toBeVisible();
+  await expect(page.locator('#receipt-document')).toBeVisible();
+  await expect(page.locator('#receipt-doc-body')).toContainText('Recibo personal de gratificacion mensual');
+  await expect(page.locator('#receipt-doc-body')).toContainText('Con tu firma electronica confirmas');
+
+  await page.locator('#receipt-btn-sign').click();
+  await expect(page.locator('#receipt-document')).toBeVisible();
+  await expect(page.locator('#receipt-step-sign')).toBeVisible();
+
+  await page.evaluate(() => {
+    if (!window.Payment || !window.Payment._debugApplyReceiptSignature) return false;
+    return window.Payment._debugApplyReceiptSignature([
+      {
+        color: '#000000',
+        points: [
+          { x: 60, y: 72, time: 0 },
+          { x: 150, y: 50, time: 1 },
+          { x: 240, y: 68, time: 2 }
+        ]
+      }
+    ]);
+  });
+  await expect(page.locator('#receipt-btn-confirm')).toBeEnabled();
+  await page.locator('#receipt-btn-confirm').click();
+  await page.locator('#receipt-btn-submit').click();
+
+  await expect(page.locator('#receipt-step-done')).toBeVisible();
+  await page.locator('#receipt-btn-done').click();
+
+  await expect(page.locator('#receipt-banner')).toBeVisible();
+  await expect(page.locator('#receipt-banner')).toContainText('Recibo firmado');
+  await expect(page.locator('#receipt-doc-body')).toContainText('Firmado el');
+  await expect(page.locator('#receipt-doc-body')).toContainText('Firma registrada');
+  await expect(page.locator('#receipt-doc-body')).toContainText('ya no admite una nueva firma');
+  await expect(page.locator('#receipt-btn-sign')).toHaveClass(/hidden/);
+  expect(state.receiptSignCalls).toHaveLength(1);
+});
+
 test('employee clock actions queue offline and sync automatically', async ({ page }) => {
   const state = await setupMockApi(page, { clockFailuresRemaining: 1 });
   const clockActions = () => state.clockActionCalls.filter((call) => call.action !== 'status');

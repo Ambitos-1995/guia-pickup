@@ -4202,10 +4202,71 @@ body {
     padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 14px;
     font-size: 0.95rem;
     line-height: 1.6;
     color: #334155;
+}
+.receipt-doc-title {
+    font-family: var(--font-display);
+    font-size: 1.12rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #0f172a;
+}
+.receipt-doc-paragraph {
+    margin: 0;
+    color: #334155;
+}
+.receipt-doc-mark {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(22, 101, 52, 0.18);
+    background:
+        linear-gradient(135deg, rgba(220, 252, 231, 0.92), rgba(240, 253, 244, 0.98)),
+        radial-gradient(circle at top right, rgba(22, 163, 74, 0.14), transparent 58%);
+    color: #14532d;
+}
+.receipt-doc-mark-icon {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(22, 163, 74, 0.12);
+    color: #15803d;
+}
+.receipt-doc-mark-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.receipt-doc-mark-eyebrow {
+    font-size: 0.74rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #15803d;
+}
+.receipt-doc-mark-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.4;
+    color: #14532d;
+}
+.receipt-doc-mark-meta {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: #166534;
+}
+.receipt-doc-grid {
+    display: grid;
+    gap: 12px;
 }
 .receipt-field {
     display: flex;
@@ -4215,6 +4276,12 @@ body {
     border-bottom: 1px solid #f1f5f9;
 }
 .receipt-field:last-child { border-bottom: none; padding-bottom: 0; }
+.receipt-field--highlight {
+    padding: 14px 16px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(227,30,36,0.08), rgba(227,30,36,0.02));
+    border: 1px solid rgba(227,30,36,0.14);
+}
 .receipt-field-label {
     font-size: 0.8rem;
     font-weight: 700;
@@ -4231,6 +4298,28 @@ body {
     font-size: 1.3rem;
     font-weight: 800;
     color: #15803d;
+}
+.receipt-doc-footer {
+    padding-top: 10px;
+    border-top: 1px solid rgba(15,23,42,0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.receipt-doc-footer-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+}
+.receipt-doc-footer-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+.receipt-doc-footer-value--signed {
+    color: #166534;
 }
 
 /* Signing steps */

@@ -942,30 +942,46 @@ async function buildReceiptPdf(
     y -= 16;
   }
 
-  y -= 20;
+  y -= 14;
+
+  page.drawText("Firma del participante", {
+    x: margin,
+    y,
+    size: 11,
+    font: fontBold,
+    color: rgb(0, 0, 0),
+  });
+  y -= 12;
+
+  const signatureBoxWidth = 220;
+  const signatureBoxHeight = 68;
+  const signatureBoxY = y - signatureBoxHeight + 4;
 
   // Signature image
   if (signatureBytes) {
     try {
       const pngImage = await pdfDoc.embedPng(signatureBytes);
-      const imgDims = pngImage.scale(0.5);
-      const maxWidth = 200;
-      const maxHeight = 80;
-      const scale = Math.min(maxWidth / imgDims.width, maxHeight / imgDims.height, 1);
-      const drawWidth = imgDims.width * scale;
-      const drawHeight = imgDims.height * scale;
+      const drawSize = containImage(pngImage.width, pngImage.height, signatureBoxWidth - 18, signatureBoxHeight - 12, 2.4);
 
       page.drawImage(pngImage, {
-        x: margin,
-        y: y - drawHeight,
-        width: drawWidth,
-        height: drawHeight,
+        x: margin + (signatureBoxWidth - drawSize.width) / 2,
+        y: signatureBoxY + (signatureBoxHeight - drawSize.height) / 2,
+        width: drawSize.width,
+        height: drawSize.height,
       });
-      y -= drawHeight + 10;
     } catch (err) {
       console.error("[kiosk-payment-receipt] Error embedding signature in PDF:", err);
     }
   }
+
+  y = signatureBoxY - 6;
+  page.drawLine({
+    start: { x: margin, y },
+    end: { x: margin + signatureBoxWidth, y },
+    thickness: 0.8,
+    color: rgb(0.65, 0.65, 0.65),
+  });
+  y -= 18;
 
   // Signed date
   if (receipt.employee_signed_at) {
@@ -1032,6 +1048,20 @@ function wrapText(
     lines.push(currentLine);
   }
   return lines;
+}
+
+function containImage(
+  width: number,
+  height: number,
+  maxWidth: number,
+  maxHeight: number,
+  maxScale = Number.POSITIVE_INFINITY,
+): { width: number; height: number } {
+  const scale = Math.min(maxWidth / width, maxHeight / height, maxScale);
+  return {
+    width: width * scale,
+    height: height * scale,
+  };
 }
 
 function decodeSignatureImage(
