@@ -465,6 +465,7 @@ var Payment = (function () {
                 receiptVerificationToken = '';
                 currentReceipt.status = 'signed';
                 currentReceipt.employee_signed_at = new Date().toISOString();
+                showReceiptBanner(currentReceipt);
                 showReceiptStep('done');
                 return;
             }

@@ -206,8 +206,11 @@ async function handleGenerate(
     `${url}/rest/v1/kiosk_payment_receipts?select=id,employee_id,status&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}&status=in.(pending,signed)`,
     { headers: authHeaders(key) },
   );
+  if (!existingRes.ok) {
+    return json({ success: false, message: "Error al comprobar los recibos existentes" }, 500);
+  }
 
-  const existingReceipts = existingRes.ok ? existingRes.data || [] : [];
+  const existingReceipts = existingRes.data || [];
   const receiptByEmployee = new Map<string, ReceiptRow>();
   for (const r of existingReceipts) {
     receiptByEmployee.set(r.employee_id, r);
@@ -248,7 +251,7 @@ async function handleGenerate(
 
   // Batch supersede in one PATCH
   if (toSupersede.length > 0) {
-    await fetchJson(
+    const supersedeRes = await fetchJson(
       `${url}/rest/v1/kiosk_payment_receipts?id=in.(${toSupersede.join(",")})&organization_id=eq.${orgId}`,
       {
         method: "PATCH",
@@ -260,6 +263,9 @@ async function handleGenerate(
         body: JSON.stringify({ status: "superseded", updated_at: new Date().toISOString() }),
       },
     );
+    if (!supersedeRes.ok) {
+      return json({ success: false, message: "Error al reemplazar recibos pendientes anteriores" }, 500);
+    }
   }
 
   // Batch insert all new receipts in one POST
@@ -277,7 +283,10 @@ async function handleGenerate(
         body: JSON.stringify(toInsert),
       },
     );
-    generated = insertRes.ok ? (insertRes.data?.length || 0) : 0;
+    if (!insertRes.ok) {
+      return json({ success: false, message: "Error al crear los recibos del mes" }, 500);
+    }
+    generated = insertRes.data?.length || 0;
   }
 
   await logAudit(url, key, {

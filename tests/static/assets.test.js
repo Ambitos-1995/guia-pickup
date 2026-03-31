@@ -13,6 +13,7 @@ const apiJs = fs.readFileSync(path.join(root, 'js', 'api.js'), 'utf8');
 const offlineQueueJs = fs.readFileSync(path.join(root, 'js', 'offline-clock-queue.js'), 'utf8');
 const guiaJs = fs.readFileSync(path.join(root, 'js', 'guia.js'), 'utf8');
 const clockFunction = fs.readFileSync(path.join(root, 'supabase', 'functions', 'kiosk-clock', 'index.ts'), 'utf8');
+const supabaseConfig = fs.readFileSync(path.join(root, 'supabase', 'config.toml'), 'utf8');
 const queuedRecordSource = offlineQueueJs.slice(
   offlineQueueJs.indexOf('function buildQueuedRecord'),
   offlineQueueJs.indexOf('function generateClientEventId')
@@ -167,4 +168,13 @@ test('offline queue stores only scoped clock credentials and requests storage pe
   assert.match(pinCacheSource, /offlineClockTokenExpiresAt:/);
   assert.doesNotMatch(pinCacheSource, /accessToken:/);
   assert.doesNotMatch(pinCacheSource, /expiresAt:/);
+});
+
+test('supabase function config includes kiosk payment receipt endpoint', () => {
+  assert.ok(
+    fs.existsSync(path.join(root, 'supabase', 'functions', 'kiosk-payment-receipt', 'index.ts')),
+    'kiosk-payment-receipt edge function source should exist'
+  );
+  assert.match(supabaseConfig, /\[functions\.kiosk-payment-receipt\]/);
+  assert.match(supabaseConfig, /\[functions\.kiosk-payment-receipt\][\s\S]*verify_jwt\s*=\s*false/);
 });
