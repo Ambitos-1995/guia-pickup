@@ -146,7 +146,8 @@ html.install-banner-active #screen-guia {
 }
 
 /* --- Utility --- */
-.hidden { display: none !important; }
+.hidden,
+.btn-xlarge.hidden { display: none !important; }
 
 .spinner {
     width: 28px;

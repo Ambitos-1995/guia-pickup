@@ -224,6 +224,10 @@ test('payment summary uses the same participant-facing amount wording across the
   assert.doesNotMatch(indexHtml, /Total ganado/);
 });
 
+test('hidden utility still hides xlarge action buttons after signing flows', () => {
+  assert.match(stylesCss, /\.btn-xlarge\.hidden \{\s*display: none !important;\s*\}/);
+});
+
 test('signature images are cropped and placed in pdfs without forced distortion', () => {
   assert.match(utilsJs, /findInkBounds/);
   assert.match(utilsJs, /getImageData\(0,\s*0,\s*sourceCanvas\.width,\s*sourceCanvas\.height\)/);
