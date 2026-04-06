@@ -1,4 +1,4 @@
-var CACHE_NAME = 'pickup-tmg-v79';
+var CACHE_NAME = 'pickup-tmg-v80';
 var FILES_TO_CACHE = [
     './index.html',
     './manifest.json',

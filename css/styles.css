@@ -4584,7 +4584,7 @@ body {
 }
 
 .btn-receipt-sign {
-    background: var(--brand);
+    background: var(--color-blue, #2563eb);
     color: #fff;
     border: none;
     border-radius: 8px;
