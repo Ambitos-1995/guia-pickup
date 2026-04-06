@@ -4,6 +4,7 @@ import {
   authHeaders,
   computeWorkedMinutes,
   corsHeaders,
+  initCors,
   fetchJson,
   getSupabaseConfig,
   isoWeekToDate,
@@ -25,6 +26,7 @@ interface RequestBody {
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  initCors(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
