@@ -148,14 +148,34 @@ var Utils = (function () {
     function bindPress(target, handler) {
         if (!target || typeof handler !== 'function') return function () {};
 
-        function onClick(event) {
+        var lastPointerPressAt = 0;
+
+        function invoke(event) {
             if (isDisabled(target)) return;
             handler.call(target, event);
         }
 
+        function onPointerUp(event) {
+            if (!event || event.pointerType === 'mouse') return;
+            lastPointerPressAt = Date.now();
+            invoke(event);
+            if (typeof event.preventDefault === 'function') {
+                event.preventDefault();
+            }
+        }
+
+        function onClick(event) {
+            if (lastPointerPressAt && (Date.now() - lastPointerPressAt) < 700) {
+                return;
+            }
+            invoke(event);
+        }
+
+        target.addEventListener('pointerup', onPointerUp);
         target.addEventListener('click', onClick);
 
         return function () {
+            target.removeEventListener('pointerup', onPointerUp);
             target.removeEventListener('click', onClick);
         };
     }
@@ -163,15 +183,35 @@ var Utils = (function () {
     function delegatePress(container, selector, handler) {
         if (!container || !selector || typeof handler !== 'function') return function () {};
 
-        function onClick(event) {
+        var lastPointerPressAt = 0;
+
+        function invoke(event) {
             var matched = closest(event.target, selector, container);
             if (!matched || isDisabled(matched)) return;
             handler.call(matched, event, matched);
         }
 
+        function onPointerUp(event) {
+            if (!event || event.pointerType === 'mouse') return;
+            lastPointerPressAt = Date.now();
+            invoke(event);
+            if (typeof event.preventDefault === 'function') {
+                event.preventDefault();
+            }
+        }
+
+        function onClick(event) {
+            if (lastPointerPressAt && (Date.now() - lastPointerPressAt) < 700) {
+                return;
+            }
+            invoke(event);
+        }
+
+        container.addEventListener('pointerup', onPointerUp);
         container.addEventListener('click', onClick);
 
         return function () {
+            container.removeEventListener('pointerup', onPointerUp);
             container.removeEventListener('click', onClick);
         };
     }

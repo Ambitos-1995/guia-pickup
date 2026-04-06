@@ -21,7 +21,9 @@ var PinPad = (function () {
             enabled: true,
             busy: false,
             dots: [],
-            keypadHandler: null
+            keypadHandler: null,
+            keypadPointerHandler: null,
+            lastPointerPressAt: 0
         };
 
         instance.dots = instance.dotsEl ? instance.dotsEl.querySelectorAll('.pin-dot') : [];
@@ -83,7 +85,25 @@ var PinPad = (function () {
 
     function bindKeypad(instance) {
         if (!instance.keypadEl) return;
+        instance.keypadPointerHandler = function (event) {
+            if (!event || event.pointerType === 'mouse') return;
+            instance.lastPointerPressAt = Date.now();
+            handleKeypadPress(instance, event);
+            if (typeof event.preventDefault === 'function') {
+                event.preventDefault();
+            }
+        };
         instance.keypadHandler = function (event) {
+            if (instance.lastPointerPressAt && (Date.now() - instance.lastPointerPressAt) < 700) {
+                return;
+            }
+            handleKeypadPress(instance, event);
+        };
+        instance.keypadEl.addEventListener('pointerup', instance.keypadPointerHandler);
+        instance.keypadEl.addEventListener('click', instance.keypadHandler);
+    }
+
+    function handleKeypadPress(instance, event) {
             var button = event.target && event.target.closest ? event.target.closest('.key-btn') : null;
             var key;
             if (!button || !instance.keypadEl.contains(button) || button.disabled || !canInteract(instance)) {
@@ -99,14 +119,14 @@ var PinPad = (function () {
             if (key) {
                 addDigit(instance, key);
             }
-        };
-        instance.keypadEl.addEventListener('click', instance.keypadHandler);
     }
 
     function unbindKeypad(instance) {
         if (!instance.keypadEl || !instance.keypadHandler) return;
+        instance.keypadEl.removeEventListener('pointerup', instance.keypadPointerHandler);
         instance.keypadEl.removeEventListener('click', instance.keypadHandler);
         instance.keypadHandler = null;
+        instance.keypadPointerHandler = null;
     }
 
     function bindKeyboard() {

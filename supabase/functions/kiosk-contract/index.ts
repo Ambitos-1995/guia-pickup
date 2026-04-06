@@ -7,6 +7,7 @@ import {
   base64UrlEncode,
   base64UrlEncodeBytes,
   corsHeaders,
+  initCors,
   fetchJson,
   getClientIp,
   getRateLimitStatus,
@@ -77,6 +78,7 @@ interface ContractRow {
 
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  initCors(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

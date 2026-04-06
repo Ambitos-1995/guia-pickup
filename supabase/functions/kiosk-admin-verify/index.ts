@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import {
   corsHeaders,
+  initCors,
   getClientIp,
   getSessionSecret,
   getSupabaseConfig,
@@ -30,6 +31,7 @@ interface VerifyBody {
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  initCors(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

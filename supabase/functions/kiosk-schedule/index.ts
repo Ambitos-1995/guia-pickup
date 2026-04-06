@@ -3,6 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   authHeaders,
   corsHeaders,
+  initCors,
   fetchJson,
   json,
   logAudit,
@@ -36,6 +37,7 @@ type ScheduleSession = {
 const TIME_REGEX = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/;
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  initCors(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

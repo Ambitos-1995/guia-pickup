@@ -1,11 +1,31 @@
 import Argon2id from "jsr:@rabbit-company/argon2id";
 
+function parseAllowedOrigins(rawValue: string | undefined): string[] {
+  return String(rawValue || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+const configuredAllowedOrigins = parseAllowedOrigins(
+  Deno.env.get("KIOSK_ALLOWED_ORIGINS") || Deno.env.get("EDGE_ALLOWED_ORIGINS"),
+);
+
 export const corsHeaders: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": configuredAllowedOrigins[0] || "*",
   "Access-Control-Allow-Headers": "authorization, content-type, x-kiosk-clock-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 };
+
+/** Call at the start of every handler to set the correct CORS origin for the request. */
+export function initCors(req: Request): void {
+  if (configuredAllowedOrigins.length <= 1) return;
+  const origin = req.headers.get("origin") || "";
+  corsHeaders["Access-Control-Allow-Origin"] =
+    configuredAllowedOrigins.includes(origin) ? origin : configuredAllowedOrigins[0];
+  corsHeaders["Vary"] = "Origin";
+}
 
 export const APP_TIME_ZONE = "Europe/Madrid";
 

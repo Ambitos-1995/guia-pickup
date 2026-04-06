@@ -212,6 +212,16 @@ var App = (function () {
     }
 
     function logout() {
+        var activeSession = getSession();
+        if (activeSession && typeof Api !== 'undefined' && Api.logout) {
+            Api.logout({
+                accessToken: activeSession.accessToken,
+                silentAuthFailure: true,
+                suppressTouchSession: true
+            }).catch(function () {
+                // best-effort server-side revocation
+            });
+        }
         clearSession();
         Pin.openForLogin('screen-menu', 'screen-menu');
         navigate('screen-pin');

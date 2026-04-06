@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import {
   corsHeaders,
+  initCors,
   createPinLookupHash,
   currentAttendanceStatus,
   fetchJson,
@@ -19,6 +20,7 @@ import {
   logUnhandledEdgeError,
   madridDateIso,
   recordAuthAttempt,
+  revokeSession,
   requireSession,
   resolveEmployeeByPin,
   resolveOrgId,
@@ -45,6 +47,7 @@ interface RequestBody {
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  initCors(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -74,6 +77,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     if (action === "verify") {
       return await handleVerify(req, url, serviceRoleKey, orgId, body);
+    }
+
+    if (action === "logout") {
+      const auth = await requireSession(req, url, serviceRoleKey, ["respondent", "org_admin"]);
+      if (auth instanceof Response) {
+        return auth;
+      }
+
+      if (auth.session.organization_id !== orgId) {
+        return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
+      }
+
+      return await handleLogout(url, serviceRoleKey, auth.session);
     }
 
     const auth = await requireSession(req, url, serviceRoleKey, ["org_admin"]);
@@ -307,6 +323,30 @@ async function handleVerify(
       organizationId: orgId,
     },
   });
+}
+
+async function handleLogout(
+  supabaseUrl: string,
+  key: string,
+  session: {
+    id: string;
+    organization_id: string;
+    role: "respondent" | "org_admin";
+    employee_id: string | null;
+  },
+): Promise<Response> {
+  await Promise.all([
+    revokeSession(supabaseUrl, key, session.id),
+    logAudit(supabaseUrl, key, {
+      organizationId: session.organization_id,
+      actorSessionId: session.id,
+      actorRole: session.role,
+      employeeId: session.employee_id,
+      action: "session_logout",
+    }),
+  ]);
+
+  return json({ success: true });
 }
 
 async function handleList(

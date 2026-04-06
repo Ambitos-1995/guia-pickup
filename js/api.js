@@ -4,8 +4,15 @@
 var Api = (function () {
     'use strict';
 
-    var ORG_SLUG = 'ambitos';
-    var SUPABASE_PROJECT_URL = 'https://mzuvkinwebqgmnutchsv.supabase.co';
+    var runtimeConfig = (typeof window !== 'undefined' && window.__SEUR_CONFIG__ && typeof window.__SEUR_CONFIG__ === 'object')
+        ? window.__SEUR_CONFIG__
+        : {};
+    var ORG_SLUG = (typeof runtimeConfig.orgSlug === 'string' && runtimeConfig.orgSlug.trim())
+        ? runtimeConfig.orgSlug.trim()
+        : 'ambitos';
+    var SUPABASE_PROJECT_URL = (typeof runtimeConfig.supabaseProjectUrl === 'string' && runtimeConfig.supabaseProjectUrl.trim())
+        ? runtimeConfig.supabaseProjectUrl.replace(/\/+$/, '')
+        : 'https://mzuvkinwebqgmnutchsv.supabase.co';
     var FUNCTIONS_BASE = SUPABASE_PROJECT_URL + '/functions/v1';
 
     function postJson(url, body, options) {
@@ -71,6 +78,13 @@ var Api = (function () {
             orgSlug: ORG_SLUG,
             pin: pin
         });
+    }
+
+    function logout(options) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-employees', {
+            action: 'logout',
+            orgSlug: ORG_SLUG
+        }, buildAuthOptions(options));
     }
 
     function buildAuthOptions(options) {
@@ -432,7 +446,6 @@ var Api = (function () {
     }
 
     function reportClientError(payload) {
-        var session = (typeof App !== 'undefined' && App.getSession) ? App.getSession() : null;
         return postJson(FUNCTIONS_BASE + '/kiosk-report', {
             orgSlug: ORG_SLUG,
             route: (window.location && window.location.pathname) || '',
@@ -444,9 +457,12 @@ var Api = (function () {
                 stack: payload.stack || null,
                 source: payload.source || null,
                 lineno: payload.lineno || null,
-                colno: payload.colno || null,
-                employeeId: session ? (session.employeeId || null) : null
+                colno: payload.colno || null
             }
+        }, {
+            requiresAuth: true,
+            silentAuthFailure: true,
+            suppressTouchSession: true
         });
     }
 
@@ -454,6 +470,7 @@ var Api = (function () {
         ORG_SLUG: ORG_SLUG,
         verifyPin: verifyPin,
         verifyAdminPin: verifyAdminPin,
+        logout: logout,
         checkIn: checkIn,
         checkOut: checkOut,
         getClockStatus: getClockStatus,

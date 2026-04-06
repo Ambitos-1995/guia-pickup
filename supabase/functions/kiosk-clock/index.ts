@@ -6,6 +6,7 @@ import {
   autoCloseStaleCheckIns,
   buildMadridDateTime,
   corsHeaders,
+  initCors,
   fetchJson,
   getAttendanceDayState,
   isoWeekInfoFromClientDate,
@@ -51,6 +52,7 @@ const MAX_CLIENT_TIMESTAMP_AGE_MS = 72 * 60 * 60 * 1000;
 const MAX_CLIENT_TIMESTAMP_FUTURE_MS = 5 * 60 * 1000;
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  initCors(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

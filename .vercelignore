@@ -1,0 +1,14 @@
+.git
+.tmp
+.vercel
+node_modules
+supabase
+tests
+test-results
+docs
+scripts
+skills
+CLAUDE.md
+package.json
+package-lock.json
+playwright.config.cjs
