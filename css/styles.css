@@ -91,9 +91,7 @@ body {
     height: 100%;
 }
 
-@media (display-mode: standalone) {
-    body { overscroll-behavior: none; }
-}
+html, body { overscroll-behavior-y: contain; }
 
 /* --- Screen System --- */
 .screen {

@@ -163,7 +163,20 @@ async function handleCreate(
   const employeeId = String(body.employeeId || "").trim();
   if (!employeeId) return json({ success: false, message: "Falta employeeId" }, 400);
   if (!body.activityDescription) return json({ success: false, message: "Falta activityDescription" }, 400);
-  if (!body.representativeName) return json({ success: false, message: "Falta representativeName" }, 400);
+
+  let representativeName = String(body.representativeName || "").trim();
+  if (!representativeName) {
+    const orgRes = await fetchJson<{ settings: Record<string, unknown> }[]>(
+      `${url}/rest/v1/organizations?select=settings&id=eq.${orgId}&limit=1`,
+      { headers: authHeaders(key) },
+    );
+    representativeName = String(
+      (orgRes.ok && orgRes.data?.[0]?.settings?.legal_representative_name) || "",
+    ).trim();
+  }
+  if (!representativeName) {
+    return json({ success: false, message: "Falta representativeName y no hay representante configurado en la organizacion" }, 400);
+  }
 
   const payload = {
     organization_id: orgId,
@@ -172,7 +185,7 @@ async function handleCreate(
     activity_description: body.activityDescription,
     schedule: body.schedule || "Segun turnos asignados semanalmente",
     validity_text: body.validityText || "3 meses, renovable",
-    representative_name: body.representativeName,
+    representative_name: representativeName,
     status: "pending_participant",
   };
 

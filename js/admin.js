@@ -660,14 +660,11 @@ var Admin = (function () {
 
     function createAcuerdo() {
         var empSelect = document.getElementById('acuerdo-emp-select');
-        var representanteInput = document.getElementById('acuerdo-representante');
         var empId = empSelect ? String(empSelect.value || '').trim() : '';
-        var representante = representanteInput ? String(representanteInput.value || '').trim() : '';
 
         hideFeedback('acuerdo-form-feedback');
 
-        if (!empId)         { showFeedback('acuerdo-form-feedback', 'error', 'Selecciona un participante.'); return; }
-        if (!representante) { showFeedback('acuerdo-form-feedback', 'error', 'Escribe el nombre del representante.'); return; }
+        if (!empId) { showFeedback('acuerdo-form-feedback', 'error', 'Selecciona un participante.'); return; }
 
         var btn = document.getElementById('admin-acuerdo-crear');
         if (btn) { btn.disabled = true; btn.textContent = 'Creando...'; }
@@ -676,17 +673,14 @@ var Admin = (function () {
             employeeId:          empId,
             activityDescription: 'Gesti\u00f3n del Punto de Entrega SEUR \u2014 Punto Inclusivo',
             schedule:            'Seg\u00fan turnos elegidos libremente por el/la Participante',
-            validityText:        '3 meses, renovable autom\u00e1ticamente',
-            representativeName:  representante
+            validityText:        '3 meses, renovable autom\u00e1ticamente'
         }).then(function (res) {
             if (btn) { btn.disabled = false; btn.textContent = 'Crear acuerdo'; }
 
             if (res && res.success) {
                 showFeedback('acuerdo-form-feedback', 'success', 'Acuerdo creado correctamente.', 3000);
                 var s = document.getElementById('acuerdo-emp-select');
-                var r = document.getElementById('acuerdo-representante');
                 if (s) s.value = '';
-                if (r) r.value = '';
                 toggleAcuerdoForm();
                 loadAcuerdosList();
             } else {
