@@ -150,6 +150,28 @@ test('direct route exposes the manual update action and requests skip waiting', 
   }).toEqual([{ type: 'SKIP_WAITING' }]);
 });
 
+test('admin shows the installed-app update banner and routes back to menu for a safe refresh', async ({ page }) => {
+  await enableSwTestApi(page);
+  await setupMockApi(page);
+  await page.goto('/');
+  await page.waitForFunction(() => !!window.__swRegisterTestApi);
+
+  await enterPin(page, '123456');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.locator('#menu-admin-shortcut').click();
+  await expect(page.locator('#screen-admin.active')).toBeVisible();
+
+  await page.evaluate(() => window.__swRegisterTestApi.setWaitingWorkerForTest());
+
+  await expect(page.locator('#admin-update-banner')).toBeVisible();
+  await expect(page.locator('#admin-update-message')).toContainText('Vuelve al menu');
+  await expect(page.locator('#update-btn')).toBeHidden();
+
+  await page.locator('#admin-update-action').click();
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await expect(page.locator('#update-btn')).toBeVisible();
+});
+
 test('main PIN layout fits inside a short mobile viewport', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await setupMockApi(page);
@@ -244,48 +266,35 @@ test('employee session persists after reload while still valid', async ({ page }
   await expect(page.locator('#menu-login-btn')).toBeHidden();
 });
 
-test('employee can read the payment receipt before signing and it stays blocked after signing', async ({ page }) => {
-  const state = await setupMockApi(page);
+test('employee payment receipt stays read-only once signed and never exposes the signing flow', async ({ page }) => {
+  const state = await setupMockApi(page, {
+    myReceipt: {
+      id: 'receipt-1',
+      status: 'signed',
+      employee_name_snapshot: 'Ismael Perez',
+      hours_worked: 24,
+      hourly_rate: 13.02,
+      amount_earned: 312.5,
+      employee_signed_at: '2026-03-31T11:08:00.000Z'
+    }
+  });
   await page.goto('/');
   await enterPin(page, '1234');
 
   await page.locator('#card-payment').click();
   await expect(page.locator('#screen-payment.active')).toBeVisible();
   await expect(page.locator('#receipt-document')).toBeVisible();
-  await expect(page.locator('#receipt-doc-body')).toContainText('Recibo personal de gratificacion terapeutico-ocupacional');
-  await expect(page.locator('#receipt-doc-body')).toContainText("programa de rehabilitacion psicosocial 'Punto Inclusivo' de Fundacion Ambitos");
-
-  await page.locator('#receipt-btn-sign').click();
-  await expect(page.locator('#receipt-document')).toBeVisible();
-  await expect(page.locator('#receipt-step-sign')).toBeVisible();
-
-  await page.evaluate(() => {
-    if (!window.Payment || !window.Payment._debugApplyReceiptSignature) return false;
-    return window.Payment._debugApplyReceiptSignature([
-      {
-        color: '#000000',
-        points: [
-          { x: 60, y: 72, time: 0 },
-          { x: 150, y: 50, time: 1 },
-          { x: 240, y: 68, time: 2 }
-        ]
-      }
-    ]);
-  });
-  await expect(page.locator('#receipt-btn-confirm')).toBeEnabled();
-  await page.locator('#receipt-btn-confirm').click();
-  await page.locator('#receipt-btn-submit').click();
-
-  await expect(page.locator('#receipt-step-done')).toBeVisible();
-  await page.locator('#receipt-btn-done').click();
+  await expect(page.locator('#receipt-doc-body')).toContainText('Recibo personal de gratificacion');
+  await expect(page.locator('#receipt-doc-body')).toContainText('Punto Inclusivo');
 
   await expect(page.locator('#receipt-banner')).toBeVisible();
   await expect(page.locator('#receipt-banner')).toContainText('Recibo firmado');
   await expect(page.locator('#receipt-doc-body')).toContainText('Firmado el');
   await expect(page.locator('#receipt-doc-body')).toContainText('Firma registrada');
   await expect(page.locator('#receipt-doc-body')).toContainText('ya no admite una nueva firma');
-  await expect(page.locator('#receipt-btn-sign')).toHaveClass(/hidden/);
-  expect(state.receiptSignCalls).toHaveLength(1);
+  await expect(page.locator('#receipt-btn-sign')).toHaveCount(0);
+  await expect(page.locator('#receipt-step-sign')).toHaveCount(0);
+  expect(state.receiptSignCalls).toHaveLength(0);
 });
 
 test('employee clock actions queue offline and sync automatically', async ({ page }) => {
@@ -492,6 +501,7 @@ test('admin can load payments and save a configured amount', async ({ page }) =>
   await page.locator('#menu-admin-shortcut').click();
   await expect(page.locator('#screen-admin.active')).toBeVisible();
   await expect(page.locator('#admin-build-version')).toContainText(/Version \d{4}\.\d{2}\.\d{2}-r\d+/);
+  await page.locator('#admin-pay-prev').click();
   await expect(page.locator('#admin-pay-summary-status')).toContainText('Sin configurar');
 
   await page.locator('#admin-pay-amount').fill('1250');
@@ -527,7 +537,7 @@ test('admin can create a new employee from ajustes empleados', async ({ page }) 
   await expect.poll(() => state.createCalls[0].role).toBe('employee');
 });
 
-test('admin can create a contract from the mobile participant picker', async ({ page }) => {
+test('admin can create a contract from the mobile native participant selector', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const state = await setupMockApi(page);
   await page.goto('/');
@@ -541,15 +551,19 @@ test('admin can create a contract from the mobile participant picker', async ({ 
   await expect(page.locator('#admin-acuerdo-list')).toContainText('Ismael Perez');
 
   await page.locator('#admin-acuerdo-nuevo').click();
-  await expect(page.locator('#acuerdo-employee-picker .acuerdo-picker-option')).toHaveCount(2);
-  await expect(page.locator('#acuerdo-employee-picker')).not.toContainText('Marta Admin');
+  await expect(page.locator('#modal-acuerdo-create')).toBeVisible();
+  await expect(page.locator('#acuerdo-emp-select')).toBeVisible();
+  await expect(page.locator('#acuerdo-emp-select')).toBeEnabled();
   await expect(page.locator('#admin-acuerdo-crear')).toBeDisabled();
 
-  await page.locator('#acuerdo-employee-picker .acuerdo-picker-option', { hasText: 'Nora Diaz' }).click();
+  const optionTexts = (await page.locator('#acuerdo-emp-select option').allTextContents()).map((value) => value.trim());
+  expect(optionTexts).toEqual(['Seleccionar participante...', 'Ismael Perez', 'Nora Diaz']);
+
+  await page.locator('#acuerdo-emp-select').selectOption('emp-4');
   await expect(page.locator('#admin-acuerdo-crear')).toBeEnabled();
   await page.locator('#admin-acuerdo-crear').click();
 
-  await expect(page.locator('#acuerdo-form-feedback')).toContainText('Contrato creado correctamente.');
+  await expect(page.locator('#modal-acuerdo-create')).toBeHidden();
   await expect(page.locator('#admin-acuerdo-list')).toContainText('Nora Diaz');
   await expect.poll(() => state.contractCreateCalls.length).toBe(1);
   await expect.poll(() => state.contractCreateCalls[0].employeeId).toBe('emp-4');
@@ -581,6 +595,22 @@ test('admin tabs stay usable on a narrow mobile viewport including ajustes', asy
   await page.locator('.admin-tab', { hasText: 'Ajustes' }).click();
   await expect(page.locator('#admin-ajustes.active')).toBeVisible();
   await expect(page.locator('#admin-setting-legal-rep')).toHaveValue('Marta Admin');
+
+  const activeTabMetrics = await page.evaluate(() => {
+    const tabs = document.getElementById('admin-tabs');
+    const activeTab = tabs.querySelector('.admin-tab.active');
+    const tabsRect = tabs.getBoundingClientRect();
+    const tabRect = activeTab.getBoundingClientRect();
+    return {
+      left: Math.round(tabRect.left),
+      right: Math.round(tabRect.right),
+      containerLeft: Math.round(tabsRect.left),
+      containerRight: Math.round(tabsRect.right)
+    };
+  });
+
+  expect(activeTabMetrics.left).toBeGreaterThanOrEqual(activeTabMetrics.containerLeft);
+  expect(activeTabMetrics.right).toBeLessThanOrEqual(activeTabMetrics.containerRight);
 });
 
 test('admin layouts fit inside a short mobile viewport', async ({ page }) => {
@@ -599,19 +629,21 @@ test('admin layouts fit inside a short mobile viewport', async ({ page }) => {
     const screen = document.querySelector('#screen-admin.active');
     const section = document.querySelector('#screen-admin.active .admin-section:not(.hidden)');
     const scroller = document.scrollingElement || document.documentElement;
+    const sectionStyles = window.getComputedStyle(section);
 
     return {
       viewport: window.innerHeight,
       screenBottom: Math.ceil(screen.getBoundingClientRect().bottom),
       screenOverflow: Math.max(0, screen.scrollHeight - screen.clientHeight),
       sectionOverflow: Math.max(0, section.scrollHeight - section.clientHeight),
+      sectionOverflowY: sectionStyles.overflowY,
       docOverflow: Math.max(0, scroller.scrollHeight - window.innerHeight)
     };
   });
 
   expect(paymentsMetrics.screenBottom).toBeLessThanOrEqual(paymentsMetrics.viewport);
   expect(paymentsMetrics.screenOverflow).toBeLessThanOrEqual(2);
-  expect(paymentsMetrics.sectionOverflow).toBeLessThanOrEqual(2);
+  expect(paymentsMetrics.sectionOverflowY).toBe('auto');
   expect(paymentsMetrics.docOverflow).toBeLessThanOrEqual(2);
 
   await page.locator('.admin-tab', { hasText: 'Empleados' }).click();
@@ -620,14 +652,16 @@ test('admin layouts fit inside a short mobile viewport', async ({ page }) => {
   const employeeMetrics = await page.evaluate(() => {
     const screen = document.querySelector('#screen-admin.active');
     const section = document.querySelector('#screen-admin.active .admin-section:not(.hidden)');
+    const sectionStyles = window.getComputedStyle(section);
     return {
       screenOverflow: Math.max(0, screen.scrollHeight - screen.clientHeight),
-      sectionOverflow: Math.max(0, section.scrollHeight - section.clientHeight)
+      sectionOverflow: Math.max(0, section.scrollHeight - section.clientHeight),
+      sectionOverflowY: sectionStyles.overflowY
     };
   });
 
   expect(employeeMetrics.screenOverflow).toBeLessThanOrEqual(2);
-  expect(employeeMetrics.sectionOverflow).toBeLessThanOrEqual(2);
+  expect(employeeMetrics.sectionOverflowY).toBe('auto');
 
   await page.locator('.btn-edit-emp').first().click();
 

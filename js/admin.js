@@ -8,10 +8,19 @@ var Admin = (function () {
     var currentYear, currentMonth;
     var receiptYear, receiptMonth;
     var newFormVisible     = false;
-    var acuerdoFormVisible = false;
+    var acuerdoModalVisible = false;
     var employeeSelectCache = null;
     var selectedContractEmployeeId = '';
     var contractEmployeeOptionsLoading = false;
+    var contractEmployeeLoadError = '';
+    var contractCreateInFlight = false;
+    var acuerdoReturnFocusEl = null;
+    var adminUpdateState = {
+        available: false,
+        safeToReload: false,
+        pendingReload: false
+    };
+    var adminUpdateTracked = false;
 
     var CALC_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="16" y1="18" x2="16" y2="18"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="8" y1="10" x2="16" y2="10"/></svg>';
     var SPINNER_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
@@ -54,31 +63,7 @@ var Admin = (function () {
         var tabs = document.querySelectorAll('.admin-tab');
         Utils.each(tabs, function (tab) {
             Utils.bindPress(tab, function () {
-                Utils.each(tabs, function (item) { item.classList.remove('active'); });
-                tab.classList.add('active');
-
-                Utils.each(document.querySelectorAll('.admin-section'), function (section) {
-                    section.classList.add('hidden');
-                    section.classList.remove('active');
-                });
-
-                var target = document.getElementById(tab.dataset.tab);
-                if (target) {
-                    target.classList.remove('hidden');
-                    target.classList.add('active');
-
-                    if (target.id === 'admin-payments') {
-                        loadPayMonth();
-                    } else if (target.id === 'admin-employees') {
-                        loadEmployees();
-                    } else if (target.id === 'admin-acuerdos') {
-                        loadAcuerdosList();
-                    } else if (target.id === 'admin-recibos') {
-                        loadReceiptMonth();
-                    } else if (target.id === 'admin-ajustes') {
-                        loadOrgSettings();
-                    }
-                }
+                activateAdminTab(tab.dataset.tab);
             });
         });
 
@@ -115,13 +100,30 @@ var Admin = (function () {
         }
 
         /* --- Acuerdos --- */
-        Utils.bindPress(document.getElementById('admin-acuerdo-nuevo'), toggleAcuerdoForm);
+        Utils.bindPress(document.getElementById('admin-acuerdo-nuevo'), openAcuerdoComposer);
         Utils.bindPress(document.getElementById('admin-acuerdo-crear'), createAcuerdo);
+        Utils.bindPress(document.getElementById('admin-acuerdo-close'), closeAcuerdoComposer);
+        Utils.bindPress(document.getElementById('admin-acuerdo-cancel'), closeAcuerdoComposer);
+        Utils.bindPress(document.getElementById('admin-acuerdo-retry'), retryContractEmployeeLoad);
         var nativeEmployeeSelect = document.getElementById('acuerdo-emp-select');
         if (nativeEmployeeSelect) {
             nativeEmployeeSelect.addEventListener('change', function () {
                 setSelectedContractEmployee(nativeEmployeeSelect.value || '');
             });
+        }
+        var acuerdoModal = document.getElementById('modal-acuerdo-create');
+        if (acuerdoModal) {
+            acuerdoModal.addEventListener('click', function (event) {
+                if (event.target === acuerdoModal) {
+                    closeAcuerdoComposer();
+                }
+            });
+        }
+        document.addEventListener('keydown', onAdminKeyDown);
+        window.addEventListener('sw-update-statechange', handleSwUpdateStateChange);
+        window.addEventListener('app-screenchange', handleAdminScreenChange);
+        if (window.ServiceWorkerUpdate && typeof window.ServiceWorkerUpdate.getState === 'function') {
+            adminUpdateState = window.ServiceWorkerUpdate.getState();
         }
 
         /* --- Recibos --- */
@@ -147,6 +149,7 @@ var Admin = (function () {
 
         /* --- Ajustes --- */
         Utils.bindPress(document.getElementById('admin-settings-save'), saveOrgSettings);
+        Utils.bindPress(document.getElementById('admin-update-action'), handleAdminUpdateAction);
 
         /* Active toggle in edit modal */
         var toggleBtn = document.getElementById('edit-emp-active');
@@ -157,6 +160,70 @@ var Admin = (function () {
                 if (label) label.textContent = toggleBtn.classList.contains('active') ? 'Activo' : 'Inactivo';
             });
         }
+
+        syncAdminUpdateBanner();
+    }
+
+    function activateAdminTab(tabId) {
+        var tabs = document.querySelectorAll('.admin-tab');
+        var sections = document.querySelectorAll('.admin-section');
+        var activeTab = document.querySelector('.admin-tab[data-tab="' + tabId + '"]');
+        var target = document.getElementById(tabId);
+
+        if (!activeTab || !target) return;
+
+        Utils.each(tabs, function (item) {
+            var isActive = item === activeTab;
+            item.classList.toggle('active', isActive);
+            item.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
+
+        Utils.each(sections, function (section) {
+            var isTarget = section === target;
+            section.classList.toggle('hidden', !isTarget);
+            section.classList.toggle('active', isTarget);
+        });
+
+        if (tabId !== 'admin-acuerdos' && acuerdoModalVisible) {
+            closeAcuerdoComposer({ restoreFocus: false, preserveSelection: false });
+        }
+
+        scrollAdminTabIntoView(activeTab);
+        loadAdminTabContent(tabId);
+        syncAdminUpdateBanner();
+    }
+
+    function loadAdminTabContent(tabId) {
+        if (tabId === 'admin-payments') {
+            loadPayMonth();
+            return;
+        }
+        if (tabId === 'admin-employees') {
+            loadEmployees();
+            return;
+        }
+        if (tabId === 'admin-acuerdos') {
+            loadAcuerdosList();
+            return;
+        }
+        if (tabId === 'admin-recibos') {
+            loadReceiptMonth();
+            return;
+        }
+        if (tabId === 'admin-ajustes') {
+            loadOrgSettings();
+        }
+    }
+
+    function scrollAdminTabIntoView(tab) {
+        var tabs = document.getElementById('admin-tabs');
+        if (!tabs || !tab || !tabs.scrollTo) return;
+
+        var targetLeft = Math.max(0, tab.offsetLeft - ((tabs.clientWidth - tab.offsetWidth) / 2));
+        tabs.scrollTo({
+            left: targetLeft,
+            behavior: 'smooth'
+        });
     }
 
     function updatePinLabel(role, labelId, inputId) {
@@ -181,25 +248,12 @@ var Admin = (function () {
 
         var activeTab = document.querySelector('.admin-tab.active');
         var activeTabId = activeTab ? activeTab.dataset.tab : 'admin-payments';
-
-        if (activeTabId === 'admin-employees') {
-            loadEmployees();
-            return;
+        if (window.ServiceWorkerUpdate && typeof window.ServiceWorkerUpdate.getState === 'function') {
+            adminUpdateState = window.ServiceWorkerUpdate.getState();
         }
-        if (activeTabId === 'admin-acuerdos') {
-            loadAcuerdosList();
-            return;
-        }
-        if (activeTabId === 'admin-recibos') {
-            loadReceiptMonth();
-            return;
-        }
-        if (activeTabId === 'admin-ajustes') {
-            loadOrgSettings();
-            return;
-        }
-
-        loadPayMonth();
+        scrollAdminTabIntoView(activeTab);
+        loadAdminTabContent(activeTabId);
+        syncAdminUpdateBanner();
     }
 
     /* =========================================================
@@ -635,85 +689,173 @@ var Admin = (function () {
        ACUERDOS TAB
        ========================================================= */
 
-    function toggleAcuerdoForm() {
-        setAcuerdoFormOpen(!acuerdoFormVisible);
+    function onAdminKeyDown(event) {
+        if (!event || event.key !== 'Escape') return;
+        if (!acuerdoModalVisible || contractCreateInFlight) return;
+        event.preventDefault();
+        closeAcuerdoComposer();
     }
 
-    function setAcuerdoFormOpen(nextState) {
-        acuerdoFormVisible = !!nextState;
-        var wrap = document.getElementById('admin-acuerdo-form-wrap');
-        var btn  = document.getElementById('admin-acuerdo-nuevo');
-        if (wrap) wrap.classList.toggle('open', acuerdoFormVisible);
-        if (btn)  btn.classList.toggle('open', acuerdoFormVisible);
-
-        if (acuerdoFormVisible) {
-            populateEmployeeSelect();
-            hideFeedback('acuerdo-form-feedback');
-            requestAnimationFrame(function () {
-                if (wrap && wrap.scrollIntoView) {
-                    wrap.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                }
-            });
-        } else {
-            hideFeedback('acuerdo-form-feedback');
+    function handleAdminScreenChange(event) {
+        var detail = event && event.detail ? event.detail : {};
+        if (detail.from !== 'screen-admin' || detail.to === 'screen-admin') return;
+        if (acuerdoModalVisible) {
+            closeAcuerdoComposer({ restoreFocus: false, preserveSelection: false });
         }
     }
 
-    function populateEmployeeSelect() {
-        var select = document.getElementById('acuerdo-emp-select');
-        var picker = document.getElementById('acuerdo-employee-picker');
-        if (!select || !picker) return;
+    function openAcuerdoComposer() {
+        var modal = document.getElementById('modal-acuerdo-create');
+        var closeBtn = document.getElementById('admin-acuerdo-close');
 
-        contractEmployeeOptionsLoading = true;
-        setContractPickerLoading();
+        if (!modal || acuerdoModalVisible) return;
+
+        acuerdoReturnFocusEl = document.activeElement || document.getElementById('admin-acuerdo-nuevo');
+        acuerdoModalVisible = true;
+        selectedContractEmployeeId = '';
+        contractEmployeeLoadError = '';
+        hideFeedback('acuerdo-form-feedback');
+        modal.classList.remove('hidden');
+        syncContractSelectStatus('Cargando participantes...', 'muted');
+        setContractRetryVisible(false);
+        populateEmployeeSelect();
+        trackAdminUiEvent('contract_sheet_opened', {
+            cachedParticipants: !!(employeeSelectCache && employeeSelectCache.length)
+        });
+
+        requestAnimationFrame(function () {
+            var select = document.getElementById('acuerdo-emp-select');
+            if (select && !select.disabled) {
+                select.focus();
+            } else if (closeBtn) {
+                closeBtn.focus();
+            }
+        });
+    }
+
+    function closeAcuerdoComposer(options) {
+        var modal = document.getElementById('modal-acuerdo-create');
+        var restoreFocus = !options || options.restoreFocus !== false;
+        var preserveSelection = !!(options && options.preserveSelection);
+
+        if (!modal || !acuerdoModalVisible || contractCreateInFlight) return;
+
+        acuerdoModalVisible = false;
+        modal.classList.add('hidden');
+        hideFeedback('acuerdo-form-feedback');
+        setContractRetryVisible(false);
+        contractEmployeeLoadError = '';
+
+        if (!preserveSelection) {
+            setSelectedContractEmployee('');
+        }
+
+        syncContractSelectStatus(
+            employeeSelectCache && employeeSelectCache.length
+                ? 'Elige un participante activo para iniciar el contrato.'
+                : 'Pulsa "Nuevo contrato" para cargar participantes activos.',
+            'muted'
+        );
         updateCreateAcuerdoButtonState();
 
-        if (employeeSelectCache) {
-            renderEmployeeOptions(select, employeeSelectCache);
-            renderContractEmployeePicker(employeeSelectCache);
+        if (restoreFocus && acuerdoReturnFocusEl && typeof acuerdoReturnFocusEl.focus === 'function') {
+            requestAnimationFrame(function () {
+                acuerdoReturnFocusEl.focus();
+            });
+        }
+    }
+
+    function retryContractEmployeeLoad() {
+        populateEmployeeSelect(true);
+    }
+
+    function populateEmployeeSelect(forceReload) {
+        var select = document.getElementById('acuerdo-emp-select');
+
+        if (!select) return;
+
+        contractEmployeeOptionsLoading = true;
+        contractEmployeeLoadError = '';
+        hideFeedback('acuerdo-form-feedback');
+        setContractRetryVisible(false);
+        renderContractSelectOptions([], 'Cargando participantes...', true);
+        syncContractSelectStatus('Buscando participantes activos...', 'muted');
+        updateCreateAcuerdoButtonState();
+
+        if (employeeSelectCache && !forceReload) {
             contractEmployeeOptionsLoading = false;
-            updateCreateAcuerdoButtonState();
+            renderEmployeeOptions(select, employeeSelectCache);
+            trackAdminUiEvent('contract_participants_loaded', {
+                participantCount: employeeSelectCache.length,
+                cached: true
+            });
             return;
         }
 
         Api.getEmployees().then(function (res) {
+            var message = '';
+
             if (!res || !res.success || !res.data) {
                 contractEmployeeOptionsLoading = false;
-                renderContractEmployeePicker([]);
-                showFeedback('acuerdo-form-feedback', 'error', (res && res.message) || 'No se pudieron cargar los participantes.');
+                contractEmployeeLoadError = 'load_failed';
+                message = resolveEmployeeLoadError(res);
+                renderContractSelectOptions([], 'No se pudieron cargar', true);
+                syncContractSelectStatus(message, 'error');
+                setContractRetryVisible(true);
+                showFeedback('acuerdo-form-feedback', 'error', message);
+                trackAdminUiEvent('contract_participants_load_failed', {
+                    reason: message,
+                    errorCode: res && res.error ? res.error : null
+                });
                 updateCreateAcuerdoButtonState();
                 return;
             }
 
             employeeSelectCache = filterContractEmployees(res.data);
-            renderEmployeeOptions(select, employeeSelectCache);
-            renderContractEmployeePicker(employeeSelectCache);
-            hideFeedback('acuerdo-form-feedback');
             contractEmployeeOptionsLoading = false;
-            updateCreateAcuerdoButtonState();
+            contractEmployeeLoadError = '';
+            renderEmployeeOptions(select, employeeSelectCache);
+            hideFeedback('acuerdo-form-feedback');
+            trackAdminUiEvent('contract_participants_loaded', {
+                participantCount: employeeSelectCache.length,
+                cached: false
+            });
         }).catch(function () {
             contractEmployeeOptionsLoading = false;
-            renderContractEmployeePicker([]);
+            contractEmployeeLoadError = 'network_error';
+            renderContractSelectOptions([], 'No se pudieron cargar', true);
+            syncContractSelectStatus('Error de conexion al cargar participantes.', 'error');
+            setContractRetryVisible(true);
             showFeedback('acuerdo-form-feedback', 'error', 'Error de conexion al cargar participantes.');
+            trackAdminUiEvent('contract_participants_load_failed', {
+                reason: 'network_error'
+            });
             updateCreateAcuerdoButtonState();
         });
     }
 
     function renderEmployeeOptions(select, employees) {
-        while (select.options.length > 1) {
-            select.remove(1);
+        var selectEl = select || document.getElementById('acuerdo-emp-select');
+
+        if (!selectEl) return;
+
+        if (!employees || !employees.length) {
+            setSelectedContractEmployee('');
+            renderContractSelectOptions([], 'Sin participantes disponibles', true);
+            syncContractSelectStatus('No hay participantes activos disponibles. Revisa la pestana de Empleados.', 'muted');
+            updateCreateAcuerdoButtonState();
+            return;
         }
-        employees.forEach(function (emp) {
-            var opt = document.createElement('option');
-            opt.value       = emp.id;
-            opt.textContent = emp.nombre + ' ' + (emp.apellido || '');
-            select.appendChild(opt);
-        });
+
+        renderContractSelectOptions(employees, 'Seleccionar participante...', false);
 
         if (!findEmployeeById(employees, selectedContractEmployeeId)) {
             selectedContractEmployeeId = '';
         }
-        select.value = selectedContractEmployeeId || '';
+
+        selectEl.value = selectedContractEmployeeId || '';
+        syncContractSelectStatus('Selecciona un participante activo con el selector del dispositivo.', 'muted');
+        updateCreateAcuerdoButtonState();
     }
 
     function filterContractEmployees(employees) {
@@ -736,10 +878,29 @@ var Admin = (function () {
         return String(role || '').trim().toLowerCase();
     }
 
-    function setContractPickerLoading() {
-        var picker = document.getElementById('acuerdo-employee-picker');
-        if (!picker) return;
-        picker.innerHTML = '<div class="acuerdo-picker-empty is-loading">Cargando participantes...</div>';
+    function renderContractSelectOptions(employees, placeholderText, disabled) {
+        var select = document.getElementById('acuerdo-emp-select');
+        var placeholder;
+
+        if (!select) return;
+
+        select.textContent = '';
+
+        placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = placeholderText || 'Seleccionar participante...';
+        placeholder.disabled = true;
+        placeholder.selected = true;
+        select.appendChild(placeholder);
+
+        Utils.each(employees || [], function (emp) {
+            var option = document.createElement('option');
+            option.value = emp.id;
+            option.textContent = ((emp.nombre || '') + ' ' + (emp.apellido || '')).trim();
+            select.appendChild(option);
+        });
+
+        select.disabled = !!disabled;
     }
 
     function renderContractEmployeePicker(employees) {
@@ -802,6 +963,60 @@ var Admin = (function () {
         btn.disabled = contractEmployeeOptionsLoading || !selectedContractEmployeeId;
     }
 
+    function syncContractSelectStatus(message, tone) {
+        var help = document.getElementById('acuerdo-picker-help');
+        if (!help) return;
+
+        help.textContent = message || '';
+        help.classList.toggle('is-error', tone === 'error');
+    }
+
+    function setContractRetryVisible(isVisible) {
+        var btn = document.getElementById('admin-acuerdo-retry');
+        if (!btn) return;
+        btn.classList.toggle('hidden', !isVisible);
+        btn.disabled = contractCreateInFlight || contractEmployeeOptionsLoading;
+    }
+
+    function setSelectedContractEmployee(employeeId) {
+        selectedContractEmployeeId = String(employeeId || '').trim();
+
+        var select = document.getElementById('acuerdo-emp-select');
+        if (select) {
+            select.value = selectedContractEmployeeId || '';
+        }
+
+        updateCreateAcuerdoButtonState();
+    }
+
+    function updateCreateAcuerdoButtonState() {
+        var btn = document.getElementById('admin-acuerdo-crear');
+        var select = document.getElementById('acuerdo-emp-select');
+        var closeBtn = document.getElementById('admin-acuerdo-close');
+        var cancelBtn = document.getElementById('admin-acuerdo-cancel');
+        var hasAdminAccess = typeof App !== 'undefined' && App && typeof App.hasAdminAccess === 'function'
+            ? App.hasAdminAccess()
+            : false;
+        if (!btn) return;
+
+        btn.textContent = contractCreateInFlight ? 'Creando...' : 'Crear contrato';
+        btn.disabled = !hasAdminAccess ||
+            contractEmployeeOptionsLoading ||
+            contractCreateInFlight ||
+            !!contractEmployeeLoadError ||
+            !selectedContractEmployeeId;
+
+        if (select) {
+            select.disabled = contractCreateInFlight ||
+                contractEmployeeOptionsLoading ||
+                !!contractEmployeeLoadError ||
+                !(employeeSelectCache && employeeSelectCache.length);
+        }
+        if (closeBtn) closeBtn.disabled = contractCreateInFlight;
+        if (cancelBtn) cancelBtn.disabled = contractCreateInFlight;
+        setContractRetryVisible(!!contractEmployeeLoadError);
+    }
+
     function findEmployeeById(employees, employeeId) {
         var wantedId = String(employeeId || '').trim();
         if (!wantedId) return null;
@@ -818,12 +1033,11 @@ var Admin = (function () {
 
         if (!empId) { showFeedback('acuerdo-form-feedback', 'error', 'Selecciona un participante.'); return; }
 
-        var btn = document.getElementById('admin-acuerdo-crear');
-        if (btn) {
-            btn.disabled = true;
-            btn.textContent = 'Creando...';
-            btn.setAttribute('data-busy', 'true');
-        }
+        contractCreateInFlight = true;
+        updateCreateAcuerdoButtonState();
+        trackAdminUiEvent('contract_create_started', {
+            employeeId: empId
+        });
 
         Api.createContract({
             employeeId:          empId,
@@ -831,25 +1045,33 @@ var Admin = (function () {
             schedule:            'Seg\u00fan turnos elegidos libremente por el/la Participante',
             validityText:        '3 meses, renovable autom\u00e1ticamente'
         }).then(function (res) {
-            if (btn) {
-                btn.textContent = 'Crear contrato';
-                btn.removeAttribute('data-busy');
-            }
+            contractCreateInFlight = false;
 
             if (res && res.success) {
-                showFeedback('acuerdo-form-feedback', 'success', 'Contrato creado correctamente.', 3000);
+                employeeSelectCache = null;
                 setSelectedContractEmployee('');
-                updateCreateAcuerdoButtonState();
+                closeAcuerdoComposer({ restoreFocus: true, preserveSelection: false });
+                App.showToast('Contrato creado correctamente.', 'success');
+                trackAdminUiEvent('contract_create_completed', {
+                    employeeId: empId,
+                    contractId: res.contractId || null,
+                    contractStatus: res.status || null
+                });
                 loadAcuerdosList();
             } else {
+                trackAdminUiEvent('contract_create_failed', {
+                    employeeId: empId,
+                    reason: (res && res.message) || 'unknown_error'
+                });
                 updateCreateAcuerdoButtonState();
                 showFeedback('acuerdo-form-feedback', 'error', (res && res.message) || 'Error al crear el contrato.');
             }
         }).catch(function () {
-            if (btn) {
-                btn.textContent = 'Crear contrato';
-                btn.removeAttribute('data-busy');
-            }
+            contractCreateInFlight = false;
+            trackAdminUiEvent('contract_create_failed', {
+                employeeId: empId,
+                reason: 'network_error'
+            });
             updateCreateAcuerdoButtonState();
             showFeedback('acuerdo-form-feedback', 'error', 'Error de conexion al crear el contrato.');
         });
@@ -1794,6 +2016,106 @@ var Admin = (function () {
             if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Confirmar y firmar'; }
             showFeedback('admin-receipt-sign-feedback', 'error', 'Error al guardar la firma.');
         });
+    }
+
+    function handleSwUpdateStateChange(event) {
+        var detail = event && event.detail ? event.detail : {};
+
+        adminUpdateState = {
+            available: !!detail.available,
+            safeToReload: !!detail.safeToReload,
+            pendingReload: !!detail.pendingReload
+        };
+
+        if (adminUpdateState.available && !adminUpdateTracked) {
+            adminUpdateTracked = true;
+            trackAdminUiEvent('admin_update_waiting_detected', {
+                safeToReload: adminUpdateState.safeToReload,
+                pendingReload: adminUpdateState.pendingReload
+            });
+        }
+
+        if (!adminUpdateState.available) {
+            adminUpdateTracked = false;
+        }
+
+        syncAdminUpdateBanner();
+    }
+
+    function syncAdminUpdateBanner() {
+        var banner = document.getElementById('admin-update-banner');
+        var message = document.getElementById('admin-update-message');
+        var action = document.getElementById('admin-update-action');
+        var hasAdminAccess = typeof App !== 'undefined' && App && typeof App.hasAdminAccess === 'function'
+            ? App.hasAdminAccess()
+            : false;
+        var isAdminScreen = typeof App !== 'undefined' && App && typeof App.isScreen === 'function'
+            ? App.isScreen('screen-admin')
+            : false;
+        var shouldShow = !!(banner && adminUpdateState.available && hasAdminAccess && isAdminScreen);
+
+        if (!banner || !message || !action) return;
+
+        banner.classList.toggle('hidden', !shouldShow);
+        if (!shouldShow) return;
+
+        if (adminUpdateState.pendingReload) {
+            message.textContent = 'Actualizando la aplicacion. Espera un momento mientras se aplica la nueva version.';
+            action.textContent = 'Actualizando...';
+            action.disabled = true;
+            return;
+        }
+
+        if (adminUpdateState.safeToReload && window.ServiceWorkerUpdate && typeof window.ServiceWorkerUpdate.requestUpdate === 'function') {
+            message.textContent = 'Hay una nueva version lista. Puedes actualizar ahora sin salir de la pantalla segura.';
+            action.textContent = 'Actualizar';
+            action.disabled = false;
+            return;
+        }
+
+        message.textContent = 'Hay una nueva version disponible. Vuelve al menu para actualizar la app instalada de forma segura.';
+        action.textContent = 'Ir al menu';
+        action.disabled = false;
+    }
+
+    function handleAdminUpdateAction() {
+        if (!adminUpdateState.available || adminUpdateState.pendingReload) return;
+
+        if (adminUpdateState.safeToReload && window.ServiceWorkerUpdate && typeof window.ServiceWorkerUpdate.requestUpdate === 'function') {
+            window.ServiceWorkerUpdate.requestUpdate();
+            return;
+        }
+
+        if (acuerdoModalVisible) {
+            closeAcuerdoComposer({ restoreFocus: false, preserveSelection: false });
+        }
+        App.navigate('screen-menu');
+    }
+
+    function trackAdminUiEvent(eventName, extra) {
+        var payload = {
+            reportType: 'ui_event',
+            message: eventName,
+            source: 'admin-ui',
+            screen: 'admin',
+            eventName: eventName,
+            tab: (document.querySelector('.admin-tab.active') || {}).dataset ? document.querySelector('.admin-tab.active').dataset.tab : '',
+            timestamp: new Date().toISOString()
+        };
+
+        if (extra && typeof extra === 'object') {
+            Object.keys(extra).forEach(function (key) {
+                payload[key] = extra[key];
+            });
+        }
+
+        try {
+            if (typeof Api !== 'undefined' && Api.reportClientError) {
+                Api.reportClientError(payload);
+            }
+        } catch (error) {
+            // best-effort telemetry
+        }
     }
 
     /* =========================================================

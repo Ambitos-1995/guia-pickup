@@ -16,6 +16,7 @@ var App = (function () {
     var viewportRaf = 0;
     var launchScreen = '';
     var launchReturnPath = '';
+    var toastTimer = 0;
 
     function init() {
         bindViewportState();
@@ -107,6 +108,8 @@ var App = (function () {
     }
 
     function navigate(screenId) {
+        var previousScreen = currentScreen;
+
         if (!canAccessScreen(screenId)) {
             if (!hasAuthenticatedAccess()) {
                 if (screenId !== 'screen-menu' && screenId !== 'screen-pin') {
@@ -160,6 +163,8 @@ var App = (function () {
         if (screenId === 'screen-payment') Payment.show();
         if (screenId === 'screen-admin') Admin.show();
         if (screenId === 'screen-acuerdo') Contract.show(App._pendingContractId);
+
+        dispatchScreenChange(previousScreen, screenId);
     }
 
     function isScreen(screenId) {
@@ -459,6 +464,47 @@ var App = (function () {
         modalCallback = null;
     }
 
+    function showToast(message, tone, durationMs) {
+        var toast = document.getElementById('pin-toast');
+        var toneClass = '';
+
+        if (!toast || !message) return;
+
+        if (toastTimer) {
+            clearTimeout(toastTimer);
+            toastTimer = 0;
+        }
+
+        toast.classList.remove('pin-toast--success', 'pin-toast--info', 'pin-toast--error');
+        toneClass = tone === 'success'
+            ? 'pin-toast--success'
+            : (tone === 'info' ? 'pin-toast--info' : 'pin-toast--error');
+
+        toast.textContent = message;
+        toast.classList.add(toneClass, 'show');
+
+        toastTimer = setTimeout(function () {
+            toast.classList.remove('show', toneClass);
+        }, durationMs || 2800);
+    }
+
+    function dispatchScreenChange(fromScreen, toScreen) {
+        var detail = {
+            from: fromScreen || '',
+            to: toScreen || ''
+        };
+        var event;
+
+        if (typeof window.CustomEvent === 'function') {
+            event = new CustomEvent('app-screenchange', { detail: detail });
+        } else {
+            event = document.createEvent('CustomEvent');
+            event.initCustomEvent('app-screenchange', false, false, detail);
+        }
+
+        window.dispatchEvent(event);
+    }
+
     function hasAdminAccess() {
         var activeSession = getSession();
         return !!(activeSession && activeSession.role === 'org_admin');
@@ -752,6 +798,7 @@ var App = (function () {
         hasAuthenticatedAccess: hasAuthenticatedAccess,
         handleAuthFailure: handleAuthFailure,
         confirm: confirm,
+        showToast: showToast,
         showMenu: showMenu,
         requestViewportUpdate: requestViewportUpdate,
         getVersion: function () { return APP_VERSION; }

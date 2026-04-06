@@ -68,12 +68,17 @@ test.describe('webkit admin ui', () => {
 
     await page.locator('.admin-tab', { hasText: 'Contratos' }).click();
     await page.locator('#admin-acuerdo-nuevo').click();
-    await expect(page.locator('#acuerdo-employee-picker .acuerdo-picker-option')).toHaveCount(2);
+    await expect(page.locator('#modal-acuerdo-create')).toBeVisible();
+    await expect(page.locator('#acuerdo-emp-select')).toBeVisible();
+    await expect(page.locator('#acuerdo-emp-select')).toBeEnabled();
 
-    await page.locator('#acuerdo-employee-picker .acuerdo-picker-option', { hasText: 'Ismael Perez' }).click();
+    const optionTexts = (await page.locator('#acuerdo-emp-select option').allTextContents()).map((value) => value.trim());
+    expect(optionTexts).toEqual(['Seleccionar participante...', 'Ismael Perez', 'Nora Diaz']);
+
+    await page.locator('#acuerdo-emp-select').selectOption('emp-1');
     await expect(page.locator('#admin-acuerdo-crear')).toBeEnabled();
     await page.locator('#admin-acuerdo-crear').click();
-    await expect(page.locator('#acuerdo-form-feedback')).toContainText('Contrato creado correctamente.');
+    await expect(page.locator('#modal-acuerdo-create')).toBeHidden();
     await expect.poll(() => state.contractCreateCalls.length).toBe(1);
 
     await page.locator('.admin-tab', { hasText: 'Ajustes' }).click();

@@ -14,6 +14,12 @@ if ("serviceWorker" in navigator) {
         var swUrl = window.SW_REGISTER_URL || '/sw.js';
         var UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
+        window.ServiceWorkerUpdate = {
+            getState: getUpdateState,
+            requestUpdate: requestUpdate,
+            syncUi: syncUpdateButton
+        };
+
         navigator.serviceWorker.addEventListener('controllerchange', function () {
             if (refreshing) return;
             if (!pendingReload) {
@@ -45,6 +51,7 @@ if ("serviceWorker" in navigator) {
                         ? waitingWorker.__messages.slice()
                         : [];
                 },
+                getStateForTest: getUpdateState,
                 syncUpdateButtonForTest: syncUpdateButton,
                 isSafeToReloadForTest: isSafeToReload,
                 requestUpdateForTest: requestUpdate
@@ -148,10 +155,34 @@ if ("serviceWorker" in navigator) {
         function syncUpdateButton() {
             var shouldShow = !!waitingWorker && isSafeToReload() && !pendingReload;
 
-            if (!updateBtn) return;
+            if (updateBtn) {
+                updateBtn.classList.toggle('hidden', !shouldShow);
+                updateBtn.disabled = !shouldShow;
+            }
 
-            updateBtn.classList.toggle('hidden', !shouldShow);
-            updateBtn.disabled = !shouldShow;
+            emitUpdateStateChange();
+        }
+
+        function getUpdateState() {
+            return {
+                available: !!waitingWorker,
+                safeToReload: isSafeToReload(),
+                pendingReload: pendingReload
+            };
+        }
+
+        function emitUpdateStateChange() {
+            var detail = getUpdateState();
+            var event;
+
+            if (typeof window.CustomEvent === 'function') {
+                event = new CustomEvent('sw-update-statechange', { detail: detail });
+            } else {
+                event = document.createEvent('CustomEvent');
+                event.initCustomEvent('sw-update-statechange', false, false, detail);
+            }
+
+            window.dispatchEvent(event);
         }
 
         function isSafeToReload() {

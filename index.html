@@ -348,6 +348,13 @@
 
             <div class="admin-container">
                 <div class="admin-build hidden" id="admin-build-version" aria-live="polite"></div>
+                <div class="admin-update-banner hidden" id="admin-update-banner" aria-live="polite">
+                    <div class="admin-update-copy">
+                        <span class="admin-update-kicker">Actualizacion disponible</span>
+                        <p class="admin-update-message" id="admin-update-message">Hay una nueva version disponible. Vuelve al menu para actualizar la app instalada de forma segura.</p>
+                    </div>
+                    <button class="btn-secondary admin-update-action" id="admin-update-action" type="button">Ir al menu</button>
+                </div>
                 <nav class="admin-tabs" id="admin-tabs">
                     <button class="admin-tab active" data-tab="admin-payments">Pagos</button>
                     <button class="admin-tab" data-tab="admin-employees">Empleados</button>
@@ -457,29 +464,10 @@
                 <!-- Admin: Acuerdos -->
                 <div class="admin-section hidden" id="admin-acuerdos">
 
-                    <button class="btn-add-emp" id="admin-acuerdo-nuevo" type="button">
+                    <button class="btn-add-emp" id="admin-acuerdo-nuevo" type="button" aria-haspopup="dialog" aria-controls="modal-acuerdo-create">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         Nuevo contrato
                     </button>
-
-                    <div class="admin-acuerdo-form-wrap" id="admin-acuerdo-form-wrap">
-                        <div class="employee-form">
-                            <div class="form-row">
-                                <label for="acuerdo-emp-select">Participante</label>
-                                <select id="acuerdo-emp-select" class="acuerdo-emp-select-native" aria-hidden="true" tabindex="-1">
-                                    <option value="">Seleccionar participante...</option>
-                                </select>
-                                <div class="acuerdo-employee-picker" id="acuerdo-employee-picker" role="listbox" aria-label="Seleccion de participante">
-                                    <div class="acuerdo-picker-empty">
-                                        Abre el formulario para cargar participantes disponibles.
-                                    </div>
-                                </div>
-                                <p class="acuerdo-picker-help" id="acuerdo-picker-help">Toca una tarjeta para seleccionar al participante.</p>
-                            </div>
-                            <button class="btn-primary btn-full" id="admin-acuerdo-crear" type="button" disabled>Crear contrato</button>
-                            <div class="employee-form-feedback hidden" id="acuerdo-form-feedback"></div>
-                        </div>
-                    </div>
 
                     <div class="employee-list" id="admin-acuerdo-list">
                         <p class="loading-text">Cargando contratos...</p>
@@ -629,7 +617,7 @@
 
                 <!-- Admin: Ajustes -->
                 <div class="admin-section hidden" id="admin-ajustes">
-                    <div class="employee-form">
+                    <div class="employee-form admin-settings-form">
                         <div class="form-row">
                             <label for="admin-setting-legal-rep">Representante legal</label>
                             <input type="text" id="admin-setting-legal-rep"
@@ -876,6 +864,36 @@
                 <div class="modal-actions">
                     <button class="btn-secondary" id="edit-emp-cancel">Cancelar</button>
                     <button class="btn-primary" id="edit-emp-save">Guardar</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-acuerdo-create" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="acuerdo-sheet-title">
+            <div class="modal-card contract-sheet">
+                <div class="contract-sheet-header">
+                    <div>
+                        <span class="contract-sheet-kicker">Contratos</span>
+                        <h3 class="modal-title contract-sheet-title" id="acuerdo-sheet-title">Nuevo contrato</h3>
+                    </div>
+                    <button class="contract-sheet-close" id="admin-acuerdo-close" type="button" aria-label="Cerrar">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <p class="contract-sheet-intro">Selecciona un participante activo con el selector nativo del dispositivo para evitar fallos en iPhone y Android.</p>
+                <div class="contract-sheet-body">
+                    <div class="form-row">
+                        <label for="acuerdo-emp-select">Participante</label>
+                        <select id="acuerdo-emp-select" class="contract-participant-select" aria-describedby="acuerdo-picker-help acuerdo-form-feedback">
+                            <option value="" selected disabled>Seleccionar participante...</option>
+                        </select>
+                        <p class="acuerdo-picker-help" id="acuerdo-picker-help">Elige un participante activo para iniciar el contrato.</p>
+                        <button class="btn-secondary btn-full hidden" id="admin-acuerdo-retry" type="button">Reintentar carga</button>
+                    </div>
+                    <div class="employee-form-feedback hidden" id="acuerdo-form-feedback"></div>
+                </div>
+                <div class="modal-actions contract-sheet-actions">
+                    <button class="btn-secondary" id="admin-acuerdo-cancel" type="button">Cancelar</button>
+                    <button class="btn-primary" id="admin-acuerdo-crear" type="button" disabled>Crear contrato</button>
                 </div>
             </div>
         </div>

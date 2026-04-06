@@ -454,19 +454,27 @@ var Api = (function () {
     }
 
     function reportClientError(payload) {
+        var reportPayload = {};
+        if (payload && typeof payload === 'object') {
+            Object.keys(payload).forEach(function (key) {
+                if (key === 'reportType') return;
+                reportPayload[key] = payload[key];
+            });
+        }
+
+        if (reportPayload.message === undefined) reportPayload.message = '';
+        if (reportPayload.stack === undefined) reportPayload.stack = null;
+        if (reportPayload.source === undefined) reportPayload.source = null;
+        if (reportPayload.lineno === undefined) reportPayload.lineno = null;
+        if (reportPayload.colno === undefined) reportPayload.colno = null;
+
         return postJson(FUNCTIONS_BASE + '/kiosk-report', {
             orgSlug: ORG_SLUG,
             route: (window.location && window.location.pathname) || '',
             appVersion: (typeof App !== 'undefined' && App.getVersion) ? App.getVersion() : '',
             deviceLabel: navigator.userAgent.slice(0, 256),
             reportType: payload.reportType || 'client_error',
-            payload: {
-                message: payload.message || '',
-                stack: payload.stack || null,
-                source: payload.source || null,
-                lineno: payload.lineno || null,
-                colno: payload.colno || null
-            }
+            payload: reportPayload
         }, {
             requiresAuth: true,
             silentAuthFailure: true,

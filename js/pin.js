@@ -88,6 +88,7 @@ var Pin = (function () {
     function showError(message) {
         if (toastTimer) clearTimeout(toastTimer);
         toastEl.textContent = message;
+        toastEl.classList.remove('pin-toast--success', 'pin-toast--info');
         toastEl.classList.add('show');
         if (pinPad) pinPad.shake();
 
@@ -98,7 +99,7 @@ var Pin = (function () {
 
     function hideError() {
         if (toastTimer) clearTimeout(toastTimer);
-        toastEl.classList.remove('show');
+        toastEl.classList.remove('show', 'pin-toast--success', 'pin-toast--info');
     }
 
     function verify() {

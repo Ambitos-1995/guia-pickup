@@ -354,6 +354,14 @@ button:focus-visible {
     pointer-events: auto;
 }
 
+.pin-toast--success {
+    background: linear-gradient(135deg, #15803d, #22c55e);
+}
+
+.pin-toast--info {
+    background: linear-gradient(135deg, #1d4ed8, #2563eb);
+}
+
 .offline-clock-banner {
     position: fixed;
     top: max(12px, env(safe-area-inset-top));
@@ -1542,16 +1550,66 @@ button:focus-visible {
     text-transform: uppercase;
 }
 
+.admin-update-banner {
+    margin: 12px 16px 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 18px;
+    background:
+        linear-gradient(135deg, rgba(255, 250, 250, 0.96), rgba(255, 241, 242, 0.98)),
+        radial-gradient(circle at top right, rgba(227, 30, 36, 0.16), transparent 58%);
+    border: 1px solid rgba(227, 30, 36, 0.16);
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+}
+
+.admin-update-copy {
+    min-width: 0;
+}
+
+.admin-update-kicker {
+    display: inline-flex;
+    margin-bottom: 6px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--red-dark);
+}
+
+.admin-update-message {
+    margin: 0;
+    color: var(--gray-600);
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.admin-update-action {
+    min-height: 46px;
+    min-width: 124px;
+    padding-inline: 16px;
+    white-space: nowrap;
+}
+
 .admin-tabs {
     display: flex;
     gap: 8px;
-    padding: 12px 16px;
-    background: var(--gray-100);
+    padding: 12px 16px 14px;
+    background: rgba(245, 247, 250, 0.92);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     flex-shrink: 0;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    scroll-padding-inline: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 3;
 }
 
 .admin-tabs::-webkit-scrollbar {
@@ -1559,7 +1617,9 @@ button:focus-visible {
 }
 
 .admin-tab {
-    flex: 1;
+    flex: 0 0 auto;
+    min-width: 112px;
+    min-height: 46px;
     padding: 12px 16px;
     font-weight: 700;
     font-size: 0.85rem;
@@ -2807,7 +2867,6 @@ body {
     }
 
     .admin-tab {
-        flex: 0 0 auto;
         min-width: 108px;
         padding: 11px 14px;
         font-size: 0.8rem;
@@ -3269,7 +3328,6 @@ body {
     }
 
     .admin-tab {
-        flex: 0 0 auto;
         min-width: 104px;
         padding: 9px 12px;
         font-size: 0.74rem;
@@ -3649,6 +3707,42 @@ body {
     .schedule-shell {
         max-width: 1240px;
         margin: 0 auto;
+    }
+}
+
+@media (max-width: 767px) {
+    .admin-update-banner {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-update-action {
+        width: 100%;
+    }
+
+    .contract-sheet-header {
+        padding: 20px 18px 12px;
+    }
+
+    .contract-sheet-intro,
+    .contract-sheet-body,
+    .contract-sheet-actions {
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+
+    .contract-sheet-actions {
+        padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    }
+}
+
+@media (min-width: 768px) {
+    #modal-acuerdo-create {
+        align-items: center;
+        padding: 16px;
+    }
+
+    #modal-acuerdo-create .modal-card {
+        border-radius: 28px;
     }
 }
 
@@ -4273,6 +4367,134 @@ body {
 
 .acuerdo-picker-empty.is-loading {
     color: var(--gray-600);
+}
+
+/* Contract creation sheet */
+#modal-acuerdo-create {
+    align-items: flex-end;
+    justify-content: center;
+    padding: max(12px, env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+}
+
+#modal-acuerdo-create .modal-card {
+    width: min(100%, 36rem);
+    max-width: 36rem;
+    padding: 0;
+    border-radius: 28px 28px 20px 20px;
+    overflow: hidden;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(249, 250, 251, 0.99)),
+        radial-gradient(circle at top right, rgba(227, 30, 36, 0.08), transparent 58%);
+}
+
+.contract-sheet {
+    display: flex;
+    flex-direction: column;
+}
+
+.contract-sheet-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 22px 12px;
+}
+
+.contract-sheet-kicker {
+    display: inline-flex;
+    margin-bottom: 6px;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--red-dark);
+}
+
+.contract-sheet-title {
+    margin-bottom: 0;
+}
+
+.contract-sheet-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: rgba(148, 163, 184, 0.1);
+    color: var(--gray-700);
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.contract-sheet-close:active,
+.contract-sheet-close.pressing {
+    transform: scale(0.96);
+}
+
+.contract-sheet-intro {
+    margin: 0;
+    padding: 0 22px 18px;
+    color: var(--gray-600);
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.contract-sheet-body {
+    padding: 0 22px 8px;
+}
+
+.contract-sheet-body .form-row {
+    margin-bottom: 0;
+}
+
+.contract-participant-select {
+    width: 100%;
+    min-height: 56px;
+    padding: 14px 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.36);
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 700;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+    appearance: auto;
+}
+
+.contract-participant-select:focus-visible,
+.contract-sheet-close:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.28);
+    outline-offset: 2px;
+}
+
+.contract-participant-select:disabled {
+    color: var(--gray-400);
+    background: rgba(241, 245, 249, 0.92);
+    box-shadow: none;
+}
+
+.acuerdo-picker-help {
+    margin: 10px 2px 0;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    color: var(--gray-500);
+}
+
+.acuerdo-picker-help.is-error {
+    color: #b91c1c;
+}
+
+.contract-sheet-actions {
+    padding: 12px 22px 22px;
+}
+
+.contract-sheet-actions .btn-primary,
+.contract-sheet-actions .btn-secondary {
+    min-height: 50px;
+}
+
+.admin-settings-form {
+    width: min(100%, 34rem);
 }
 
 .acuerdo-row {
