@@ -108,6 +108,10 @@ async function handleSetAmount(
     return json({ success: false, message: "Ano o mes invalido" }, 400);
   }
 
+  if (!isMonthClosed(year, month)) {
+    return json({ success: false, message: "Solo se puede configurar meses ya cerrados. Disponible a partir del dia 1 del proximo mes." }, 400);
+  }
+
   if (Number.isNaN(totalAmount) || totalAmount < 0) {
     return json({ success: false, message: "Importe invalido" }, 400);
   }
@@ -158,6 +162,10 @@ async function handleCalculate(
 
   if (!year || !month || month < 1 || month > 12) {
     return json({ success: false, message: "Ano o mes invalido" }, 400);
+  }
+
+  if (!isMonthClosed(year, month)) {
+    return json({ success: false, message: "Solo se puede calcular meses ya cerrados. Disponible a partir del dia 1 del proximo mes." }, 400);
   }
 
   const amountRes = await fetchJson<Array<{ total_amount: string }>>(
@@ -539,6 +547,20 @@ function pushAnomaly(map: Map<string, string[]>, employeeId: string, message: st
     list.push(message);
   }
   map.set(employeeId, list);
+}
+
+function isMonthClosed(year: number, month: number): boolean {
+  const now = new Date();
+  const madridParts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Madrid",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const nowYear = Number(madridParts.find((p) => p.type === "year")!.value);
+  const nowMonth = Number(madridParts.find((p) => p.type === "month")!.value);
+  return year < nowYear || (year === nowYear && month < nowMonth);
 }
 
 function round2(value: number): number {

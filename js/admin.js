@@ -119,6 +119,21 @@ var Admin = (function () {
         Utils.bindPress(document.getElementById('admin-receipt-generate'), function () { generateReceipts(); });
         Utils.bindPress(document.getElementById('admin-receipt-bulk-pdf'), function () { downloadBulkPdf(); });
 
+        /* --- Recibo firma overlay --- */
+        Utils.bindPress(document.getElementById('admin-receipt-sign-back'), closeAdminReceiptSigning);
+        Utils.bindPress(document.getElementById('admin-receipt-btn-clear'), function () {
+            if (arSignPad) arSignPad.clear();
+            updateArConfirmState();
+        });
+        Utils.bindPress(document.getElementById('admin-receipt-btn-confirm'), goToArPreview);
+        Utils.bindPress(document.getElementById('admin-receipt-btn-redo'), goToArSignCanvas);
+        Utils.bindPress(document.getElementById('admin-receipt-btn-submit'), submitArSignature);
+        Utils.bindPress(document.getElementById('admin-receipt-btn-done'), function () {
+            closeAdminReceiptSigning();
+            loadReceiptMonth();
+        });
+        bindArPinKeypad();
+
         /* Active toggle in edit modal */
         var toggleBtn = document.getElementById('edit-emp-active');
         if (toggleBtn) {
@@ -179,6 +194,13 @@ var Admin = (function () {
         loadPayMonth();
     }
 
+    function isMonthClosed(y, m) {
+        var now = new Date();
+        var nowYear = now.getFullYear();
+        var nowMonth = now.getMonth() + 1;
+        return y < nowYear || (y === nowYear && m < nowMonth);
+    }
+
     function loadPayMonth() {
         var label = document.getElementById('admin-pay-month-label');
         label.textContent = Utils.MONTH_NAMES[currentMonth - 1] + ' ' + currentYear;
@@ -186,11 +208,29 @@ var Admin = (function () {
         var amountEl = document.getElementById('admin-pay-summary-amount');
         var statusEl = document.getElementById('admin-pay-summary-status');
         var resultsEl = document.getElementById('admin-pay-results');
+        var saveBtn = document.getElementById('admin-pay-save');
+        var calcBtn = document.getElementById('admin-pay-calculate');
+        var feedbackEl = document.getElementById('admin-pay-feedback');
 
         amountEl.textContent = '...';
         statusEl.textContent = 'Cargando';
         statusEl.className = 'admin-pay-summary-badge';
         resultsEl.classList.add('hidden');
+
+        var closed = isMonthClosed(currentYear, currentMonth);
+        saveBtn.disabled = !closed;
+        calcBtn.disabled = !closed;
+
+        if (!closed) {
+            var nextMonth = currentMonth === 12 ? 'Enero ' + (currentYear + 1) : Utils.MONTH_NAMES[currentMonth] + ' ' + currentYear;
+            showFeedback('admin-pay-feedback', 'error', 'Mes en curso. Disponible a partir del 1 de ' + nextMonth + '.', 0);
+            amountEl.textContent = '—';
+            statusEl.textContent = 'No disponible';
+            statusEl.className = 'admin-pay-summary-badge';
+            return;
+        }
+
+        if (feedbackEl) feedbackEl.classList.add('hidden');
 
         /* Read-only: fetch existing summary without recalculating */
         Api.getPaymentSummary(currentYear, currentMonth).then(function (res) {
@@ -1175,6 +1215,14 @@ var Admin = (function () {
                 Utils.bindPress(dlBtn, function () { downloadReceiptPdf(id, dlBtn); });
             })(receipt.id);
             row.appendChild(dlBtn);
+        } else {
+            var signBtn = document.createElement('button');
+            signBtn.className = 'btn-receipt-sign';
+            signBtn.textContent = 'Firmar';
+            (function (r) {
+                Utils.bindPress(signBtn, function () { openAdminReceiptSigning(r); });
+            })(receipt);
+            row.appendChild(signBtn);
         }
 
         return row;
@@ -1280,6 +1328,261 @@ var Admin = (function () {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    /* =========================================================
+       RECEIPT SIGNING (admin-initiated, employee-signed)
+       ========================================================= */
+
+    var arTarget = null;         // receipt object being signed
+    var arPin = '';               // employee PIN input
+    var arVerificationToken = ''; // server token from PIN verify
+    var arSignPad = null;        // SignaturePad instance
+    var arSignDataUrl = '';       // captured signature data URL
+    var arSigningInFlight = false;
+    var arResizeBound = false;
+    var arPinVerifyInFlight = false;
+
+    function openAdminReceiptSigning(receipt) {
+        arTarget = receipt;
+        arPin = '';
+        arVerificationToken = '';
+        arSignDataUrl = '';
+        arSigningInFlight = false;
+        arPinVerifyInFlight = false;
+
+        var nameEl = document.getElementById('admin-receipt-pin-target');
+        if (nameEl) nameEl.textContent = receipt.employee_name || receipt.employee_name_snapshot || '-';
+
+        var titleEl = document.getElementById('admin-receipt-sign-title');
+        if (titleEl) titleEl.textContent = 'Firmar recibo \u2014 ' + (receipt.employee_name || receipt.employee_name_snapshot || '');
+
+        renderArDocument(receipt);
+        showArStep('pin');
+        updateArPinUi();
+
+        var overlay = document.getElementById('admin-receipt-signing');
+        if (overlay) overlay.classList.remove('hidden');
+    }
+
+    function closeAdminReceiptSigning() {
+        var overlay = document.getElementById('admin-receipt-signing');
+        if (overlay) overlay.classList.add('hidden');
+
+        arTarget = null;
+        arPin = '';
+        arVerificationToken = '';
+        arSignDataUrl = '';
+        arSigningInFlight = false;
+        arPinVerifyInFlight = false;
+
+        if (arSignPad) {
+            arSignPad.clear();
+        }
+    }
+
+    function renderArDocument(receipt) {
+        var bodyEl = document.getElementById('admin-receipt-doc-body');
+        if (!bodyEl) return;
+
+        var name = escapeHtml(receipt.employee_name || receipt.employee_name_snapshot || '\u2014');
+        var hours = Number(receipt.hours_worked || 0).toFixed(1);
+        var amount = Number(receipt.amount_earned || 0).toFixed(2);
+
+        bodyEl.innerHTML =
+            '<div class="receipt-doc-meta">' +
+                '<span class="receipt-doc-status receipt-status receipt-status--pending">Pendiente de firma</span>' +
+            '</div>' +
+            '<div class="receipt-doc-grid">' +
+                '<div class="receipt-doc-field"><span class="receipt-doc-label">Participante</span><span class="receipt-doc-value">' + name + '</span></div>' +
+                '<div class="receipt-doc-field"><span class="receipt-doc-label">Horas trabajadas</span><span class="receipt-doc-value">' + escapeHtml(hours) + ' h</span></div>' +
+                '<div class="receipt-doc-field receipt-doc-field--highlight"><span class="receipt-doc-label">Importe del recibo</span><span class="receipt-doc-value">' + escapeHtml(amount) + ' \u20ac</span></div>' +
+            '</div>';
+    }
+
+    /* --- PIN management (manual, same pattern as contract.js) --- */
+
+    function bindArPinKeypad() {
+        Utils.each(document.querySelectorAll('#admin-receipt-pin-keypad [data-key]'), function (btn) {
+            Utils.bindPress(btn, function () {
+                var key = btn.getAttribute('data-key');
+                if (!key) return;
+                if (key === 'clear') { backspaceArPin(); return; }
+                if (key === 'submit') { verifyArPin(); return; }
+                appendArPin(key);
+            });
+        });
+    }
+
+    function appendArPin(key) {
+        if (arPinVerifyInFlight) return;
+        if (!/^\d$/.test(key)) return;
+        if (arPin.length >= 6) return;
+        arPin += key;
+        arVerificationToken = '';
+        updateArPinUi();
+    }
+
+    function backspaceArPin() {
+        if (arPinVerifyInFlight || !arPin.length) return;
+        arPin = arPin.slice(0, -1);
+        arVerificationToken = '';
+        updateArPinUi();
+    }
+
+    function clearArPin() {
+        arPin = '';
+        arVerificationToken = '';
+        updateArPinUi();
+    }
+
+    function updateArPinUi() {
+        Utils.each(document.querySelectorAll('#admin-receipt-pin-dots .acuerdo-pin-dot'), function (dot, index) {
+            dot.classList.toggle('filled', index < arPin.length);
+        });
+        var feedbackEl = document.getElementById('admin-receipt-pin-feedback');
+        if (feedbackEl && arPin.length > 0) feedbackEl.classList.add('hidden');
+    }
+
+    function verifyArPin() {
+        if (!arTarget || arPinVerifyInFlight) return;
+        if (arPin.length < 4) {
+            showFeedback('admin-receipt-pin-feedback', 'error', 'Introduce el PIN completo del participante.');
+            return;
+        }
+
+        var feedbackEl = document.getElementById('admin-receipt-pin-feedback');
+        if (feedbackEl) feedbackEl.classList.add('hidden');
+
+        arPinVerifyInFlight = true;
+
+        Api.verifyReceiptPin(arTarget.id, arPin).then(function (res) {
+            arPinVerifyInFlight = false;
+
+            if (res && res.success && res.verificationToken) {
+                arVerificationToken = res.verificationToken;
+                arPin = '';
+                updateArPinUi();
+                goToArSignCanvas();
+                return;
+            }
+
+            arVerificationToken = '';
+            clearArPin();
+            showFeedback('admin-receipt-pin-feedback', 'error', (res && res.message) || 'No se pudo validar el PIN.');
+        }).catch(function () {
+            arPinVerifyInFlight = false;
+            arVerificationToken = '';
+            clearArPin();
+            showFeedback('admin-receipt-pin-feedback', 'error', 'Error al validar el PIN.');
+        });
+    }
+
+    /* --- Step navigation --- */
+
+    function showArStep(step) {
+        var pinEl = document.getElementById('admin-receipt-step-pin');
+        var signEl = document.getElementById('admin-receipt-step-sign');
+        var previewEl = document.getElementById('admin-receipt-step-preview');
+        var doneEl = document.getElementById('admin-receipt-step-done');
+        var docEl = document.getElementById('admin-receipt-doc');
+
+        if (pinEl) pinEl.classList.toggle('hidden', step !== 'pin');
+        if (signEl) signEl.classList.toggle('hidden', step !== 'sign');
+        if (previewEl) previewEl.classList.toggle('hidden', step !== 'preview');
+        if (doneEl) doneEl.classList.toggle('hidden', step !== 'done');
+        if (docEl) docEl.classList.toggle('hidden', step === 'done');
+
+        if (step === 'sign') {
+            initArSignaturePad();
+        }
+    }
+
+    function goToArSignCanvas() {
+        arSignDataUrl = '';
+        showArStep('sign');
+        resizeArCanvas();
+        if (arSignPad) arSignPad.clear();
+        updateArConfirmState();
+    }
+
+    /* --- Signature pad --- */
+
+    function initArSignaturePad() {
+        if (typeof SignaturePad === 'undefined') return;
+        var canvas = document.getElementById('admin-receipt-canvas');
+        if (!canvas) return;
+
+        resizeArCanvas();
+
+        if (!arSignPad) {
+            arSignPad = new SignaturePad(canvas, {
+                minWidth: 2,
+                maxWidth: 4,
+                penColor: '#000000',
+                backgroundColor: 'rgba(0,0,0,0)'
+            });
+            arSignPad.addEventListener('endStroke', function () { updateArConfirmState(); });
+        }
+
+        if (!arResizeBound) {
+            arResizeBound = true;
+            window.addEventListener('resize', function () {
+                resizeArCanvas();
+                if (arSignPad) arSignPad.clear();
+                updateArConfirmState();
+            });
+        }
+
+        updateArConfirmState();
+    }
+
+    function resizeArCanvas() {
+        Utils.resizeCanvas(document.getElementById('admin-receipt-canvas'));
+    }
+
+    function updateArConfirmState() {
+        var btn = document.getElementById('admin-receipt-btn-confirm');
+        if (btn) btn.disabled = !arSignPad || arSignPad.isEmpty();
+    }
+
+    function goToArPreview() {
+        if (!arSignPad || arSignPad.isEmpty()) return;
+        arSignDataUrl = Utils.getNormalizedSignatureDataUrl(arSignPad);
+        if (!arSignDataUrl) {
+            showFeedback('admin-receipt-sign-feedback', 'error', 'No se pudo capturar la firma.');
+            goToArSignCanvas();
+            return;
+        }
+        var img = document.getElementById('admin-receipt-preview-img');
+        if (img) img.src = arSignDataUrl;
+        showArStep('preview');
+    }
+
+    function submitArSignature() {
+        if (!arTarget || !arSignDataUrl || arSigningInFlight) return;
+        arSigningInFlight = true;
+
+        var submitBtn = document.getElementById('admin-receipt-btn-submit');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Guardando...'; }
+
+        var feedbackEl = document.getElementById('admin-receipt-sign-feedback');
+        if (feedbackEl) feedbackEl.classList.add('hidden');
+
+        Api.signReceipt(arTarget.id, arVerificationToken, arSignDataUrl).then(function (res) {
+            arSigningInFlight = false;
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Confirmar y firmar'; }
+
+            if (res && res.success) {
+                showArStep('done');
+            } else {
+                showFeedback('admin-receipt-sign-feedback', 'error', (res && res.message) || 'Error al guardar la firma.');
+            }
+        }).catch(function () {
+            arSigningInFlight = false;
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Confirmar y firmar'; }
+            showFeedback('admin-receipt-sign-feedback', 'error', 'Error al guardar la firma.');
+        });
     }
 
     return { init: init, show: show };
