@@ -4232,6 +4232,30 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
 }
+.acuerdo-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.btn-acuerdo-eliminar {
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 12px;
+    min-height: 48px;
+    min-width: 48px;
+    cursor: pointer;
+    font-family: var(--font);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-acuerdo-eliminar:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
 
 /* =====================================================
    RECEIPT (Recibos de Pago Mensuales)

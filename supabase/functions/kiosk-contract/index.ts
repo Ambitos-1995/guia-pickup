@@ -144,6 +144,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return await handleGetPdfData(url, serviceRoleKey, orgId, body);
     }
 
+    if (action === "delete") {
+      return await handleDelete(url, serviceRoleKey, orgId, body, auth.session.id, auth.session.employee_id);
+    }
+
     return json({ success: false, message: `Accion desconocida: ${action}` }, 400);
   } catch (err) {
     await logUnhandledEdgeError(errUrl, errKey, "kiosk-contract", err, { requestMethod: req.method });
@@ -181,7 +185,7 @@ async function handleCreate(
   const payload = {
     organization_id: orgId,
     employee_id: employeeId,
-    title: body.title || "Acuerdo de Participacion en Actividad Ocupacional",
+    title: body.title || "Contrato de Participacion en Actividad Ocupacional",
     activity_description: body.activityDescription,
     schedule: body.schedule || "Segun turnos asignados semanalmente",
     validity_text: body.validityText || "3 meses, renovable",
@@ -204,7 +208,7 @@ async function handleCreate(
 
   if (!res.ok || !res.data?.[0]?.id) {
     console.error("[kiosk-contract] create error:", res.data);
-    return json({ success: false, message: "Error al crear el acuerdo" }, 500);
+    return json({ success: false, message: "Error al crear el contrato" }, 500);
   }
 
   const contractId = res.data[0].id;
@@ -236,7 +240,7 @@ async function handleGet(
 
   const contract = await fetchContract(url, key, orgId, contractId, true);
   if (!contract) {
-    return json({ success: false, message: "Acuerdo no encontrado" }, 404);
+    return json({ success: false, message: "Contrato no encontrado" }, 404);
   }
 
   const employee = contract.kiosk_employees;
@@ -272,7 +276,7 @@ async function handleListAll(
   );
 
   if (!res.ok) {
-    return json({ success: false, message: "Error al obtener acuerdos" }, 500);
+    return json({ success: false, message: "Error al obtener contratos" }, 500);
   }
 
   const contracts = (res.data || []).map((contract) => {
@@ -309,7 +313,7 @@ async function handleListByEmployee(
   );
 
   if (!res.ok) {
-    return json({ success: false, message: "Error al obtener acuerdos" }, 500);
+    return json({ success: false, message: "Error al obtener contratos" }, 500);
   }
 
   const contracts = (res.data || []).map((contract) => ({
@@ -344,13 +348,13 @@ async function handleVerifyParticipant(
 
   const contract = await fetchContract(url, key, orgId, contractId, true);
   if (!contract) {
-    return json({ success: false, message: "Acuerdo no encontrado" }, 404);
+    return json({ success: false, message: "Contrato no encontrado" }, 404);
   }
   if (contract.status === "signed") {
-    return json({ success: false, message: "El acuerdo ya esta firmado." }, 409);
+    return json({ success: false, message: "El contrato ya esta firmado." }, 409);
   }
   if (contract.status === "cancelled") {
-    return json({ success: false, message: "El acuerdo esta cancelado." }, 409);
+    return json({ success: false, message: "El contrato esta cancelado." }, 409);
   }
   if (contract.status === "pending_admin") {
     return json({
@@ -436,7 +440,7 @@ async function handleVerifyParticipant(
     return json({
       success: false,
       error: "EMPLOYEE_MISMATCH",
-      message: `Ese PIN pertenece a ${resolvedEmployeeName}, no al participante asignado en este acuerdo.`,
+      message: `Ese PIN pertenece a ${resolvedEmployeeName}, no al participante asignado en este contrato.`,
       resolvedEmployeeName,
     }, 409);
   }
@@ -492,13 +496,13 @@ async function handleParticipantSign(
 
   const contract = await fetchContract(url, key, orgId, contractId);
   if (!contract) {
-    return json({ success: false, message: "Acuerdo no encontrado" }, 404);
+    return json({ success: false, message: "Contrato no encontrado" }, 404);
   }
   if (contract.status === "signed") {
-    return json({ success: false, message: "El acuerdo ya esta firmado." }, 409);
+    return json({ success: false, message: "El contrato ya esta firmado." }, 409);
   }
   if (contract.status === "cancelled") {
-    return json({ success: false, message: "El acuerdo esta cancelado." }, 409);
+    return json({ success: false, message: "El contrato esta cancelado." }, 409);
   }
   if (contract.status !== "pending_participant") {
     return json({
@@ -521,7 +525,7 @@ async function handleParticipantSign(
     return json({
       success: false,
       error: "VERIFICATION_TOKEN_MISMATCH",
-      message: "La validacion del PIN no corresponde a este acuerdo.",
+      message: "La validacion del PIN no corresponde a este contrato.",
     }, 403);
   }
 
@@ -617,13 +621,13 @@ async function handleAdminSign(
 
   const contract = await fetchContract(url, key, orgId, contractId);
   if (!contract) {
-    return json({ success: false, message: "Acuerdo no encontrado" }, 404);
+    return json({ success: false, message: "Contrato no encontrado" }, 404);
   }
   if (contract.status === "signed") {
-    return json({ success: false, message: "El acuerdo ya esta firmado." }, 409);
+    return json({ success: false, message: "El contrato ya esta firmado." }, 409);
   }
   if (contract.status === "cancelled") {
-    return json({ success: false, message: "El acuerdo esta cancelado." }, 409);
+    return json({ success: false, message: "El contrato esta cancelado." }, 409);
   }
   if (contract.status !== "pending_admin") {
     return json({
@@ -921,10 +925,10 @@ async function handleGetPdfData(
 
   const contract = await fetchContract(url, key, orgId, contractId, true);
   if (!contract) {
-    return json({ success: false, message: "Acuerdo no encontrado" }, 404);
+    return json({ success: false, message: "Contrato no encontrado" }, 404);
   }
   if (contract.status !== "signed") {
-    return json({ success: false, message: "El acuerdo aun no esta firmado" }, 409);
+    return json({ success: false, message: "El contrato aun no esta firmado" }, 409);
   }
 
   const supabaseAdmin = createClient(url, key, {
@@ -985,6 +989,68 @@ async function handleGetPdfData(
       document_snapshot_json: contract.document_snapshot_json,
     },
   });
+}
+
+async function handleDelete(
+  url: string,
+  key: string,
+  orgId: string,
+  body: RequestBody,
+  actorSessionId: string,
+  deletedByEmployeeId: string | null,
+): Promise<Response> {
+  const contractId = String(body.contractId || "").trim();
+  if (!contractId) return json({ success: false, message: "Falta contractId" }, 400);
+
+  const contract = await fetchContract(url, key, orgId, contractId, true);
+  if (!contract) {
+    return json({ success: false, message: "Contrato no encontrado" }, 404);
+  }
+
+  // Clean up storage files (best-effort)
+  const supabaseAdmin = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const filesToRemove: string[] = [];
+  if (contract.participant_sign_url) filesToRemove.push(contract.participant_sign_url);
+  if (contract.admin_sign_url) filesToRemove.push(contract.admin_sign_url);
+  if (filesToRemove.length > 0) {
+    await supabaseAdmin.storage.from("contract-signatures").remove(filesToRemove).catch(() => {});
+  }
+  if (contract.document_storage_path) {
+    await supabaseAdmin.storage.from("contract-documents").remove([contract.document_storage_path]).catch(() => {});
+  }
+
+  // Hard DELETE the row
+  const deleteRes = await fetch(
+    `${url}/rest/v1/kiosk_contracts?id=eq.${encodeURIComponent(contractId)}&organization_id=eq.${encodeURIComponent(orgId)}`,
+    {
+      method: "DELETE",
+      headers: authHeaders(key),
+    },
+  );
+
+  if (!deleteRes.ok) {
+    return json({ success: false, message: "Error al eliminar el contrato" }, 500);
+  }
+
+  const employee = contract.kiosk_employees;
+  await logAudit(url, key, {
+    organizationId: orgId,
+    actorSessionId,
+    actorRole: "org_admin",
+    employeeId: contract.employee_id,
+    action: "contract_deleted",
+    metadata: {
+      contract_id: contractId,
+      deleted_by_employee_id: deletedByEmployeeId,
+      contract_status_at_deletion: contract.status,
+      employee_name: employee ? `${employee.nombre} ${employee.apellido}`.trim() : "",
+    },
+  });
+
+  return json({ success: true });
 }
 
 async function downloadSignatureAsBase64(

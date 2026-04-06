@@ -351,7 +351,7 @@
                 <nav class="admin-tabs" id="admin-tabs">
                     <button class="admin-tab active" data-tab="admin-payments">Pagos</button>
                     <button class="admin-tab" data-tab="admin-employees">Empleados</button>
-                    <button class="admin-tab" data-tab="admin-acuerdos">Acuerdos</button>
+                    <button class="admin-tab" data-tab="admin-acuerdos">Contratos</button>
                     <button class="admin-tab" data-tab="admin-recibos">Recibos</button>
                     <button class="admin-tab" data-tab="admin-ajustes">Ajustes</button>
                 </nav>
@@ -459,7 +459,7 @@
 
                     <button class="btn-add-emp" id="admin-acuerdo-nuevo" type="button">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        Nuevo acuerdo
+                        Nuevo contrato
                     </button>
 
                     <div class="admin-acuerdo-form-wrap" id="admin-acuerdo-form-wrap">
@@ -470,13 +470,13 @@
                                     <option value="">Seleccionar participante...</option>
                                 </select>
                             </div>
-                            <button class="btn-primary btn-full" id="admin-acuerdo-crear" type="button">Crear acuerdo</button>
+                            <button class="btn-primary btn-full" id="admin-acuerdo-crear" type="button">Crear contrato</button>
                             <div class="employee-form-feedback hidden" id="acuerdo-form-feedback"></div>
                         </div>
                     </div>
 
                     <div class="employee-list" id="admin-acuerdo-list">
-                        <p class="loading-text">Cargando acuerdos...</p>
+                        <p class="loading-text">Cargando contratos...</p>
                     </div>
                 </div>
 
@@ -645,7 +645,7 @@
                 <button class="back-btn" id="acuerdo-back-btn" aria-label="Volver">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
                 </button>
-                <h2 id="acuerdo-header-title">Acuerdo de Participación</h2>
+                <h2 id="acuerdo-header-title">Contrato de Participación</h2>
             </header>
 
             <div class="acuerdo-steps-bar">
@@ -804,7 +804,7 @@
                         <div class="acuerdo-success-icon">
                             <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                         </div>
-                        <h3 class="acuerdo-success-title">¡Acuerdo firmado!</h3>
+                        <h3 class="acuerdo-success-title">¡Contrato firmado!</h3>
                         <p class="acuerdo-success-sub">Las dos firmas han quedado guardadas correctamente.</p>
                         <button id="acuerdo-btn-done" class="btn-primary btn-full btn-xlarge">Volver al inicio</button>
                     </div>

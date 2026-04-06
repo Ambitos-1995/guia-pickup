@@ -119,7 +119,7 @@ var Contract = (function () {
     function loadContractData(contractId) {
         Api.getContract(contractId).then(function (res) {
             if (!res || !res.success || !res.data) {
-                showFeedback((res && res.message) || 'No se pudo cargar el acuerdo.');
+                showFeedback((res && res.message) || 'No se pudo cargar el contrato.');
                 App.navigate('screen-admin');
                 return;
             }
@@ -140,7 +140,7 @@ var Contract = (function () {
 
     function renderContractSummary(data) {
         var name = data.employee_name || '-';
-        setText('acuerdo-header-title', name !== '-' ? ('Acuerdo - ' + name) : 'Acuerdo de Participacion');
+        setText('acuerdo-header-title', name !== '-' ? ('Contrato - ' + name) : 'Contrato de Participacion');
         setText('acuerdo-pin-target', name);
         renderContractLegalDoc(name);
     }

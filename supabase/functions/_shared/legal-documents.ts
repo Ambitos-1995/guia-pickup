@@ -46,7 +46,7 @@ export function buildLegacyContractRenderedContent(employeeName: string): Unknow
   return {
     schema_version: 1,
     template_version: LEGACY_CONTRACT_TEMPLATE_VERSION,
-    title: "Acuerdo de Participacion en Actividad Ocupacional",
+    title: "Contrato de Participacion en Actividad Ocupacional",
     opening: buildContractOpening(employeeName),
     clauses: [
       {
@@ -72,7 +72,7 @@ export function buildLegacyContractRenderedContent(employeeName: string): Unknow
       {
         title: "Quinta — Voluntariedad y baja",
         text:
-          "La participacion es completamente voluntaria. Cualquiera de las partes puede dar por finalizado este acuerdo en cualquier momento, sin necesidad de preaviso ni penalizacion.",
+          "La participacion es completamente voluntaria. Cualquiera de las partes puede dar por finalizado este contrato en cualquier momento, sin necesidad de preaviso ni penalizacion.",
       },
       {
         title: "Sexta — Seguro y cobertura",
@@ -87,7 +87,7 @@ export function buildLegacyContractRenderedContent(employeeName: string): Unknow
       {
         title: "Octava — Vigencia",
         text:
-          "Este acuerdo tiene una duracion de tres meses desde la fecha de firma, renovable automaticamente por periodos iguales salvo comunicacion en contrario por cualquiera de las partes.",
+          "Este contrato tiene una duracion de tres meses desde la fecha de firma, renovable automaticamente por periodos iguales salvo comunicacion en contrario por cualquiera de las partes.",
       },
     ],
     closing: "Ambas partes firman electronicamente a continuacion en senal de conformidad.",
@@ -98,7 +98,7 @@ export function buildCurrentContractRenderedContent(employeeName: string): Unkno
   return {
     schema_version: 2,
     template_version: CURRENT_LEGAL_TEMPLATE_VERSION,
-    title: "Acuerdo de Participacion en Actividad Ocupacional",
+    title: "Contrato de Participacion en Actividad Ocupacional",
     opening: buildContractOpening(employeeName),
     clauses: [
       {
@@ -124,7 +124,7 @@ export function buildCurrentContractRenderedContent(employeeName: string): Unkno
       {
         title: "Quinta — Voluntariedad y baja",
         text:
-          "La participacion es completamente voluntaria. Cualquiera de las partes puede dar por finalizado este acuerdo en cualquier momento, sin necesidad de preaviso ni penalizacion.",
+          "La participacion es completamente voluntaria. Cualquiera de las partes puede dar por finalizado este contrato en cualquier momento, sin necesidad de preaviso ni penalizacion.",
       },
       {
         title: "Sexta — Seguro y cobertura",
@@ -134,7 +134,7 @@ export function buildCurrentContractRenderedContent(employeeName: string): Unkno
       {
         title: "Septima — Proteccion de datos",
         text:
-          "Los datos personales del/la Participante, incluidos los relativos a su salud como categoria especial de datos, se tratan conforme al Reglamento (UE) 2016/679 (RGPD) y la Ley Organica 3/2018 (LOPDGDD).\n\nResponsable del tratamiento: Fundacion Ambitos (NIF: G85643849), con domicilio en Calle Belmonte de Tajo 52-54, 28019 Madrid. Contacto: tecnologia@ambitos.social.\n\nFinalidad: gestion del programa de rehabilitacion psicosocial 'Punto Inclusivo', incluyendo el registro de participacion, el calculo y abono de gratificaciones, y la coordinacion con profesionales de referencia del/la participante cuando sea necesario para los fines del programa.\n\nBase juridica: articulo 6.1.e) RGPD (mision de interes publico en el ambito de servicios sociales) y articulo 9.2.h) RGPD (tratamiento necesario para la prestacion de asistencia social), en relacion con la Ley 12/2022 de Servicios Sociales de la Comunidad de Madrid y el Real Decreto Legislativo 1/2013.\n\nDestinatarios: equipo del programa, profesionales sanitarios o sociales de referencia del/la participante cuando sea necesario. No se realizan transferencias internacionales de datos.\n\nPlazo de conservacion: los datos se conservaran durante la vigencia del presente acuerdo y, tras su finalizacion, durante los plazos legalmente establecidos para atender posibles responsabilidades.\n\nDerechos: el/la Participante puede ejercer sus derechos de acceso, rectificacion, supresion, portabilidad, limitacion del tratamiento y oposicion, dirigiendose a Fundacion Ambitos en la direccion indicada. Asimismo, tiene derecho a presentar reclamacion ante la Agencia Espanola de Proteccion de Datos (www.aepd.es).",
+          "Los datos personales del/la Participante, incluidos los relativos a su salud como categoria especial de datos, se tratan conforme al Reglamento (UE) 2016/679 (RGPD) y la Ley Organica 3/2018 (LOPDGDD).\n\nResponsable del tratamiento: Fundacion Ambitos (NIF: G85643849), con domicilio en Calle Belmonte de Tajo 52-54, 28019 Madrid. Contacto: tecnologia@ambitos.social.\n\nFinalidad: gestion del programa de rehabilitacion psicosocial 'Punto Inclusivo', incluyendo el registro de participacion, el calculo y abono de gratificaciones, y la coordinacion con profesionales de referencia del/la participante cuando sea necesario para los fines del programa.\n\nBase juridica: articulo 6.1.e) RGPD (mision de interes publico en el ambito de servicios sociales) y articulo 9.2.h) RGPD (tratamiento necesario para la prestacion de asistencia social), en relacion con la Ley 12/2022 de Servicios Sociales de la Comunidad de Madrid y el Real Decreto Legislativo 1/2013.\n\nDestinatarios: equipo del programa, profesionales sanitarios o sociales de referencia del/la participante cuando sea necesario. No se realizan transferencias internacionales de datos.\n\nPlazo de conservacion: los datos se conservaran durante la vigencia del presente contrato y, tras su finalizacion, durante los plazos legalmente establecidos para atender posibles responsabilidades.\n\nDerechos: el/la Participante puede ejercer sus derechos de acceso, rectificacion, supresion, portabilidad, limitacion del tratamiento y oposicion, dirigiendose a Fundacion Ambitos en la direccion indicada. Asimismo, tiene derecho a presentar reclamacion ante la Agencia Espanola de Proteccion de Datos (www.aepd.es).",
       },
       {
         title: "Octava — Naturaleza del programa y supervision",
@@ -144,7 +144,7 @@ export function buildCurrentContractRenderedContent(employeeName: string): Unkno
       {
         title: "Novena — Vigencia",
         text:
-          "Este acuerdo tiene una duracion de tres meses desde la fecha de firma, renovable automaticamente por periodos iguales salvo comunicacion en contrario por cualquiera de las partes.",
+          "Este contrato tiene una duracion de tres meses desde la fecha de firma, renovable automaticamente por periodos iguales salvo comunicacion en contrario por cualquiera de las partes.",
       },
     ],
     closing: "Ambas partes firman electronicamente a continuacion en senal de conformidad.",

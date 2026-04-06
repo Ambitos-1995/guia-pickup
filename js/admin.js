@@ -14,6 +14,7 @@ var Admin = (function () {
     var CALC_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="16" y1="18" x2="16" y2="18"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="8" y1="10" x2="16" y2="10"/></svg>';
     var SPINNER_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
     var DOWNLOAD_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    var TRASH_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
 
     /* --- Shared feedback helper --- */
     function showFeedback(elementId, type, message, autoHideMs) {
@@ -684,40 +685,41 @@ var Admin = (function () {
             schedule:            'Seg\u00fan turnos elegidos libremente por el/la Participante',
             validityText:        '3 meses, renovable autom\u00e1ticamente'
         }).then(function (res) {
-            if (btn) { btn.disabled = false; btn.textContent = 'Crear acuerdo'; }
+            if (btn) { btn.disabled = false; btn.textContent = 'Crear contrato'; }
 
             if (res && res.success) {
-                showFeedback('acuerdo-form-feedback', 'success', 'Acuerdo creado correctamente.', 3000);
+                showFeedback('acuerdo-form-feedback', 'success', 'Contrato creado correctamente.', 3000);
                 var s = document.getElementById('acuerdo-emp-select');
                 if (s) s.value = '';
                 toggleAcuerdoForm();
                 loadAcuerdosList();
             } else {
-                showFeedback('acuerdo-form-feedback', 'error', (res && res.message) || 'Error al crear el acuerdo.');
+                showFeedback('acuerdo-form-feedback', 'error', (res && res.message) || 'Error al crear el contrato.');
             }
         });
     }
 
     function loadAcuerdosList() {
+        employeeSelectCache = null;
         var list = document.getElementById('admin-acuerdo-list');
         if (!list) return;
         list.textContent = '';
 
         var loading = document.createElement('p');
         loading.className   = 'loading-text';
-        loading.textContent = 'Cargando acuerdos...';
+        loading.textContent = 'Cargando contratos...';
         list.appendChild(loading);
 
         Api.listAllContracts().then(function (res) {
             list.textContent = '';
 
             if (!res || !res.success) {
-                renderEmployeeState(list, 'No se pudieron cargar los acuerdos.', true);
+                renderEmployeeState(list, 'No se pudieron cargar los contratos.', true);
                 return;
             }
 
             if (!res.contracts || res.contracts.length === 0) {
-                renderEmployeeState(list, 'No hay acuerdos registrados aún.');
+                renderEmployeeState(list, 'No hay contratos registrados aún.');
                 return;
             }
 
@@ -752,6 +754,9 @@ var Admin = (function () {
 
         row.appendChild(info);
 
+        var actions = document.createElement('div');
+        actions.className = 'acuerdo-row-actions';
+
         if (contract.status === 'signed') {
             var dlBtn = document.createElement('button');
             dlBtn.className = 'btn-acuerdo-descargar';
@@ -761,8 +766,8 @@ var Admin = (function () {
                     downloadContractPdf(id, dlBtn);
                 });
             }(contract.id));
-            row.appendChild(dlBtn);
-        } else {
+            actions.appendChild(dlBtn);
+        } else if (contract.status !== 'cancelled') {
             var btn = document.createElement('button');
             btn.className   = 'btn-acuerdo-iniciar';
             btn.textContent = contract.status === 'pending_admin' ? 'Cofirmar' : 'Iniciar firma';
@@ -771,10 +776,40 @@ var Admin = (function () {
                     App.navigateToContract(id);
                 });
             }(contract.id));
-            row.appendChild(btn);
+            actions.appendChild(btn);
         }
 
+        var delBtn = document.createElement('button');
+        delBtn.className = 'btn-acuerdo-eliminar';
+        delBtn.innerHTML = TRASH_ICON;
+        delBtn.setAttribute('aria-label', 'Eliminar contrato');
+        delBtn.setAttribute('title', 'Eliminar');
+        (function (id, name) {
+            Utils.bindPress(delBtn, function () {
+                deleteContractConfirm(id, name);
+            });
+        }(contract.id, contract.employee_name || ''));
+        actions.appendChild(delBtn);
+
+        row.appendChild(actions);
+
         return row;
+    }
+
+    function deleteContractConfirm(contractId, employeeName) {
+        App.confirm(
+            'Eliminar contrato',
+            'Se eliminara permanentemente el contrato de ' + (employeeName || 'este participante') + '. Esta accion no se puede deshacer.',
+            function () {
+                Api.deleteContract(contractId).then(function (res) {
+                    if (res && res.success) {
+                        loadAcuerdosList();
+                    } else {
+                        App.confirm('Error', (res && res.message) || 'No se pudo eliminar el contrato.', null);
+                    }
+                });
+            }
+        );
     }
 
     function escapeHtml(str) {
@@ -801,11 +836,11 @@ var Admin = (function () {
         Api.getContractPdfData(contractId).then(function (res) {
             resetBtn();
             if (!res || !res.success || !res.data) {
-                App.showToast('No se pudo obtener el acuerdo', 'error');
+                App.showToast('No se pudo obtener el contrato', 'error');
                 return;
             }
             generateContractPdf(res.data).catch(function () {
-                App.showToast('No se pudo generar el PDF del acuerdo', 'error');
+                App.showToast('No se pudo generar el PDF del contrato', 'error');
             });
         }).catch(function () {
             resetBtn();
@@ -942,8 +977,8 @@ var Admin = (function () {
         }
 
         // Download
-        var safeName = (data.employee_name || 'acuerdo').replace(/[^a-zA-Z0-9\u00c0-\u017f]/g, '_').replace(/_+/g, '_');
-        doc.save('Acuerdo_' + safeName + '.pdf');
+        var safeName = (data.employee_name || 'contrato').replace(/[^a-zA-Z0-9\u00c0-\u017f]/g, '_').replace(/_+/g, '_');
+        doc.save('Contrato_' + safeName + '.pdf');
     }
 
     function resolveContractPdfContent(data) {

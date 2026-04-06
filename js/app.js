@@ -730,7 +730,7 @@ var App = (function () {
         if (!activeSession.employeeId) {
             confirm(
                 'Firma no disponible',
-                'Para cofirmar un acuerdo debes entrar con un PIN personal de administrador, no con el PIN general de ajustes.'
+                'Para cofirmar un contrato debes entrar con un PIN personal de administrador, no con el PIN general de ajustes.'
             );
             return;
         }

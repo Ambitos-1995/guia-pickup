@@ -380,6 +380,14 @@ var Api = (function () {
         }, { requiresAuth: true });
     }
 
+    function deleteContract(contractId) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-contract', {
+            orgSlug: ORG_SLUG,
+            action: 'delete',
+            contractId: contractId
+        }, { requiresAuth: true });
+    }
+
     // ── Recibos de pago mensuales ──────────────────────────────────────────
 
     function generateReceipts(year, month) {
@@ -512,6 +520,7 @@ var Api = (function () {
         adminSignContract: adminSignContract,
         listAllContracts: listAllContracts,
         getContractPdfData: getContractPdfData,
+        deleteContract: deleteContract,
         generateReceipts: generateReceipts,
         getMyReceipt: getMyReceipt,
         verifyReceiptPin: verifyReceiptPin,
