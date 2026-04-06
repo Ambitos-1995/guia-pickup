@@ -278,13 +278,13 @@ async function handleCalculate(
     const entry = perEmployee.get(employeeId) || { workedMinutes: 0, slotCount: 0 };
     const anomalyNotes = anomalies.get(employeeId) || [];
     const hasAnomalies = anomalyNotes.length > 0;
+    const hoursWorked = round2(entry.workedMinutes / 60);
+    const amountEarned = hoursWorked > 0 ? round2(hoursWorked * hourlyRate) : 0;
     const status = hasAnomalies
       ? "review_required"
-      : entry.workedMinutes > 0
+      : hoursWorked > 0
       ? "calculated"
       : "pending";
-    const hoursWorked = round2(entry.workedMinutes / 60);
-    const amountEarned = status === "calculated" ? round2(hoursWorked * hourlyRate) : 0;
 
     return {
       organization_id: orgId,
@@ -293,7 +293,7 @@ async function handleCalculate(
       month,
       status,
       hours_worked: hoursWorked,
-      hourly_rate: status === "calculated" ? round4(hourlyRate) : 0,
+      hourly_rate: hoursWorked > 0 ? round4(hourlyRate) : 0,
       amount_earned: amountEarned,
       worked_minutes: entry.workedMinutes,
       slot_count: entry.slotCount,
