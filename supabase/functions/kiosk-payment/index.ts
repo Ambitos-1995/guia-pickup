@@ -265,9 +265,15 @@ async function handleCalculate(
     perEmployee.set(slot.employee_id, current);
   }
 
+  const totalPossibleMinutes = monthSlots.reduce((sum, slot) => {
+    const [sh, sm] = slot.start_time.split(":").map(Number);
+    const [eh, em] = slot.end_time.split(":").map(Number);
+    return sum + ((eh * 60 + em) - (sh * 60 + sm));
+  }, 0);
+  const totalPossibleHours = totalPossibleMinutes / 60;
   const validatedMinutes = Array.from(perEmployee.values()).reduce((sum, item) => sum + item.workedMinutes, 0);
   const validatedHours = validatedMinutes / 60;
-  const hourlyRate = validatedHours > 0 ? totalAmount / validatedHours : 0;
+  const hourlyRate = totalPossibleHours > 0 ? totalAmount / totalPossibleHours : 0;
 
   const affectedEmployeeIds = new Set<string>([
     ...Array.from(perEmployee.keys()),
@@ -361,6 +367,7 @@ async function handleCalculate(
     success: true,
     data: {
       total_seur_amount: round2(totalAmount),
+      total_possible_hours: round2(totalPossibleHours),
       total_validated_hours: round2(validatedHours),
       rate_per_hour: round2(hourlyRate),
       total_paid: totalPaid,
@@ -477,11 +484,12 @@ async function handleGetSummary(
       employee_id: string;
       employee_name_snapshot: string;
       hours_worked: number;
+      hourly_rate: number;
       amount_earned: number;
       status: string;
       notes: string;
     }>>(
-      `${url}/rest/v1/kiosk_payment_settlements?select=employee_id,employee_name_snapshot,hours_worked,amount_earned,status,notes&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}`,
+      `${url}/rest/v1/kiosk_payment_settlements?select=employee_id,employee_name_snapshot,hours_worked,hourly_rate,amount_earned,status,notes&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}`,
       { headers: authHeaders(key) },
     ),
   ]);
@@ -497,7 +505,8 @@ async function handleGetSummary(
   const totalPaid = settlements.reduce((sum, s) => sum + Number(s.amount_earned || 0), 0);
   const totalHours = settlements.reduce((sum, s) => sum + Number(s.hours_worked || 0), 0);
   const reviewCount = settlements.filter((s) => s.status === "review_required").length;
-  const ratePerHour = totalHours > 0 ? totalAmount / totalHours : 0;
+  const storedRate = settlements.find((s) => Number(s.hourly_rate || 0) > 0);
+  const ratePerHour = storedRate ? Number(storedRate.hourly_rate) : 0;
 
   const calculations = settlements.map((s) => ({
     employee_id: s.employee_id,
