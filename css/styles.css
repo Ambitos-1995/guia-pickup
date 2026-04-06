@@ -4582,3 +4582,42 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+.btn-receipt-sign {
+    background: var(--brand);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    min-height: 48px;
+    min-width: 80px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-family: var(--font);
+}
+
+/* Admin receipt signing overlay */
+.admin-receipt-signing-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: var(--bg, #f1f5f9);
+    overflow-y: auto;
+    padding: 0 16px env(safe-area-inset-bottom);
+}
+.admin-receipt-signing-overlay.hidden { display: none; }
+.admin-receipt-signing-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 0;
+}
+.admin-receipt-signing-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text, #1e293b);
+    margin: 0;
+}

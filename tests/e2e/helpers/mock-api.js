@@ -71,6 +71,10 @@ function buildState(overrides = {}) {
         assigned_employee_profile_id: null
       }
     ],
+    receiptList: [
+      { id: 'receipt-1', employee_id: 'emp-1', employee_name: 'Ismael Perez', employee_name_snapshot: 'Ismael Perez', hours_worked: 24, amount_earned: 312.5, status: 'pending', employee_signed_at: null },
+      { id: 'receipt-2', employee_id: 'emp-2', employee_name: 'Lucia Garcia', employee_name_snapshot: 'Lucia Garcia', hours_worked: 18, amount_earned: 234.36, status: 'signed', employee_signed_at: '2026-03-28T10:00:00.000Z' }
+    ],
     createCalls: [],
     receiptSignCalls: [],
     scheduleActionCalls: [],
@@ -184,6 +188,10 @@ async function setupMockApi(page, overrides = {}) {
         return fulfillJson(route, { success: false, message: 'PIN incorrecto' }, 401);
       }
 
+      if (body.action === 'logout') {
+        return fulfillJson(route, { success: true });
+      }
+
       if (body.action === 'list') {
         return fulfillJson(route, { success: true, data: state.employees });
       }
@@ -263,6 +271,20 @@ async function setupMockApi(page, overrides = {}) {
         return fulfillJson(route, { success: true, data: state.myReceipt });
       }
 
+      if (body.action === 'list') {
+        return fulfillJson(route, { success: true, receipts: state.receiptList || [] });
+      }
+
+      if (body.action === 'verify-pin') {
+        state.receiptVerifyPinCalls = state.receiptVerifyPinCalls || [];
+        state.receiptVerifyPinCalls.push(body);
+        var pin = String(body.pin || '');
+        if (pin === '1234' || pin === '4321' || pin === '5555') {
+          return fulfillJson(route, { success: true, verificationToken: 'mock-receipt-token', employeeName: 'Mock', expiresInSeconds: 600 });
+        }
+        return fulfillJson(route, { success: false, message: 'PIN incorrecto' }, 401);
+      }
+
       if (body.action === 'sign') {
         state.receiptSignCalls.push(body);
         if (!state.myReceipt || state.myReceipt.status !== 'pending') {
@@ -277,6 +299,14 @@ async function setupMockApi(page, overrides = {}) {
 
         return fulfillJson(route, { success: true });
       }
+
+      if (body.action === 'generate') {
+        return fulfillJson(route, { success: true, generated: 1, skippedSigned: 0 });
+      }
+    }
+
+    if (url.pathname.endsWith('/kiosk-report')) {
+      return fulfillJson(route, { success: true });
     }
 
     if (url.pathname.endsWith('/kiosk-schedule')) {

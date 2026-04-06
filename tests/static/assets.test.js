@@ -9,16 +9,29 @@ const directIndexHtml = fs.readFileSync(path.join(root, 'direct', 'index.html'),
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
 const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 const swRegister = fs.readFileSync(path.join(root, 'js', 'sw-register.js'), 'utf8');
+const vercelIgnore = fs.readFileSync(path.join(root, '.vercelignore'), 'utf8');
 const apiJs = fs.readFileSync(path.join(root, 'js', 'api.js'), 'utf8');
+const appJs = fs.readFileSync(path.join(root, 'js', 'app.js'), 'utf8');
 const offlineQueueJs = fs.readFileSync(path.join(root, 'js', 'offline-clock-queue.js'), 'utf8');
 const guiaJs = fs.readFileSync(path.join(root, 'js', 'guia.js'), 'utf8');
 const stylesCss = fs.readFileSync(path.join(root, 'css', 'styles.css'), 'utf8');
 const paymentJs = fs.readFileSync(path.join(root, 'js', 'payment.js'), 'utf8');
 const adminJs = fs.readFileSync(path.join(root, 'js', 'admin.js'), 'utf8');
 const utilsJs = fs.readFileSync(path.join(root, 'js', 'utils.js'), 'utf8');
+const pinPadJs = fs.readFileSync(path.join(root, 'js', 'pin-pad.js'), 'utf8');
 const clockFunction = fs.readFileSync(path.join(root, 'supabase', 'functions', 'kiosk-clock', 'index.ts'), 'utf8');
 const supabaseConfig = fs.readFileSync(path.join(root, 'supabase', 'config.toml'), 'utf8');
 const receiptFunction = fs.readFileSync(path.join(root, 'supabase', 'functions', 'kiosk-payment-receipt', 'index.ts'), 'utf8');
+const sharedKiosk = fs.readFileSync(path.join(root, 'supabase', 'functions', '_shared', 'kiosk.ts'), 'utf8');
+const baselineContractMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260330092629_add_kiosk_contracts.sql'), 'utf8');
+const contractStatusMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260330103212_add_participant_verified_at_and_pending_admin_status.sql'), 'utf8');
+const supersededContractMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260330120000_add_kiosk_contracts.sql'), 'utf8');
+const baselineAuditMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260330122835_kiosk_row_level_audit_triggers.sql'), 'utf8');
+const supersededAuditMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260330150000_kiosk_row_level_audit_triggers.sql'), 'utf8');
+const baselineAuditExpansionMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260330123332_audit_triggers_all_tables.sql'), 'utf8');
+const supersededAuditExpansionMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260330160000_audit_triggers_all_tables.sql'), 'utf8');
+const supersededReceiptMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260331100000_add_kiosk_payment_receipts.sql'), 'utf8');
+const baselineReceiptMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260331103702_add_kiosk_payment_receipts.sql'), 'utf8');
 const queuedRecordSource = offlineQueueJs.slice(
   offlineQueueJs.indexOf('function buildQueuedRecord'),
   offlineQueueJs.indexOf('function generateClientEventId')
@@ -115,6 +128,20 @@ test('service worker registration exposes the manual update button and avoids th
   assert.doesNotMatch(swRegister, /fetchAssetFingerprint/);
 });
 
+test('vercel deployment excludes internal source and audit artifacts from the public static output', () => {
+  [
+    'supabase',
+    'tests',
+    'test-results',
+    'docs',
+    'scripts',
+    'skills',
+    'node_modules'
+  ].forEach((entry) => {
+    assert.match(vercelIgnore, new RegExp(`^${entry}$`, 'm'));
+  });
+});
+
 test('service worker offline api fallback returns 503', () => {
   assert.match(sw, /status:\s*503/);
   assert.match(sw, /statusText:\s*'Offline'/);
@@ -185,15 +212,99 @@ test('supabase function config includes kiosk payment receipt endpoint', () => {
   assert.match(supabaseConfig, /\[functions\.kiosk-payment-receipt\][\s\S]*verify_jwt\s*=\s*false/);
 });
 
-test('receipt signing reuses the authenticated user session without asking for the PIN again', () => {
-  const startSigningSource = paymentJs.slice(
-    paymentJs.indexOf('function startReceiptSigning()'),
-    paymentJs.indexOf('function bindReceiptKeypad()')
+test('shared kiosk edge helpers support a configurable CORS allowlist', () => {
+  assert.match(sharedKiosk, /KIOSK_ALLOWED_ORIGINS/);
+  assert.match(sharedKiosk, /EDGE_ALLOWED_ORIGINS/);
+  assert.match(sharedKiosk, /configuredAllowedOrigins\[0\] \|\| "\*"/);
+});
+
+test('touch-driven keypad interactions do not rely on click-only handlers', () => {
+  assert.match(pinPadJs, /addEventListener\('pointerup', instance\.keypadPointerHandler\)/);
+  assert.match(pinPadJs, /instance\.lastPointerPressAt = Date\.now\(\)/);
+  assert.match(utilsJs, /target\.addEventListener\('pointerup', onPointerUp\)/);
+  assert.match(utilsJs, /container\.addEventListener\('pointerup', onPointerUp\)/);
+});
+
+test('logout revokes the server-side session instead of only clearing local state', () => {
+  assert.match(apiJs, /function logout\(options\)/);
+  assert.match(apiJs, /action:\s*'logout'/);
+  assert.match(appJs, /Api\.logout\(\{/);
+  assert.match(appJs, /accessToken:\s*activeSession\.accessToken/);
+  assert.match(appJs, /clearSession\(\);/);
+  assert.match(
+    fs.readFileSync(path.join(root, 'supabase', 'functions', 'kiosk-employees', 'index.ts'), 'utf8'),
+    /action === "logout"/
   );
-  assert.match(startSigningSource, /goToReceiptSign\(\);/);
-  assert.doesNotMatch(startSigningSource, /showReceiptStep\('pin'\)/);
-  assert.doesNotMatch(startSigningSource, /verifyReceiptPin\(\)/);
-  assert.doesNotMatch(paymentJs, /La validacion del PIN ha caducado/);
+  assert.match(
+    fs.readFileSync(path.join(root, 'supabase', 'functions', 'kiosk-employees', 'index.ts'), 'utf8'),
+    /revokeSession\(supabaseUrl, key, session\.id\)/
+  );
+});
+
+test('client error reporting requires an authenticated session and sanitizes payloads server-side', () => {
+  const reportFunction = fs.readFileSync(path.join(root, 'supabase', 'functions', 'kiosk-report', 'index.ts'), 'utf8');
+  assert.match(apiJs, /reportClientError\(payload\)/);
+  assert.match(apiJs, /requiresAuth:\s*true/);
+  assert.match(apiJs, /silentAuthFailure:\s*true/);
+  assert.match(apiJs, /suppressTouchSession:\s*true/);
+  assert.doesNotMatch(apiJs, /employeeId:\s*session/);
+  assert.match(reportFunction, /requireSession\(req, url, serviceRoleKey, \["respondent", "org_admin"\]\)/);
+  assert.match(reportFunction, /actor_session_id:\s*auth\.session\.id/);
+  assert.match(reportFunction, /employee_id:\s*auth\.session\.employee_id/);
+  assert.match(reportFunction, /normalizePayload\(body\.payload\)/);
+});
+
+test('api client keeps safe defaults but allows runtime deploy configuration', () => {
+  assert.match(apiJs, /window\.__SEUR_CONFIG__/);
+  assert.match(apiJs, /runtimeConfig\.orgSlug/);
+  assert.match(apiJs, /runtimeConfig\.supabaseProjectUrl/);
+  assert.match(apiJs, /'https:\/\/mzuvkinwebqgmnutchsv\.supabase\.co'/);
+});
+
+test('contract migration history keeps production as baseline and marks duplicate local ddl as superseded', () => {
+  assert.match(baselineContractMigration, /CREATE TABLE public\.kiosk_contracts/i);
+  assert.match(contractStatusMigration, /ADD COLUMN IF NOT EXISTS participant_verified_at TIMESTAMPTZ/i);
+  assert.match(contractStatusMigration, /DROP CONSTRAINT IF EXISTS kiosk_contracts_status_check/i);
+  assert.match(contractStatusMigration, /ADD CONSTRAINT kiosk_contracts_status_check/i);
+  assert.match(supersededContractMigration, /Superseded by 20260330092629_add_kiosk_contracts\.sql/i);
+  assert.doesNotMatch(supersededContractMigration, /create table|alter table|create index|create trigger/i);
+});
+
+test('audit migration history keeps the remote-applied baseline and nulls later duplicates', () => {
+  assert.match(baselineAuditMigration, /create table if not exists public\.kiosk_row_audit_log/i);
+  assert.match(baselineAuditExpansionMigration, /alter table public\.kiosk_row_audit_log/i);
+  assert.match(baselineAuditExpansionMigration, /add column if not exists row_pk text/i);
+  assert.match(supersededAuditMigration, /Superseded by 20260330122835_kiosk_row_level_audit_triggers\.sql/i);
+  assert.match(supersededAuditExpansionMigration, /Superseded by 20260330123332_audit_triggers_all_tables\.sql/i);
+  assert.doesNotMatch(supersededAuditMigration, /create table|create trigger|create function|grant select/i);
+  assert.doesNotMatch(supersededAuditExpansionMigration, /alter table|create trigger|create function|create index/i);
+});
+
+test('payment receipt migration history keeps the remote-applied baseline and nulls the local duplicate', () => {
+  assert.match(baselineReceiptMigration, /CREATE TABLE public\.kiosk_payment_receipts/i);
+  assert.match(baselineReceiptMigration, /CREATE UNIQUE INDEX kiosk_payment_receipts_active_unique/i);
+  assert.match(supersededReceiptMigration, /Superseded by 20260331103702_add_kiosk_payment_receipts\.sql/i);
+  assert.doesNotMatch(supersededReceiptMigration, /create table|alter table|create index|create policy/i);
+});
+
+test('receipt signing has been removed from the employee payment screen', () => {
+  assert.doesNotMatch(paymentJs, /startReceiptSigning/);
+  assert.doesNotMatch(paymentJs, /submitReceiptSignature/);
+  assert.doesNotMatch(paymentJs, /receipt-btn-sign/);
+  assert.doesNotMatch(paymentJs, /receiptSignPad/);
+  assert.doesNotMatch(paymentJs, /_debugGetReceiptPad/);
+  assert.match(paymentJs, /Consulta con tu responsable/);
+});
+
+test('receipt signing is available in the admin panel with employee PIN verification', () => {
+  assert.match(adminJs, /openAdminReceiptSigning/);
+  assert.match(adminJs, /verifyArPin/);
+  assert.match(adminJs, /submitArSignature/);
+  assert.match(adminJs, /Api\.verifyReceiptPin/);
+  assert.match(adminJs, /Api\.signReceipt/);
+  assert.match(indexHtml, /admin-receipt-signing/);
+  assert.match(indexHtml, /admin-receipt-pin-keypad/);
+  assert.match(indexHtml, /admin-receipt-canvas/);
 });
 
 test('signed receipts render an internal signed mark and explain that the document is blocked', () => {

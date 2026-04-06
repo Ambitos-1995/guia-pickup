@@ -323,102 +323,12 @@
                         </div>
                     </div>
 
-                    <!-- Banner: pendiente o firmado -->
+                    <!-- Banner: pendiente o firmado (solo lectura) -->
                     <div class="receipt-banner hidden" id="receipt-banner">
                         <div class="receipt-banner-icon" id="receipt-banner-icon">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                         </div>
                         <div class="receipt-banner-text" id="receipt-banner-text"></div>
-                        <button class="btn-primary btn-xlarge" id="receipt-btn-sign" type="button">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                            Firmar recibo
-                        </button>
-                    </div>
-
-                    <!-- Paso 1: PIN -->
-                    <div class="receipt-step hidden" id="receipt-step-pin">
-                        <div class="sign-instruction">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            <span>Introduce tu PIN para verificar tu identidad</span>
-                        </div>
-                        <div class="acuerdo-pin-panel">
-                            <div class="acuerdo-pin-dots" id="receipt-pin-dots" aria-label="PIN">
-                                <span class="acuerdo-pin-dot" data-index="0"></span>
-                                <span class="acuerdo-pin-dot" data-index="1"></span>
-                                <span class="acuerdo-pin-dot" data-index="2"></span>
-                                <span class="acuerdo-pin-dot" data-index="3"></span>
-                                <span class="acuerdo-pin-dot" data-index="4"></span>
-                                <span class="acuerdo-pin-dot" data-index="5"></span>
-                            </div>
-                            <div class="acuerdo-pin-keypad" id="receipt-pin-keypad">
-                                <button class="acuerdo-pin-key" data-key="1" type="button">1</button>
-                                <button class="acuerdo-pin-key" data-key="2" type="button">2</button>
-                                <button class="acuerdo-pin-key" data-key="3" type="button">3</button>
-                                <button class="acuerdo-pin-key" data-key="4" type="button">4</button>
-                                <button class="acuerdo-pin-key" data-key="5" type="button">5</button>
-                                <button class="acuerdo-pin-key" data-key="6" type="button">6</button>
-                                <button class="acuerdo-pin-key" data-key="7" type="button">7</button>
-                                <button class="acuerdo-pin-key" data-key="8" type="button">8</button>
-                                <button class="acuerdo-pin-key" data-key="9" type="button">9</button>
-                                <button class="acuerdo-pin-key acuerdo-pin-key--ghost" data-key="clear" type="button">Borrar</button>
-                                <button class="acuerdo-pin-key" data-key="0" type="button">0</button>
-                                <button class="acuerdo-pin-key acuerdo-pin-key--brand" data-key="submit" type="button">Validar</button>
-                            </div>
-                        </div>
-                        <div class="employee-form-feedback hidden" id="receipt-pin-feedback"></div>
-                    </div>
-
-                    <!-- Paso 2: Firma canvas -->
-                    <div class="receipt-step hidden" id="receipt-step-sign">
-                        <div class="sign-instruction">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                            <span>Firma aqui con tu dedo</span>
-                        </div>
-                        <div class="sign-canvas-wrap">
-                            <canvas id="receipt-canvas" class="sign-canvas" aria-label="Area de firma"></canvas>
-                            <div class="sign-guide-line"></div>
-                        </div>
-                        <div class="sign-actions">
-                            <button id="receipt-btn-clear" class="btn-secondary btn-xlarge" type="button">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
-                                Borrar
-                            </button>
-                            <button id="receipt-btn-confirm" class="btn-primary btn-xlarge" type="button" disabled>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                Confirmar
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Paso 3: Preview firma -->
-                    <div class="receipt-step hidden" id="receipt-step-preview">
-                        <p class="preview-question">¿Es esta tu firma?</p>
-                        <div class="preview-img-wrap">
-                            <img id="receipt-preview-img" alt="Tu firma" class="preview-img"/>
-                        </div>
-                        <div class="sign-actions">
-                            <button id="receipt-btn-redo" class="btn-secondary btn-xlarge" type="button">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
-                                Repetir
-                            </button>
-                            <button id="receipt-btn-submit" class="btn-primary btn-xlarge" type="button">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                Confirmar y firmar
-                            </button>
-                        </div>
-                        <div class="employee-form-feedback hidden" id="receipt-sign-feedback"></div>
-                    </div>
-
-                    <!-- Paso 4: Completado -->
-                    <div class="receipt-step hidden" id="receipt-step-done">
-                        <div class="acuerdo-success">
-                            <div class="acuerdo-success-icon">
-                                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                            </div>
-                            <h3 class="acuerdo-success-title">Recibo firmado</h3>
-                            <p class="acuerdo-success-sub">Tu recibo de este mes ha quedado registrado correctamente.</p>
-                            <button id="receipt-btn-done" class="btn-primary btn-full btn-xlarge" type="button">Volver</button>
-                        </div>
                     </div>
 
                 </div>
@@ -603,6 +513,114 @@
 
                     <div class="employee-list" id="admin-receipt-list">
                         <p class="loading-text">Cargando recibos...</p>
+                    </div>
+
+                    <!-- Overlay firma de recibo (admin inicia, empleado firma) -->
+                    <div class="admin-receipt-signing-overlay hidden" id="admin-receipt-signing">
+                        <header class="admin-receipt-signing-header">
+                            <button class="back-btn" id="admin-receipt-sign-back" type="button" aria-label="Volver">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                            </button>
+                            <h2 class="admin-receipt-signing-title" id="admin-receipt-sign-title">Firmar recibo</h2>
+                        </header>
+
+                        <!-- Documento del recibo -->
+                        <div class="receipt-document" id="admin-receipt-doc">
+                            <div class="receipt-doc-header">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                <span id="admin-receipt-doc-header-title">Recibo</span>
+                            </div>
+                            <div class="receipt-doc-body" id="admin-receipt-doc-body"></div>
+                        </div>
+
+                        <!-- Step: PIN del participante -->
+                        <div class="receipt-step" id="admin-receipt-step-pin">
+                            <div class="sign-instruction">
+                                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                <span>El participante debe introducir su PIN</span>
+                            </div>
+                            <div class="acuerdo-notice">
+                                Validacion del recibo para <strong id="admin-receipt-pin-target">-</strong>. Este PIN no cambia la sesion del kiosko.
+                            </div>
+                            <div class="acuerdo-pin-panel">
+                                <div class="acuerdo-pin-dots" id="admin-receipt-pin-dots" aria-label="PIN del participante">
+                                    <span class="acuerdo-pin-dot" data-index="0"></span>
+                                    <span class="acuerdo-pin-dot" data-index="1"></span>
+                                    <span class="acuerdo-pin-dot" data-index="2"></span>
+                                    <span class="acuerdo-pin-dot" data-index="3"></span>
+                                    <span class="acuerdo-pin-dot" data-index="4"></span>
+                                    <span class="acuerdo-pin-dot" data-index="5"></span>
+                                </div>
+                                <div class="acuerdo-pin-keypad" id="admin-receipt-pin-keypad">
+                                    <button class="acuerdo-pin-key" data-key="1" type="button">1</button>
+                                    <button class="acuerdo-pin-key" data-key="2" type="button">2</button>
+                                    <button class="acuerdo-pin-key" data-key="3" type="button">3</button>
+                                    <button class="acuerdo-pin-key" data-key="4" type="button">4</button>
+                                    <button class="acuerdo-pin-key" data-key="5" type="button">5</button>
+                                    <button class="acuerdo-pin-key" data-key="6" type="button">6</button>
+                                    <button class="acuerdo-pin-key" data-key="7" type="button">7</button>
+                                    <button class="acuerdo-pin-key" data-key="8" type="button">8</button>
+                                    <button class="acuerdo-pin-key" data-key="9" type="button">9</button>
+                                    <button class="acuerdo-pin-key acuerdo-pin-key--ghost" data-key="clear" type="button">Borrar</button>
+                                    <button class="acuerdo-pin-key" data-key="0" type="button">0</button>
+                                    <button class="acuerdo-pin-key acuerdo-pin-key--brand" data-key="submit" type="button">Validar</button>
+                                </div>
+                            </div>
+                            <div class="employee-form-feedback hidden" id="admin-receipt-pin-feedback"></div>
+                        </div>
+
+                        <!-- Step: Firma canvas -->
+                        <div class="receipt-step hidden" id="admin-receipt-step-sign">
+                            <div class="sign-instruction">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                <span>Firma aqui con tu dedo</span>
+                            </div>
+                            <div class="sign-canvas-wrap">
+                                <canvas id="admin-receipt-canvas" class="sign-canvas" aria-label="Area de firma"></canvas>
+                                <div class="sign-guide-line"></div>
+                            </div>
+                            <div class="sign-actions">
+                                <button id="admin-receipt-btn-clear" class="btn-secondary btn-xlarge" type="button">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
+                                    Borrar
+                                </button>
+                                <button id="admin-receipt-btn-confirm" class="btn-primary btn-xlarge" type="button" disabled>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                    Confirmar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Step: Preview firma -->
+                        <div class="receipt-step hidden" id="admin-receipt-step-preview">
+                            <p class="preview-question">¿Es esta la firma del participante?</p>
+                            <div class="preview-img-wrap">
+                                <img id="admin-receipt-preview-img" alt="Firma del participante" class="preview-img"/>
+                            </div>
+                            <div class="sign-actions">
+                                <button id="admin-receipt-btn-redo" class="btn-secondary btn-xlarge" type="button">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
+                                    Repetir
+                                </button>
+                                <button id="admin-receipt-btn-submit" class="btn-primary btn-xlarge" type="button">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                    Confirmar y firmar
+                                </button>
+                            </div>
+                            <div class="employee-form-feedback hidden" id="admin-receipt-sign-feedback"></div>
+                        </div>
+
+                        <!-- Step: Completado -->
+                        <div class="receipt-step hidden" id="admin-receipt-step-done">
+                            <div class="acuerdo-success">
+                                <div class="acuerdo-success-icon">
+                                    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                </div>
+                                <h3 class="acuerdo-success-title">Recibo firmado</h3>
+                                <p class="acuerdo-success-sub">El recibo ha quedado registrado correctamente.</p>
+                                <button id="admin-receipt-btn-done" class="btn-primary btn-full btn-xlarge" type="button">Volver a la lista</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

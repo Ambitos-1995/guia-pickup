@@ -1379,13 +1379,16 @@ var Admin = (function () {
         if (arSignPad) {
             arSignPad.clear();
         }
+
+        var previewImg = document.getElementById('admin-receipt-preview-img');
+        if (previewImg) previewImg.removeAttribute('src');
     }
 
     function renderArDocument(receipt) {
         var bodyEl = document.getElementById('admin-receipt-doc-body');
         if (!bodyEl) return;
 
-        var name = escapeHtml(receipt.employee_name || receipt.employee_name_snapshot || '\u2014');
+        var name = Utils.escapeHtml(receipt.employee_name || receipt.employee_name_snapshot || '\u2014');
         var hours = Number(receipt.hours_worked || 0).toFixed(1);
         var amount = Number(receipt.amount_earned || 0).toFixed(2);
 
@@ -1395,8 +1398,8 @@ var Admin = (function () {
             '</div>' +
             '<div class="receipt-doc-grid">' +
                 '<div class="receipt-doc-field"><span class="receipt-doc-label">Participante</span><span class="receipt-doc-value">' + name + '</span></div>' +
-                '<div class="receipt-doc-field"><span class="receipt-doc-label">Horas trabajadas</span><span class="receipt-doc-value">' + escapeHtml(hours) + ' h</span></div>' +
-                '<div class="receipt-doc-field receipt-doc-field--highlight"><span class="receipt-doc-label">Importe del recibo</span><span class="receipt-doc-value">' + escapeHtml(amount) + ' \u20ac</span></div>' +
+                '<div class="receipt-doc-field"><span class="receipt-doc-label">Horas trabajadas</span><span class="receipt-doc-value">' + Utils.escapeHtml(hours) + ' h</span></div>' +
+                '<div class="receipt-doc-field receipt-doc-field--highlight"><span class="receipt-doc-label">Importe del recibo</span><span class="receipt-doc-value">' + Utils.escapeHtml(amount) + ' \u20ac</span></div>' +
             '</div>';
     }
 

@@ -6,6 +6,7 @@ import {
   authHeaders,
   computeSha256,
   corsHeaders,
+  initCors,
   fetchJson,
   getClientIp,
   getRateLimitStatus,
@@ -20,6 +21,7 @@ import {
   resolveEmployeeByPin,
   resolveOrgId,
   signVerificationToken,
+  type SessionRole,
   verifyVerificationToken,
 } from "../_shared/kiosk.ts";
 import {
@@ -88,6 +90,7 @@ interface SettlementRow {
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  initCors(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -127,21 +130,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     if (action === "verify-pin") {
-      const auth = await requireSession(req, url, serviceRoleKey, ["respondent"]);
+      const auth = await requireSession(req, url, serviceRoleKey, ["respondent", "org_admin"]);
       if (auth instanceof Response) return auth;
-      if (auth.session.organization_id !== orgId || !auth.session.employee_id) {
+      if (auth.session.organization_id !== orgId) {
+        return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
+      }
+      if (auth.session.role === "respondent" && !auth.session.employee_id) {
         return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
       }
       return await handleVerifyPin(req, url, serviceRoleKey, orgId, body, auth.session.id);
     }
 
     if (action === "sign") {
-      const auth = await requireSession(req, url, serviceRoleKey, ["respondent"]);
+      const auth = await requireSession(req, url, serviceRoleKey, ["respondent", "org_admin"]);
       if (auth instanceof Response) return auth;
-      if (auth.session.organization_id !== orgId || !auth.session.employee_id) {
+      if (auth.session.organization_id !== orgId) {
         return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
       }
-      return await handleSign(url, serviceRoleKey, orgId, body, auth.session.id, auth.session.employee_id);
+      if (auth.session.role === "respondent" && !auth.session.employee_id) {
+        return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
+      }
+      return await handleSign(url, serviceRoleKey, orgId, body, auth.session.id, auth.session.employee_id || "", auth.session.role);
     }
 
     // --- Admin-session actions ---
@@ -504,6 +513,7 @@ async function handleSign(
   body: RequestBody,
   actorSessionId: string,
   actorEmployeeId: string,
+  actorRole: SessionRole = "respondent",
 ): Promise<Response> {
   const receiptId = String(body.receiptId || "").trim();
   const verificationToken = String(body.verificationToken || "").trim();
@@ -542,6 +552,12 @@ async function handleSign(
     }
 
     employeeVerifiedAt = new Date(tokenPayload.iat * 1000).toISOString();
+  } else if (actorRole === "org_admin") {
+    return json({
+      success: false,
+      error: "VERIFICATION_TOKEN_REQUIRED",
+      message: "Se requiere validacion del PIN del participante.",
+    }, 403);
   } else if (actorEmployeeId !== receipt.employee_id) {
     return json({
       success: false,
@@ -665,7 +681,7 @@ async function handleSign(
   await logAudit(url, key, {
     organizationId: orgId,
     actorSessionId,
-    actorRole: "respondent",
+    actorRole,
     employeeId: receipt.employee_id,
     action: "receipt_signed",
     metadata: {
