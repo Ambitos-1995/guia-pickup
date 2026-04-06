@@ -75,7 +75,20 @@ function buildState(overrides = {}) {
       { id: 'receipt-1', employee_id: 'emp-1', employee_name: 'Ismael Perez', employee_name_snapshot: 'Ismael Perez', hours_worked: 24, amount_earned: 312.5, status: 'pending', employee_signed_at: null },
       { id: 'receipt-2', employee_id: 'emp-2', employee_name: 'Lucia Garcia', employee_name_snapshot: 'Lucia Garcia', hours_worked: 18, amount_earned: 234.36, status: 'signed', employee_signed_at: '2026-03-28T10:00:00.000Z' }
     ],
+    contracts: [
+      {
+        id: 'contract-1',
+        employee_id: 'emp-1',
+        employee_name: 'Ismael Perez',
+        status: 'pending_participant',
+        created_at: '2026-03-30T09:30:00.000Z'
+      }
+    ],
+    orgSettings: {
+      legal_representative_name: 'Marta Admin'
+    },
     createCalls: [],
+    contractCreateCalls: [],
     receiptSignCalls: [],
     scheduleActionCalls: [],
     clockActionCalls: [],
@@ -196,6 +209,18 @@ async function setupMockApi(page, overrides = {}) {
         return fulfillJson(route, { success: true, data: state.employees });
       }
 
+      if (body.action === 'get-org-settings') {
+        return fulfillJson(route, { success: true, data: { settings: state.orgSettings } });
+      }
+
+      if (body.action === 'update-org-settings') {
+        state.orgSettings = {
+          ...state.orgSettings,
+          ...(body.settings || {})
+        };
+        return fulfillJson(route, { success: true, data: { settings: state.orgSettings } });
+      }
+
       if (body.action === 'create') {
         const employee = {
           id: `emp-${state.employees.length + 1}`,
@@ -223,6 +248,32 @@ async function setupMockApi(page, overrides = {}) {
         if (body.attendance_enabled !== undefined) employee.attendance_enabled = body.attendance_enabled;
 
         return fulfillJson(route, { success: true, data: employee });
+      }
+    }
+
+    if (url.pathname.endsWith('/kiosk-contract')) {
+      if (body.action === 'list-all') {
+        return fulfillJson(route, { success: true, contracts: state.contracts || [] });
+      }
+
+      if (body.action === 'create') {
+        const employee = state.employees.find((item) => item.id === body.employeeId);
+
+        if (!employee) {
+          return fulfillJson(route, { success: false, message: 'Empleado no encontrado' }, 404);
+        }
+
+        const contract = {
+          id: `contract-${(state.contracts || []).length + 1}`,
+          employee_id: employee.id,
+          employee_name: `${employee.nombre} ${employee.apellido}`.trim(),
+          status: 'pending_participant',
+          created_at: '2026-04-06T12:00:00.000Z'
+        };
+
+        state.contractCreateCalls.push(body);
+        state.contracts = [contract].concat(state.contracts || []);
+        return fulfillJson(route, { success: true, contractId: contract.id, status: contract.status });
       }
     }
 

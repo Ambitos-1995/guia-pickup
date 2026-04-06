@@ -10,6 +10,8 @@ var Admin = (function () {
     var newFormVisible     = false;
     var acuerdoFormVisible = false;
     var employeeSelectCache = null;
+    var selectedContractEmployeeId = '';
+    var contractEmployeeOptionsLoading = false;
 
     var CALC_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="16" y1="18" x2="16" y2="18"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="8" y1="10" x2="16" y2="10"/></svg>';
     var SPINNER_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
@@ -115,6 +117,12 @@ var Admin = (function () {
         /* --- Acuerdos --- */
         Utils.bindPress(document.getElementById('admin-acuerdo-nuevo'), toggleAcuerdoForm);
         Utils.bindPress(document.getElementById('admin-acuerdo-crear'), createAcuerdo);
+        var nativeEmployeeSelect = document.getElementById('acuerdo-emp-select');
+        if (nativeEmployeeSelect) {
+            nativeEmployeeSelect.addEventListener('change', function () {
+                setSelectedContractEmployee(nativeEmployeeSelect.value || '');
+            });
+        }
 
         /* --- Recibos --- */
         Utils.bindPress(document.getElementById('admin-receipt-prev'), function () { changeReceiptMonth(-1); });
@@ -628,7 +636,11 @@ var Admin = (function () {
        ========================================================= */
 
     function toggleAcuerdoForm() {
-        acuerdoFormVisible = !acuerdoFormVisible;
+        setAcuerdoFormOpen(!acuerdoFormVisible);
+    }
+
+    function setAcuerdoFormOpen(nextState) {
+        acuerdoFormVisible = !!nextState;
         var wrap = document.getElementById('admin-acuerdo-form-wrap');
         var btn  = document.getElementById('admin-acuerdo-nuevo');
         if (wrap) wrap.classList.toggle('open', acuerdoFormVisible);
@@ -636,22 +648,54 @@ var Admin = (function () {
 
         if (acuerdoFormVisible) {
             populateEmployeeSelect();
+            hideFeedback('acuerdo-form-feedback');
+            requestAnimationFrame(function () {
+                if (wrap && wrap.scrollIntoView) {
+                    wrap.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            });
+        } else {
+            hideFeedback('acuerdo-form-feedback');
         }
     }
 
     function populateEmployeeSelect() {
         var select = document.getElementById('acuerdo-emp-select');
-        if (!select) return;
+        var picker = document.getElementById('acuerdo-employee-picker');
+        if (!select || !picker) return;
+
+        contractEmployeeOptionsLoading = true;
+        setContractPickerLoading();
+        updateCreateAcuerdoButtonState();
 
         if (employeeSelectCache) {
             renderEmployeeOptions(select, employeeSelectCache);
+            renderContractEmployeePicker(employeeSelectCache);
+            contractEmployeeOptionsLoading = false;
+            updateCreateAcuerdoButtonState();
             return;
         }
 
         Api.getEmployees().then(function (res) {
-            if (!res || !res.success || !res.data) return;
-            employeeSelectCache = res.data;
-            renderEmployeeOptions(select, res.data);
+            if (!res || !res.success || !res.data) {
+                contractEmployeeOptionsLoading = false;
+                renderContractEmployeePicker([]);
+                showFeedback('acuerdo-form-feedback', 'error', (res && res.message) || 'No se pudieron cargar los participantes.');
+                updateCreateAcuerdoButtonState();
+                return;
+            }
+
+            employeeSelectCache = filterContractEmployees(res.data);
+            renderEmployeeOptions(select, employeeSelectCache);
+            renderContractEmployeePicker(employeeSelectCache);
+            hideFeedback('acuerdo-form-feedback');
+            contractEmployeeOptionsLoading = false;
+            updateCreateAcuerdoButtonState();
+        }).catch(function () {
+            contractEmployeeOptionsLoading = false;
+            renderContractEmployeePicker([]);
+            showFeedback('acuerdo-form-feedback', 'error', 'Error de conexion al cargar participantes.');
+            updateCreateAcuerdoButtonState();
         });
     }
 
@@ -660,24 +704,126 @@ var Admin = (function () {
             select.remove(1);
         }
         employees.forEach(function (emp) {
-            if (emp.role === 'admin') return;
             var opt = document.createElement('option');
             opt.value       = emp.id;
             opt.textContent = emp.nombre + ' ' + (emp.apellido || '');
             select.appendChild(opt);
         });
+
+        if (!findEmployeeById(employees, selectedContractEmployeeId)) {
+            selectedContractEmployeeId = '';
+        }
+        select.value = selectedContractEmployeeId || '';
+    }
+
+    function filterContractEmployees(employees) {
+        return (employees || [])
+            .filter(function (emp) {
+                var role = normalizeEmployeeRole(emp && emp.role);
+                return role !== 'admin' &&
+                    role !== 'org_admin' &&
+                    emp &&
+                    emp.attendance_enabled !== false;
+            })
+            .sort(function (a, b) {
+                var aName = ((a && a.nombre) || '') + ' ' + (((a && a.apellido) || ''));
+                var bName = ((b && b.nombre) || '') + ' ' + (((b && b.apellido) || ''));
+                return aName.localeCompare(bName, 'es', { sensitivity: 'base' });
+            });
+    }
+
+    function normalizeEmployeeRole(role) {
+        return String(role || '').trim().toLowerCase();
+    }
+
+    function setContractPickerLoading() {
+        var picker = document.getElementById('acuerdo-employee-picker');
+        if (!picker) return;
+        picker.innerHTML = '<div class="acuerdo-picker-empty is-loading">Cargando participantes...</div>';
+    }
+
+    function renderContractEmployeePicker(employees) {
+        var picker = document.getElementById('acuerdo-employee-picker');
+        if (!picker) return;
+
+        picker.textContent = '';
+
+        if (!employees || employees.length === 0) {
+            picker.innerHTML = '<div class="acuerdo-picker-empty">No hay participantes activos disponibles. Revisa la pestaña de Empleados.</div>';
+            setSelectedContractEmployee('');
+            return;
+        }
+
+        employees.forEach(function (emp) {
+            var button = document.createElement('button');
+            var fullName = ((emp.nombre || '') + ' ' + (emp.apellido || '')).trim();
+            var initials = (((emp.nombre || '').charAt(0) + (emp.apellido || '').charAt(0)).toUpperCase()) || '--';
+            var selected = String(emp.id) === selectedContractEmployeeId;
+
+            button.type = 'button';
+            button.className = 'acuerdo-picker-option' + (selected ? ' is-selected' : '');
+            button.setAttribute('role', 'option');
+            button.setAttribute('aria-selected', selected ? 'true' : 'false');
+            button.setAttribute('data-employee-id', String(emp.id));
+            button.innerHTML =
+                '<span class="acuerdo-picker-avatar">' + escapeHtml(initials) + '</span>' +
+                '<span class="acuerdo-picker-copy">' +
+                    '<span class="acuerdo-picker-name">' + escapeHtml(fullName || 'Sin nombre') + '</span>' +
+                    '<span class="acuerdo-picker-meta">Participante activo</span>' +
+                '</span>';
+
+            Utils.bindPress(button, function () {
+                setSelectedContractEmployee(emp.id);
+            });
+
+            picker.appendChild(button);
+        });
+    }
+
+    function setSelectedContractEmployee(employeeId) {
+        selectedContractEmployeeId = String(employeeId || '').trim();
+
+        var select = document.getElementById('acuerdo-emp-select');
+        if (select) select.value = selectedContractEmployeeId || '';
+
+        Utils.each(document.querySelectorAll('#acuerdo-employee-picker .acuerdo-picker-option'), function (button) {
+            var selected = button.getAttribute('data-employee-id') === selectedContractEmployeeId;
+            button.classList.toggle('is-selected', selected);
+            button.setAttribute('aria-selected', selected ? 'true' : 'false');
+        });
+
+        updateCreateAcuerdoButtonState();
+    }
+
+    function updateCreateAcuerdoButtonState() {
+        var btn = document.getElementById('admin-acuerdo-crear');
+        if (!btn) return;
+        if (btn.getAttribute('data-busy') === 'true') return;
+        btn.disabled = contractEmployeeOptionsLoading || !selectedContractEmployeeId;
+    }
+
+    function findEmployeeById(employees, employeeId) {
+        var wantedId = String(employeeId || '').trim();
+        if (!wantedId) return null;
+        for (var i = 0; i < employees.length; i++) {
+            if (String(employees[i].id) === wantedId) return employees[i];
+        }
+        return null;
     }
 
     function createAcuerdo() {
-        var empSelect = document.getElementById('acuerdo-emp-select');
-        var empId = empSelect ? String(empSelect.value || '').trim() : '';
+        var empId = String(selectedContractEmployeeId || '').trim();
 
         hideFeedback('acuerdo-form-feedback');
 
         if (!empId) { showFeedback('acuerdo-form-feedback', 'error', 'Selecciona un participante.'); return; }
 
         var btn = document.getElementById('admin-acuerdo-crear');
-        if (btn) { btn.disabled = true; btn.textContent = 'Creando...'; }
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Creando...';
+            btn.setAttribute('data-busy', 'true');
+        }
 
         Api.createContract({
             employeeId:          empId,
@@ -685,17 +831,27 @@ var Admin = (function () {
             schedule:            'Seg\u00fan turnos elegidos libremente por el/la Participante',
             validityText:        '3 meses, renovable autom\u00e1ticamente'
         }).then(function (res) {
-            if (btn) { btn.disabled = false; btn.textContent = 'Crear contrato'; }
+            if (btn) {
+                btn.textContent = 'Crear contrato';
+                btn.removeAttribute('data-busy');
+            }
 
             if (res && res.success) {
                 showFeedback('acuerdo-form-feedback', 'success', 'Contrato creado correctamente.', 3000);
-                var s = document.getElementById('acuerdo-emp-select');
-                if (s) s.value = '';
-                toggleAcuerdoForm();
+                setSelectedContractEmployee('');
+                updateCreateAcuerdoButtonState();
                 loadAcuerdosList();
             } else {
+                updateCreateAcuerdoButtonState();
                 showFeedback('acuerdo-form-feedback', 'error', (res && res.message) || 'Error al crear el contrato.');
             }
+        }).catch(function () {
+            if (btn) {
+                btn.textContent = 'Crear contrato';
+                btn.removeAttribute('data-busy');
+            }
+            updateCreateAcuerdoButtonState();
+            showFeedback('acuerdo-form-feedback', 'error', 'Error de conexion al crear el contrato.');
         });
     }
 

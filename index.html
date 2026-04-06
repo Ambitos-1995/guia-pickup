@@ -466,11 +466,17 @@
                         <div class="employee-form">
                             <div class="form-row">
                                 <label for="acuerdo-emp-select">Participante</label>
-                                <select id="acuerdo-emp-select">
+                                <select id="acuerdo-emp-select" class="acuerdo-emp-select-native" aria-hidden="true" tabindex="-1">
                                     <option value="">Seleccionar participante...</option>
                                 </select>
+                                <div class="acuerdo-employee-picker" id="acuerdo-employee-picker" role="listbox" aria-label="Seleccion de participante">
+                                    <div class="acuerdo-picker-empty">
+                                        Abre el formulario para cargar participantes disponibles.
+                                    </div>
+                                </div>
+                                <p class="acuerdo-picker-help" id="acuerdo-picker-help">Toca una tarjeta para seleccionar al participante.</p>
                             </div>
-                            <button class="btn-primary btn-full" id="admin-acuerdo-crear" type="button">Crear contrato</button>
+                            <button class="btn-primary btn-full" id="admin-acuerdo-crear" type="button" disabled>Crear contrato</button>
                             <div class="employee-form-feedback hidden" id="acuerdo-form-feedback"></div>
                         </div>
                     </div>

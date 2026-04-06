@@ -44,3 +44,40 @@ test.describe('webkit pwa smoke', () => {
     }).toBe(true);
   });
 });
+
+test.describe('webkit admin ui', () => {
+  test.use({ serviceWorkers: 'block' });
+
+  test('admin contracts and ajustes remain usable on narrow webkit layout', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const state = await setupMockApi(page);
+    await page.goto('/');
+    await page.evaluate(() => {
+      window.App.setSession({
+        accessToken: 'admin-token',
+        expiresAt: '2099-12-31T23:59:59.000Z',
+        role: 'org_admin',
+        employeeId: 'emp-2',
+        employeeName: 'Marta Admin',
+        organizationId: 'org-1'
+      });
+      window.App.navigate('screen-menu');
+    });
+    await expect(page.locator('#screen-menu.active')).toBeVisible();
+    await page.locator('#menu-admin-shortcut').click();
+
+    await page.locator('.admin-tab', { hasText: 'Contratos' }).click();
+    await page.locator('#admin-acuerdo-nuevo').click();
+    await expect(page.locator('#acuerdo-employee-picker .acuerdo-picker-option')).toHaveCount(2);
+
+    await page.locator('#acuerdo-employee-picker .acuerdo-picker-option', { hasText: 'Ismael Perez' }).click();
+    await expect(page.locator('#admin-acuerdo-crear')).toBeEnabled();
+    await page.locator('#admin-acuerdo-crear').click();
+    await expect(page.locator('#acuerdo-form-feedback')).toContainText('Contrato creado correctamente.');
+    await expect.poll(() => state.contractCreateCalls.length).toBe(1);
+
+    await page.locator('.admin-tab', { hasText: 'Ajustes' }).click();
+    await expect(page.locator('#admin-ajustes.active')).toBeVisible();
+    await expect(page.locator('#admin-setting-legal-rep')).toHaveValue('Marta Admin');
+  });
+});

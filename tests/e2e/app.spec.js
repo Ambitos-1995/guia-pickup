@@ -527,6 +527,62 @@ test('admin can create a new employee from ajustes empleados', async ({ page }) 
   await expect.poll(() => state.createCalls[0].role).toBe('employee');
 });
 
+test('admin can create a contract from the mobile participant picker', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+
+  await enterPin(page, '123456');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.locator('#menu-admin-shortcut').click();
+
+  await page.locator('.admin-tab', { hasText: 'Contratos' }).click();
+  await expect(page.locator('#admin-acuerdo-list')).toContainText('Ismael Perez');
+
+  await page.locator('#admin-acuerdo-nuevo').click();
+  await expect(page.locator('#acuerdo-employee-picker .acuerdo-picker-option')).toHaveCount(2);
+  await expect(page.locator('#acuerdo-employee-picker')).not.toContainText('Marta Admin');
+  await expect(page.locator('#admin-acuerdo-crear')).toBeDisabled();
+
+  await page.locator('#acuerdo-employee-picker .acuerdo-picker-option', { hasText: 'Nora Diaz' }).click();
+  await expect(page.locator('#admin-acuerdo-crear')).toBeEnabled();
+  await page.locator('#admin-acuerdo-crear').click();
+
+  await expect(page.locator('#acuerdo-form-feedback')).toContainText('Contrato creado correctamente.');
+  await expect(page.locator('#admin-acuerdo-list')).toContainText('Nora Diaz');
+  await expect.poll(() => state.contractCreateCalls.length).toBe(1);
+  await expect.poll(() => state.contractCreateCalls[0].employeeId).toBe('emp-4');
+});
+
+test('admin tabs stay usable on a narrow mobile viewport including ajustes', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+
+  await enterPin(page, '123456');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.locator('#menu-admin-shortcut').click();
+
+  const tabMetrics = await page.evaluate(() => {
+    const tabs = document.getElementById('admin-tabs');
+    const styles = window.getComputedStyle(tabs);
+    return {
+      overflowX: styles.overflowX,
+      scrollWidth: tabs.scrollWidth,
+      clientWidth: tabs.clientWidth
+    };
+  });
+
+  expect(tabMetrics.overflowX).toBe('auto');
+  expect(tabMetrics.scrollWidth).toBeGreaterThan(tabMetrics.clientWidth);
+
+  await page.locator('.admin-tab', { hasText: 'Ajustes' }).click();
+  await expect(page.locator('#admin-ajustes.active')).toBeVisible();
+  await expect(page.locator('#admin-setting-legal-rep')).toHaveValue('Marta Admin');
+});
+
 test('admin layouts fit inside a short mobile viewport', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await setupMockApi(page);
