@@ -642,7 +642,7 @@ async function handleGetOrgSettings(
 ): Promise<Response> {
   const res = await fetchJson<Array<{ settings: Record<string, unknown> }>>(
     `${url}/rest/v1/organizations?select=settings&id=eq.${orgId}&limit=1`,
-    { headers: authHeaders(key) },
+    { headers: getHeaders(key) },
   );
 
   if (!res.ok || !res.data?.[0]) {
@@ -666,7 +666,7 @@ async function handleUpdateOrgSettings(
 
   const currentRes = await fetchJson<Array<{ settings: Record<string, unknown> }>>(
     `${url}/rest/v1/organizations?select=settings&id=eq.${orgId}&limit=1`,
-    { headers: authHeaders(key) },
+    { headers: getHeaders(key) },
   );
   const currentSettings: Record<string, unknown> = (currentRes.ok && currentRes.data?.[0]?.settings) || {};
   const merged = { ...currentSettings };
@@ -696,7 +696,7 @@ async function handleUpdateOrgSettings(
     `${url}/rest/v1/organizations?id=eq.${orgId}`,
     {
       method: "PATCH",
-      headers: { ...authHeaders(key), "Content-Type": "application/json", Prefer: "return=representation" },
+      headers: { ...getHeaders(key), "Content-Type": "application/json", Prefer: "return=representation" },
       body: JSON.stringify({ settings: merged, updated_at: new Date().toISOString() }),
     },
   );
