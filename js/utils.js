@@ -148,34 +148,26 @@ var Utils = (function () {
     function bindPress(target, handler) {
         if (!target || typeof handler !== 'function') return function () {};
 
-        var lastPointerPressAt = 0;
-
         function invoke(event) {
             if (isDisabled(target)) return;
             handler.call(target, event);
         }
 
-        function onPointerUp(event) {
-            if (!event || event.pointerType === 'mouse') return;
-            lastPointerPressAt = Date.now();
-            invoke(event);
-            if (typeof event.preventDefault === 'function') {
-                event.preventDefault();
-            }
-        }
+        function onPointerDown() { target.classList.add('pressing'); }
+        function onPointerEnd() { target.classList.remove('pressing'); }
+        function onClick(event) { invoke(event); }
 
-        function onClick(event) {
-            if (lastPointerPressAt && (Date.now() - lastPointerPressAt) < 700) {
-                return;
-            }
-            invoke(event);
-        }
-
-        target.addEventListener('pointerup', onPointerUp);
+        target.addEventListener('pointerdown', onPointerDown);
+        target.addEventListener('pointerup', onPointerEnd);
+        target.addEventListener('pointerleave', onPointerEnd);
+        target.addEventListener('pointercancel', onPointerEnd);
         target.addEventListener('click', onClick);
 
         return function () {
-            target.removeEventListener('pointerup', onPointerUp);
+            target.removeEventListener('pointerdown', onPointerDown);
+            target.removeEventListener('pointerup', onPointerEnd);
+            target.removeEventListener('pointerleave', onPointerEnd);
+            target.removeEventListener('pointercancel', onPointerEnd);
             target.removeEventListener('click', onClick);
         };
     }
@@ -183,35 +175,33 @@ var Utils = (function () {
     function delegatePress(container, selector, handler) {
         if (!container || !selector || typeof handler !== 'function') return function () {};
 
-        var lastPointerPressAt = 0;
+        function onPointerDown(event) {
+            var matched = closest(event.target, selector, container);
+            if (matched) matched.classList.add('pressing');
+        }
 
-        function invoke(event) {
+        function onPointerEnd(event) {
+            var matched = closest(event.target, selector, container);
+            if (matched) matched.classList.remove('pressing');
+        }
+
+        function onClick(event) {
             var matched = closest(event.target, selector, container);
             if (!matched || isDisabled(matched)) return;
             handler.call(matched, event, matched);
         }
 
-        function onPointerUp(event) {
-            if (!event || event.pointerType === 'mouse') return;
-            lastPointerPressAt = Date.now();
-            invoke(event);
-            if (typeof event.preventDefault === 'function') {
-                event.preventDefault();
-            }
-        }
-
-        function onClick(event) {
-            if (lastPointerPressAt && (Date.now() - lastPointerPressAt) < 700) {
-                return;
-            }
-            invoke(event);
-        }
-
-        container.addEventListener('pointerup', onPointerUp);
+        container.addEventListener('pointerdown', onPointerDown);
+        container.addEventListener('pointerup', onPointerEnd);
+        container.addEventListener('pointerleave', onPointerEnd);
+        container.addEventListener('pointercancel', onPointerEnd);
         container.addEventListener('click', onClick);
 
         return function () {
-            container.removeEventListener('pointerup', onPointerUp);
+            container.removeEventListener('pointerdown', onPointerDown);
+            container.removeEventListener('pointerup', onPointerEnd);
+            container.removeEventListener('pointerleave', onPointerEnd);
+            container.removeEventListener('pointercancel', onPointerEnd);
             container.removeEventListener('click', onClick);
         };
     }

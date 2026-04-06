@@ -196,7 +196,7 @@ button:focus-visible {
     transition: background var(--transition);
 }
 .btn-primary:hover { background: var(--red-dark); }
-.btn-primary:active { transform: scale(0.94); filter: brightness(0.92); transition: transform 0.1s cubic-bezier(0.22, 1, 0.36, 1); }
+.btn-primary:active, .btn-primary.pressing { transform: scale(0.94); filter: brightness(0.92); transition: transform 0.1s cubic-bezier(0.22, 1, 0.36, 1); }
 
 .btn-secondary {
     display: block;
@@ -210,7 +210,7 @@ button:focus-visible {
     transition: background var(--transition);
 }
 .btn-secondary:hover { background: var(--gray-300); }
-.btn-secondary:active { transform: scale(0.94); filter: brightness(0.95); transition: transform 0.1s cubic-bezier(0.22, 1, 0.36, 1); }
+.btn-secondary:active, .btn-secondary.pressing { transform: scale(0.94); filter: brightness(0.95); transition: transform 0.1s cubic-bezier(0.22, 1, 0.36, 1); }
 
 /* --- Screen Header --- */
 .screen-header {
@@ -410,7 +410,7 @@ button:focus-visible {
 
 .key-btn:hover { background: rgba(255,255,255,0.14); }
 
-.key-btn:active {
+.key-btn:active, .key-btn.pressing {
     background: rgba(255,255,255,0.22);
     transform: scale(0.95);
 }
@@ -426,6 +426,10 @@ button:focus-visible {
     border-color: rgba(255,255,255,0.08);
 }
 
+@media (pointer: coarse) {
+    .key-btn { min-height: 72px; }
+}
+
 .pin-loading {
     display: flex;
     align-items: center;
@@ -439,8 +443,8 @@ button:focus-visible {
     position: absolute;
     top: max(12px, env(safe-area-inset-top));
     left: max(12px, env(safe-area-inset-left));
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     background: rgba(255,255,255,0.1);
     border: 1px solid rgba(255,255,255,0.15);
@@ -503,7 +507,7 @@ button:focus-visible {
     background: #c91a20;
 }
 
-.menu-login-btn:active {
+.menu-login-btn:active, .menu-login-btn.pressing {
     transform: scale(0.97);
 }
 
@@ -543,11 +547,11 @@ button:focus-visible {
     background: #0f172a;
 }
 
-.menu-direct-shortcut:active {
+.menu-direct-shortcut:active, .menu-direct-shortcut.pressing {
     transform: scale(0.97);
 }
 
-.menu-admin-shortcut:active {
+.menu-admin-shortcut:active, .menu-admin-shortcut.pressing {
     background: rgba(227, 30, 36, 0.08);
     transform: scale(0.95);
 }
@@ -601,8 +605,8 @@ button:focus-visible {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0,0,0,0.1), 0 2px 6px rgba(0,0,0,0.06);
 }
-.menu-card:active::before { opacity: 1; }
-.menu-card:active { transform: scale(0.94) translateY(1px); transition: transform 0.1s cubic-bezier(0.22, 1, 0.36, 1); }
+.menu-card:active::before, .menu-card.pressing::before { opacity: 1; }
+.menu-card:active, .menu-card.pressing { transform: scale(0.94) translateY(1px); transition: transform 0.1s cubic-bezier(0.22, 1, 0.36, 1); }
 
 .menu-card.is-locked,
 .menu-card[aria-disabled="true"] {
@@ -623,7 +627,9 @@ button:focus-visible {
 }
 
 .menu-card.is-locked:active,
-.menu-card[aria-disabled="true"]:active {
+.menu-card[aria-disabled="true"]:active,
+.menu-card.is-locked.pressing,
+.menu-card[aria-disabled="true"].pressing {
     transform: none;
 }
 
@@ -736,7 +742,7 @@ button:focus-visible {
     transition: background var(--transition);
 }
 .week-arrow:hover { background: var(--gray-200); }
-.week-arrow:active { background: var(--gray-300); }
+.week-arrow:active, .week-arrow.pressing { background: var(--gray-300); }
 
 .week-label {
     font-size: 1rem;
@@ -789,7 +795,7 @@ button:focus-visible {
     word-break: break-word;
 }
 
-.sched-cell:active { transform: scale(0.94); }
+.sched-cell:active, .sched-cell.pressing { transform: scale(0.94); }
 
 
 .sched-mine {
@@ -804,7 +810,7 @@ button:focus-visible {
     color: var(--gray-500);
     cursor: default;
 }
-.sched-taken:active { transform: none; }
+.sched-taken:active, .sched-taken.pressing { transform: none; }
 
 .schedule-legend {
     display: flex;
@@ -961,7 +967,7 @@ button:focus-visible {
     z-index: 1;
 }
 
-.clock-btn:active {
+.clock-btn:active, .clock-btn.pressing {
     transform: scale(0.95);
     transition: transform 0.1s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1104,12 +1110,12 @@ button:focus-visible {
     pointer-events: none;
 }
 
-.guia-card:active {
+.guia-card:active, .guia-card.pressing {
     transform: scale(0.95);
     box-shadow: 0 1px 4px rgba(0,0,0,0.1);
 }
 
-.guia-card:active::after {
+.guia-card:active::after, .guia-card.pressing::after {
     opacity: 1;
 }
 
@@ -1819,7 +1825,7 @@ button:focus-visible {
     margin-bottom: 16px;
 }
 
-.btn-add-emp:active {
+.btn-add-emp:active, .btn-add-emp.pressing {
     transform: scale(0.97);
     background: rgba(227, 30, 36, 0.04);
 }
@@ -2024,8 +2030,8 @@ button:focus-visible {
 
 /* --- Edit Employee Icon Button --- */
 .btn-edit-emp {
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2038,7 +2044,7 @@ button:focus-visible {
     transition: all var(--transition);
 }
 
-.btn-edit-emp:active {
+.btn-edit-emp:active, .btn-edit-emp.pressing {
     background: var(--gray-200);
     transform: scale(0.92);
 }

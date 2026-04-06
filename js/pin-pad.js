@@ -22,8 +22,8 @@ var PinPad = (function () {
             busy: false,
             dots: [],
             keypadHandler: null,
-            keypadPointerHandler: null,
-            lastPointerPressAt: 0
+            keypadPointerDownHandler: null,
+            keypadPointerEndHandler: null
         };
 
         instance.dots = instance.dotsEl ? instance.dotsEl.querySelectorAll('.pin-dot') : [];
@@ -85,21 +85,25 @@ var PinPad = (function () {
 
     function bindKeypad(instance) {
         if (!instance.keypadEl) return;
-        instance.keypadPointerHandler = function (event) {
-            if (!event || event.pointerType === 'mouse') return;
-            instance.lastPointerPressAt = Date.now();
-            handleKeypadPress(instance, event);
-            if (typeof event.preventDefault === 'function') {
-                event.preventDefault();
+        instance.keypadPointerDownHandler = function (event) {
+            var button = event.target && event.target.closest ? event.target.closest('.key-btn') : null;
+            if (button && instance.keypadEl.contains(button)) {
+                button.classList.add('pressing');
+            }
+        };
+        instance.keypadPointerEndHandler = function (event) {
+            var button = event.target && event.target.closest ? event.target.closest('.key-btn') : null;
+            if (button && instance.keypadEl.contains(button)) {
+                button.classList.remove('pressing');
             }
         };
         instance.keypadHandler = function (event) {
-            if (instance.lastPointerPressAt && (Date.now() - instance.lastPointerPressAt) < 700) {
-                return;
-            }
             handleKeypadPress(instance, event);
         };
-        instance.keypadEl.addEventListener('pointerup', instance.keypadPointerHandler);
+        instance.keypadEl.addEventListener('pointerdown', instance.keypadPointerDownHandler);
+        instance.keypadEl.addEventListener('pointerup', instance.keypadPointerEndHandler);
+        instance.keypadEl.addEventListener('pointerleave', instance.keypadPointerEndHandler);
+        instance.keypadEl.addEventListener('pointercancel', instance.keypadPointerEndHandler);
         instance.keypadEl.addEventListener('click', instance.keypadHandler);
     }
 
@@ -122,11 +126,19 @@ var PinPad = (function () {
     }
 
     function unbindKeypad(instance) {
-        if (!instance.keypadEl || !instance.keypadHandler) return;
-        instance.keypadEl.removeEventListener('pointerup', instance.keypadPointerHandler);
-        instance.keypadEl.removeEventListener('click', instance.keypadHandler);
-        instance.keypadHandler = null;
-        instance.keypadPointerHandler = null;
+        if (!instance.keypadEl) return;
+        if (instance.keypadPointerDownHandler) {
+            instance.keypadEl.removeEventListener('pointerdown', instance.keypadPointerDownHandler);
+            instance.keypadEl.removeEventListener('pointerup', instance.keypadPointerEndHandler);
+            instance.keypadEl.removeEventListener('pointerleave', instance.keypadPointerEndHandler);
+            instance.keypadEl.removeEventListener('pointercancel', instance.keypadPointerEndHandler);
+            instance.keypadPointerDownHandler = null;
+            instance.keypadPointerEndHandler = null;
+        }
+        if (instance.keypadHandler) {
+            instance.keypadEl.removeEventListener('click', instance.keypadHandler);
+            instance.keypadHandler = null;
+        }
     }
 
     function bindKeyboard() {

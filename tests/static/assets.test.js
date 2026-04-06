@@ -218,11 +218,13 @@ test('shared kiosk edge helpers support a configurable CORS allowlist', () => {
   assert.match(sharedKiosk, /configuredAllowedOrigins\[0\] \|\| "\*"/);
 });
 
-test('touch-driven keypad interactions do not rely on click-only handlers', () => {
-  assert.match(pinPadJs, /addEventListener\('pointerup', instance\.keypadPointerHandler\)/);
-  assert.match(pinPadJs, /instance\.lastPointerPressAt = Date\.now\(\)/);
-  assert.match(utilsJs, /target\.addEventListener\('pointerup', onPointerUp\)/);
-  assert.match(utilsJs, /container\.addEventListener\('pointerup', onPointerUp\)/);
+test('touch interactions use click for action and pointerdown for visual feedback', () => {
+  assert.match(pinPadJs, /addEventListener\('pointerdown', instance\.keypadPointerDownHandler\)/);
+  assert.match(pinPadJs, /addEventListener\('click', instance\.keypadHandler\)/);
+  assert.match(utilsJs, /target\.addEventListener\('pointerdown', onPointerDown\)/);
+  assert.match(utilsJs, /target\.addEventListener\('click', onClick\)/);
+  assert.match(utilsJs, /container\.addEventListener\('pointerdown', onPointerDown\)/);
+  assert.match(utilsJs, /container\.addEventListener\('click', onClick\)/);
 });
 
 test('logout revokes the server-side session instead of only clearing local state', () => {
