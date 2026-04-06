@@ -200,6 +200,10 @@ async function handleGenerate(
     return json({ success: false, message: "Ano o mes invalido" }, 400);
   }
 
+  if (!isMonthClosed(year, month)) {
+    return json({ success: false, message: "Solo se puede generar recibos de meses ya cerrados. Disponible a partir del dia 1 del proximo mes." }, 400);
+  }
+
   // Fetch settlements with qualifying statuses
   const settlementsRes = await fetchJson<SettlementRow[]>(
     `${url}/rest/v1/kiosk_payment_settlements?select=id,employee_id,employee_name_snapshot,hours_worked,hourly_rate,amount_earned,worked_minutes,slot_count,status&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}&status=in.(calculated,review_required,confirmed)`,
@@ -1275,4 +1279,15 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
     bytes.byteOffset,
     bytes.byteOffset + bytes.byteLength,
   ) as ArrayBuffer;
+}
+
+function isMonthClosed(year: number, month: number): boolean {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  const nowYear = Number(parts.find((p) => p.type === "year")!.value);
+  const nowMonth = Number(parts.find((p) => p.type === "month")!.value);
+  return year < nowYear || (year === nowYear && month < nowMonth);
 }

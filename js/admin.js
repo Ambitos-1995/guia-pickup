@@ -72,6 +72,8 @@ var Admin = (function () {
                         loadAcuerdosList();
                     } else if (target.id === 'admin-recibos') {
                         loadReceiptMonth();
+                    } else if (target.id === 'admin-ajustes') {
+                        loadOrgSettings();
                     }
                 }
             });
@@ -134,6 +136,9 @@ var Admin = (function () {
         });
         bindArPinKeypad();
 
+        /* --- Ajustes --- */
+        Utils.bindPress(document.getElementById('admin-settings-save'), saveOrgSettings);
+
         /* Active toggle in edit modal */
         var toggleBtn = document.getElementById('edit-emp-active');
         if (toggleBtn) {
@@ -178,6 +183,10 @@ var Admin = (function () {
         }
         if (activeTabId === 'admin-recibos') {
             loadReceiptMonth();
+            return;
+        }
+        if (activeTabId === 'admin-ajustes') {
+            loadOrgSettings();
             return;
         }
 
@@ -1104,12 +1113,26 @@ var Admin = (function () {
         var list = document.getElementById('admin-receipt-list');
         list.textContent = '';
 
+        var generateBtn = document.getElementById('admin-receipt-generate');
+        hideFeedback('admin-receipt-feedback');
+
+        var closed = isMonthClosed(receiptYear, receiptMonth);
+        if (!closed) {
+            var nextMonth = receiptMonth === 12
+                ? 'Enero ' + (receiptYear + 1)
+                : Utils.MONTH_NAMES[receiptMonth] + ' ' + receiptYear;
+            if (generateBtn) generateBtn.disabled = true;
+            showFeedback('admin-receipt-feedback', 'error', 'Mes en curso. Disponible a partir del 1 de ' + nextMonth + '.', 0);
+            renderEmployeeState(list, 'Los recibos se generan a partir del mes siguiente.');
+            return;
+        }
+
+        if (generateBtn) generateBtn.disabled = false;
+
         var loading = document.createElement('p');
         loading.className = 'loading-text';
         loading.textContent = 'Cargando recibos...';
         list.appendChild(loading);
-
-        hideFeedback('admin-receipt-feedback');
 
         Api.listReceipts(receiptYear, receiptMonth).then(function (res) {
             list.textContent = '';
@@ -1579,6 +1602,65 @@ var Admin = (function () {
             arSigningInFlight = false;
             if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Confirmar y firmar'; }
             showFeedback('admin-receipt-sign-feedback', 'error', 'Error al guardar la firma.');
+        });
+    }
+
+    /* =========================================================
+       ORG SETTINGS
+       ========================================================= */
+
+    function loadOrgSettings() {
+        var input = document.getElementById('admin-setting-legal-rep');
+        var saveBtn = document.getElementById('admin-settings-save');
+        hideFeedback('admin-settings-feedback');
+
+        if (input) input.disabled = true;
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Cargando...'; }
+
+        Api.getOrgSettings().then(function (res) {
+            if (input) input.disabled = false;
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar ajustes'; }
+
+            if (res && res.success && res.data && res.data.settings) {
+                if (input) input.value = res.data.settings.legal_representative_name || '';
+            } else {
+                showFeedback('admin-settings-feedback', 'error',
+                    (res && res.message) || 'Error al cargar ajustes.', 4000);
+            }
+        }).catch(function () {
+            if (input) input.disabled = false;
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar ajustes'; }
+            showFeedback('admin-settings-feedback', 'error', 'Error de conexion.', 4000);
+        });
+    }
+
+    function saveOrgSettings() {
+        var input = document.getElementById('admin-setting-legal-rep');
+        var saveBtn = document.getElementById('admin-settings-save');
+        hideFeedback('admin-settings-feedback');
+
+        var legalRep = (input ? input.value : '').trim();
+        if (!legalRep) {
+            showFeedback('admin-settings-feedback', 'error', 'El representante legal es obligatorio.');
+            return;
+        }
+
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando...'; }
+
+        Api.updateOrgSettings({
+            legal_representative_name: legalRep
+        }).then(function (res) {
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar ajustes'; }
+
+            if (res && res.success) {
+                showFeedback('admin-settings-feedback', 'success', 'Ajustes guardados correctamente.', 3000);
+            } else {
+                showFeedback('admin-settings-feedback', 'error',
+                    (res && res.message) || 'Error al guardar ajustes.');
+            }
+        }).catch(function () {
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar ajustes'; }
+            showFeedback('admin-settings-feedback', 'error', 'Error de conexion.');
         });
     }
 

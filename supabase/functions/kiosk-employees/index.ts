@@ -44,7 +44,11 @@ interface RequestBody {
   employeeId?: string;
   attendance_enabled?: boolean;
   role?: string;
+  settings?: Record<string, unknown>;
 }
+
+const ALLOWED_SETTINGS_KEYS = ["legal_representative_name"] as const;
+const MAX_SETTING_VALUE_LENGTH = 200;
 
 Deno.serve(async (req: Request): Promise<Response> => {
   initCors(req);
@@ -111,6 +115,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     if (action === "update") {
       return await handleUpdate(url, serviceRoleKey, auth.session.organization_id, auth.session.id, body);
+    }
+
+    if (action === "get-org-settings") {
+      return await handleGetOrgSettings(url, serviceRoleKey, auth.session.organization_id);
+    }
+
+    if (action === "update-org-settings") {
+      return await handleUpdateOrgSettings(url, serviceRoleKey, auth.session.organization_id, auth.session.id, body);
     }
 
     return json({ success: false, message: "Accion no valida" }, 400);
@@ -619,4 +631,87 @@ function buildEmployeeAuthMetadata(
     userAgent: getUserAgent(req),
     ...extras,
   };
+}
+
+// ─── Org settings ─────────────────────────────────────────────────────────────
+
+async function handleGetOrgSettings(
+  url: string,
+  key: string,
+  orgId: string,
+): Promise<Response> {
+  const res = await fetchJson<Array<{ settings: Record<string, unknown> }>>(
+    `${url}/rest/v1/organizations?select=settings&id=eq.${orgId}&limit=1`,
+    { headers: authHeaders(key) },
+  );
+
+  if (!res.ok || !res.data?.[0]) {
+    return json({ success: false, message: "Error al obtener ajustes" }, 500);
+  }
+
+  return json({ success: true, data: { settings: res.data[0].settings || {} } });
+}
+
+async function handleUpdateOrgSettings(
+  url: string,
+  key: string,
+  orgId: string,
+  sessionId: string,
+  body: RequestBody,
+): Promise<Response> {
+  const incoming = body.settings;
+  if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) {
+    return json({ success: false, message: "Datos de ajustes invalidos" }, 400);
+  }
+
+  const currentRes = await fetchJson<Array<{ settings: Record<string, unknown> }>>(
+    `${url}/rest/v1/organizations?select=settings&id=eq.${orgId}&limit=1`,
+    { headers: authHeaders(key) },
+  );
+  const currentSettings: Record<string, unknown> = (currentRes.ok && currentRes.data?.[0]?.settings) || {};
+  const merged = { ...currentSettings };
+  const changes: Record<string, { old: unknown; new: unknown }> = {};
+
+  for (const allowedKey of ALLOWED_SETTINGS_KEYS) {
+    if (!(allowedKey in incoming)) continue;
+    const raw = incoming[allowedKey];
+    if (typeof raw !== "string") {
+      return json({ success: false, message: `El campo "${allowedKey}" debe ser texto` }, 400);
+    }
+    const trimmed = raw.trim();
+    if (trimmed.length > MAX_SETTING_VALUE_LENGTH) {
+      return json({ success: false, message: `El campo "${allowedKey}" excede ${MAX_SETTING_VALUE_LENGTH} caracteres` }, 400);
+    }
+    if (merged[allowedKey] !== trimmed) {
+      changes[allowedKey] = { old: merged[allowedKey] ?? null, new: trimmed };
+      merged[allowedKey] = trimmed;
+    }
+  }
+
+  if (Object.keys(changes).length === 0) {
+    return json({ success: true, data: { settings: merged }, message: "Sin cambios" });
+  }
+
+  const updateRes = await fetchJson(
+    `${url}/rest/v1/organizations?id=eq.${orgId}`,
+    {
+      method: "PATCH",
+      headers: { ...authHeaders(key), "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({ settings: merged, updated_at: new Date().toISOString() }),
+    },
+  );
+
+  if (!updateRes.ok) {
+    return json({ success: false, message: "Error al guardar ajustes" }, 500);
+  }
+
+  await logAudit(url, key, {
+    organizationId: orgId,
+    actorSessionId: sessionId,
+    actorRole: "org_admin",
+    action: "org_settings_updated",
+    metadata: { changes },
+  });
+
+  return json({ success: true, data: { settings: merged } });
 }

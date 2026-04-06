@@ -466,6 +466,21 @@ var Api = (function () {
         });
     }
 
+    function getOrgSettings() {
+        return postJson(FUNCTIONS_BASE + '/kiosk-employees', {
+            action: 'get-org-settings',
+            orgSlug: ORG_SLUG
+        }, { requiresAuth: true });
+    }
+
+    function updateOrgSettings(settings) {
+        return postJson(FUNCTIONS_BASE + '/kiosk-employees', {
+            action: 'update-org-settings',
+            orgSlug: ORG_SLUG,
+            settings: settings
+        }, { requiresAuth: true });
+    }
+
     return {
         ORG_SLUG: ORG_SLUG,
         verifyPin: verifyPin,
@@ -504,6 +519,8 @@ var Api = (function () {
         listReceipts: listReceipts,
         getReceiptPdf: getReceiptPdf,
         getBulkReceiptPdf: getBulkReceiptPdf,
-        reportClientError: reportClientError
+        reportClientError: reportClientError,
+        getOrgSettings: getOrgSettings,
+        updateOrgSettings: updateOrgSettings
     };
 })();

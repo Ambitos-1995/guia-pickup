@@ -353,6 +353,7 @@
                     <button class="admin-tab" data-tab="admin-employees">Empleados</button>
                     <button class="admin-tab" data-tab="admin-acuerdos">Acuerdos</button>
                     <button class="admin-tab" data-tab="admin-recibos">Recibos</button>
+                    <button class="admin-tab" data-tab="admin-ajustes">Ajustes</button>
                 </nav>
 
                 <!-- Admin: Payments -->
@@ -617,6 +618,20 @@
                                 <button id="admin-receipt-btn-done" class="btn-primary btn-full btn-xlarge" type="button">Volver a la lista</button>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Admin: Ajustes -->
+                <div class="admin-section hidden" id="admin-ajustes">
+                    <div class="employee-form">
+                        <div class="form-row">
+                            <label for="admin-setting-legal-rep">Representante legal</label>
+                            <input type="text" id="admin-setting-legal-rep"
+                                   placeholder="Nombre del representante"
+                                   maxlength="200" autocomplete="off">
+                        </div>
+                        <button class="btn-primary btn-full" id="admin-settings-save" type="button">Guardar ajustes</button>
+                        <div class="employee-form-feedback hidden" id="admin-settings-feedback"></div>
                     </div>
                 </div>
             </div>
