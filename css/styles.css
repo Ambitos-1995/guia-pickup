@@ -3016,7 +3016,7 @@ body {
 
     #modal-edit-emp .modal-card {
         padding: 20px 16px;
-        max-height: calc(100vh - 24px);
+        max-height: calc(var(--visual-viewport-height) - 24px);
         row-gap: 10px;
     }
 
@@ -3274,7 +3274,73 @@ body {
     }
 }
 
-@media (max-width: 399px), (max-height: 660px) {
+@media (max-width: 399px) {
+    .pin-container {
+        --pin-keypad-gap: 8px;
+        --pin-keypad-button-size: clamp(44px, 15vw, 54px);
+        padding: 12px 10px;
+        gap: 6px;
+    }
+
+    .pin-logo {
+        font-size: 1rem;
+    }
+
+    .pin-clock {
+        font-size: clamp(1.65rem, 7.2vh, 2.05rem);
+    }
+
+    .pin-date {
+        font-size: 0.72rem;
+    }
+
+    .pin-prompt {
+        font-size: 0.9rem;
+    }
+
+    .admin-build {
+        display: none;
+    }
+
+    .acuerdo-row,
+    .receipt-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .acuerdo-row-info,
+    .receipt-row-info {
+        width: 100%;
+    }
+
+    .acuerdo-row-actions {
+        width: 100%;
+        margin-left: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .btn-acuerdo-iniciar,
+    .btn-acuerdo-descargar,
+    .btn-receipt-sign,
+    .btn-receipt-pdf {
+        width: 100%;
+        margin-left: 0;
+        padding: 12px 14px;
+    }
+
+    .btn-acuerdo-eliminar {
+        width: 48px;
+        min-width: 48px;
+        justify-self: end;
+    }
+}
+
+@media (max-height: 660px) {
     .pin-container {
         --pin-keypad-gap: 8px;
         --pin-keypad-button-size: clamp(44px, 15vw, 54px);
@@ -3447,7 +3513,7 @@ body {
 
     #modal-edit-emp .modal-card {
         max-width: min(94vw, 720px);
-        max-height: calc(100vh - 16px);
+        max-height: calc(var(--visual-viewport-height) - 16px);
         padding: 14px 16px;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         column-gap: 12px;
@@ -4499,7 +4565,7 @@ body {
 
 .acuerdo-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
     padding: 14px 12px;
     background: #fff;
@@ -4512,15 +4578,19 @@ body {
     font-weight: 700;
     font-size: 1rem;
     color: #1e293b;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
 }
 .acuerdo-row-date {
     font-size: 0.8rem;
     color: #64748b;
-    margin-top: 2px;
+    margin-top: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    align-items: center;
 }
+.acuerdo-row-meta-item { min-width: 0; }
 
 .acuerdo-status {
     font-size: 0.75rem;
@@ -4545,9 +4615,15 @@ body {
     font-weight: 700;
     cursor: pointer;
     min-height: 48px;
-    white-space: nowrap;
+    min-width: 0;
+    white-space: normal;
     flex-shrink: 0;
     font-family: var(--font);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+    text-align: center;
 }
 .btn-acuerdo-descargar {
     background: #166534;
@@ -4560,13 +4636,15 @@ body {
     cursor: pointer;
     min-height: 48px;
     min-width: 80px;
-    white-space: nowrap;
+    white-space: normal;
     flex-shrink: 0;
     font-family: var(--font);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
+    line-height: 1.2;
+    text-align: center;
 }
 .btn-acuerdo-descargar:disabled {
     opacity: 0.5;
@@ -4887,7 +4965,7 @@ body {
 /* Receipt list rows (reuses acuerdo-row pattern) */
 .receipt-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
     padding: 14px 12px;
     background: #fff;
@@ -4900,19 +4978,19 @@ body {
     font-weight: 700;
     font-size: 1rem;
     color: #1e293b;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
 }
 .receipt-row-meta {
     font-size: 0.8rem;
     color: #64748b;
-    margin-top: 2px;
+    margin-top: 4px;
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 6px 8px;
     align-items: center;
 }
+.receipt-row-meta-item { min-width: 0; }
 
 .receipt-status {
     font-size: 0.75rem;
@@ -4938,13 +5016,15 @@ body {
     cursor: pointer;
     min-height: 48px;
     min-width: 80px;
-    white-space: nowrap;
+    white-space: normal;
     flex-shrink: 0;
     font-family: var(--font);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
+    line-height: 1.2;
+    text-align: center;
 }
 .btn-receipt-pdf:disabled {
     opacity: 0.5;
@@ -4962,9 +5042,14 @@ body {
     cursor: pointer;
     min-height: 48px;
     min-width: 80px;
-    white-space: nowrap;
+    white-space: normal;
     flex-shrink: 0;
     font-family: var(--font);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+    text-align: center;
 }
 
 /* Admin receipt signing overlay */

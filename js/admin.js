@@ -1128,7 +1128,10 @@ var Admin = (function () {
         info.className   = 'acuerdo-row-info';
         info.innerHTML   =
             '<div class="acuerdo-row-name">' + escapeHtml(contract.employee_name || '—') + '</div>' +
-            '<div class="acuerdo-row-date">' + dateStr + ' · ' + statusLabel + '</div>';
+            '<div class="acuerdo-row-date">' +
+                '<span class="acuerdo-row-meta-item">' + dateStr + '</span>' +
+                statusLabel +
+            '</div>';
 
         row.appendChild(info);
 
@@ -1148,7 +1151,7 @@ var Admin = (function () {
         } else if (contract.status !== 'cancelled') {
             var btn = document.createElement('button');
             btn.className   = 'btn-acuerdo-iniciar';
-            btn.textContent = contract.status === 'pending_admin' ? 'Cofirmar' : 'Iniciar firma';
+            btn.textContent = contract.status === 'pending_admin' ? 'Confirmar' : 'Iniciar firma';
             (function (id) {
                 Utils.bindPress(btn, function () {
                     App.navigateToContract(id);
@@ -1631,8 +1634,8 @@ var Admin = (function () {
         info.innerHTML =
             '<div class="receipt-row-name">' + escapeHtml(name) + '</div>' +
             '<div class="receipt-row-meta">' +
-                escapeHtml(Number(receipt.hours_worked || 0).toFixed(1)) + 'h \u00b7 ' +
-                escapeHtml(Number(receipt.amount_earned || 0).toFixed(2)) + ' \u20ac \u00b7 ' +
+                '<span class="receipt-row-meta-item">' + escapeHtml(Number(receipt.hours_worked || 0).toFixed(1)) + 'h</span>' +
+                '<span class="receipt-row-meta-item">' + escapeHtml(Number(receipt.amount_earned || 0).toFixed(2)) + ' \u20ac</span>' +
                 '<span class="receipt-status ' + statusClass + '">' + statusLbl + '</span>' +
             '</div>';
         row.appendChild(info);

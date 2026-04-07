@@ -569,6 +569,95 @@ test('admin can create a contract from the mobile native participant selector', 
   await expect.poll(() => state.contractCreateCalls[0].employeeId).toBe('emp-4');
 });
 
+test('admin contract and receipt rows stack their primary actions on narrow mobile screens', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+
+  await enterPin(page, '123456');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.locator('#menu-admin-shortcut').click();
+
+  await page.locator('.admin-tab', { hasText: 'Contratos' }).click();
+  await expect(page.locator('#admin-acuerdo-list')).toContainText('Ismael Perez');
+
+  const contractMetrics = await page.evaluate(() => {
+    const row = document.querySelector('#admin-acuerdo-list .acuerdo-row');
+    const info = row && row.querySelector('.acuerdo-row-info');
+    const actions = row && row.querySelector('.acuerdo-row-actions');
+    const button = row && row.querySelector('.btn-acuerdo-iniciar, .btn-acuerdo-descargar');
+    if (!row || !info || !actions || !button) return null;
+    const rowRect = row.getBoundingClientRect();
+    const infoRect = info.getBoundingClientRect();
+    const actionsRect = actions.getBoundingClientRect();
+    const buttonRect = button.getBoundingClientRect();
+    return {
+      actionsTop: Math.round(actionsRect.top),
+      infoBottom: Math.round(infoRect.bottom),
+      buttonRight: Math.ceil(buttonRect.right),
+      rowRight: Math.ceil(rowRect.right)
+    };
+  });
+
+  expect(contractMetrics).not.toBeNull();
+  expect(contractMetrics.actionsTop).toBeGreaterThanOrEqual(contractMetrics.infoBottom - 1);
+  expect(contractMetrics.buttonRight).toBeLessThanOrEqual(contractMetrics.rowRight);
+
+  await page.locator('.admin-tab', { hasText: 'Recibos' }).click();
+  await page.locator('#admin-receipt-prev').click();
+  await expect(page.locator('#admin-receipt-list')).toContainText('Ismael Perez');
+
+  const receiptMetrics = await page.evaluate(() => {
+    const button = document.querySelector('#admin-receipt-list .btn-receipt-sign');
+    const row = button ? button.closest('.receipt-row') : null;
+    const info = row && row.querySelector('.receipt-row-info');
+    if (!row || !info || !button) return null;
+    const rowRect = row.getBoundingClientRect();
+    const infoRect = info.getBoundingClientRect();
+    const buttonRect = button.getBoundingClientRect();
+    return {
+      buttonTop: Math.round(buttonRect.top),
+      infoBottom: Math.round(infoRect.bottom),
+      buttonRight: Math.ceil(buttonRect.right),
+      rowRight: Math.ceil(rowRect.right)
+    };
+  });
+
+  expect(receiptMetrics).not.toBeNull();
+  expect(receiptMetrics.buttonTop).toBeGreaterThanOrEqual(receiptMetrics.infoBottom - 1);
+  expect(receiptMetrics.buttonRight).toBeLessThanOrEqual(receiptMetrics.rowRight);
+});
+
+test('admin contract rows keep inline actions on short but wide viewports', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 640 });
+  await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+
+  await enterPin(page, '123456');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.locator('#menu-admin-shortcut').click();
+  await page.locator('.admin-tab', { hasText: 'Contratos' }).click();
+  await expect(page.locator('#admin-acuerdo-list')).toContainText('Ismael Perez');
+
+  const rowMetrics = await page.evaluate(() => {
+    const row = document.querySelector('#admin-acuerdo-list .acuerdo-row');
+    const info = row && row.querySelector('.acuerdo-row-info');
+    const actions = row && row.querySelector('.acuerdo-row-actions');
+    if (!row || !info || !actions) return null;
+    const infoRect = info.getBoundingClientRect();
+    const actionsRect = actions.getBoundingClientRect();
+    return {
+      actionsTop: Math.round(actionsRect.top),
+      infoBottom: Math.round(infoRect.bottom)
+    };
+  });
+
+  expect(rowMetrics).not.toBeNull();
+  expect(rowMetrics.actionsTop).toBeLessThan(rowMetrics.infoBottom);
+});
+
 test('admin tabs stay usable on a narrow mobile viewport including ajustes', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await setupMockApi(page);
