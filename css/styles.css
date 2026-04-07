@@ -3319,20 +3319,12 @@ body {
         width: 100%;
         margin-left: 0;
         display: flex;
-        flex-direction: row;
-        align-items: stretch;
+        flex-direction: column;
         gap: 8px;
     }
 
     .btn-acuerdo-iniciar,
-    .btn-acuerdo-descargar {
-        flex: 1 1 0%;
-        min-width: 0;
-        margin-left: 0;
-        padding: 12px 14px;
-        font-size: 0.86rem;
-    }
-
+    .btn-acuerdo-descargar,
     .btn-receipt-sign,
     .btn-receipt-pdf {
         width: 100%;
@@ -3342,9 +3334,8 @@ body {
     }
 
     .btn-acuerdo-eliminar {
-        width: 48px;
-        min-width: 48px;
-        flex-shrink: 0;
+        width: 100%;
+        min-width: 0;
     }
 }
 
