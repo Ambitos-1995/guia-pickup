@@ -1151,7 +1151,7 @@ var Admin = (function () {
         } else if (contract.status !== 'cancelled') {
             var btn = document.createElement('button');
             btn.className   = 'btn-acuerdo-iniciar';
-            btn.textContent = contract.status === 'pending_admin' ? 'Confirmar' : 'Iniciar firma';
+            btn.textContent = contract.status === 'pending_admin' ? 'Confirmar' : 'Firmar';
             (function (id) {
                 Utils.bindPress(btn, function () {
                     App.navigateToContract(id);

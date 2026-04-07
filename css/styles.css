@@ -3274,7 +3274,7 @@ body {
     }
 }
 
-@media (max-width: 399px) {
+@media (max-width: 560px) {
     .pin-container {
         --pin-keypad-gap: 8px;
         --pin-keypad-button-size: clamp(44px, 15vw, 54px);
@@ -3318,8 +3318,8 @@ body {
     .acuerdo-row-actions {
         width: 100%;
         margin-left: 0;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
+        display: flex;
+        flex-direction: column;
         align-items: stretch;
         gap: 8px;
     }
@@ -3331,12 +3331,13 @@ body {
         width: 100%;
         margin-left: 0;
         padding: 12px 14px;
+        font-size: 0.86rem;
     }
 
     .btn-acuerdo-eliminar {
         width: 48px;
         min-width: 48px;
-        justify-self: end;
+        align-self: flex-end;
     }
 }
 

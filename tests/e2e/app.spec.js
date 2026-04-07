@@ -629,6 +629,45 @@ test('admin contract and receipt rows stack their primary actions on narrow mobi
   expect(receiptMetrics.buttonRight).toBeLessThanOrEqual(receiptMetrics.rowRight);
 });
 
+test('admin contract rows also stack on typical Android widths', async ({ page }) => {
+  await page.setViewportSize({ width: 412, height: 915 });
+  await setupMockApi(page);
+  await page.goto('/');
+  await expect(page.locator('#screen-pin.active')).toBeVisible();
+
+  await enterPin(page, '123456');
+  await expect(page.locator('#screen-menu.active')).toBeVisible();
+  await page.locator('#menu-admin-shortcut').click();
+  await page.locator('.admin-tab', { hasText: 'Contratos' }).click();
+  await expect(page.locator('#admin-acuerdo-list')).toContainText('Ismael Perez');
+
+  const rowMetrics = await page.evaluate(() => {
+    const row = document.querySelector('#admin-acuerdo-list .acuerdo-row');
+    const info = row && row.querySelector('.acuerdo-row-info');
+    const actions = row && row.querySelector('.acuerdo-row-actions');
+    const primary = row && row.querySelector('.btn-acuerdo-iniciar, .btn-acuerdo-descargar');
+    const remove = row && row.querySelector('.btn-acuerdo-eliminar');
+    if (!row || !info || !actions || !primary || !remove) return null;
+    const infoRect = info.getBoundingClientRect();
+    const actionsRect = actions.getBoundingClientRect();
+    const primaryRect = primary.getBoundingClientRect();
+    const removeRect = remove.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    return {
+      actionsTop: Math.round(actionsRect.top),
+      infoBottom: Math.round(infoRect.bottom),
+      primaryRight: Math.ceil(primaryRect.right),
+      removeRight: Math.ceil(removeRect.right),
+      rowRight: Math.ceil(rowRect.right)
+    };
+  });
+
+  expect(rowMetrics).not.toBeNull();
+  expect(rowMetrics.actionsTop).toBeGreaterThanOrEqual(rowMetrics.infoBottom - 1);
+  expect(rowMetrics.primaryRight).toBeLessThanOrEqual(rowMetrics.rowRight);
+  expect(rowMetrics.removeRight).toBeLessThanOrEqual(rowMetrics.rowRight);
+});
+
 test('admin contract rows keep inline actions on short but wide viewports', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 640 });
   await setupMockApi(page);
