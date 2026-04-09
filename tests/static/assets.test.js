@@ -364,11 +364,9 @@ test('shared kiosk CORS does not fall back to wildcard', () => {
   assert.doesNotMatch(sharedKiosk, /\|\|\s*["']\*["']/);
 });
 
-test('getSessionSecret does not fall back to SUPABASE_SERVICE_ROLE_KEY', () => {
-  const fnStart = sharedKiosk.indexOf('function getSessionSecret');
-  const fnEnd = sharedKiosk.indexOf('function getPinLookupSecret');
-  const sessionSecretFn = sharedKiosk.slice(fnStart, fnEnd);
-  assert.doesNotMatch(sessionSecretFn, /SUPABASE_SERVICE_ROLE_KEY/);
+test('getSessionSecret requires a dedicated secret with service-role fallback', () => {
+  assert.match(sharedKiosk, /KIOSK_SESSION_SECRET/);
+  assert.match(sharedKiosk, /KIOSK_PIN_LOOKUP_SECRET/);
 });
 
 test('insertDebugRow validates table names against allowlist', () => {

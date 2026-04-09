@@ -172,14 +172,14 @@ export function getSupabaseConfig(): { url: string; serviceRoleKey: string } {
 }
 
 export function getSessionSecret(): string {
-  const secret = Deno.env.get("KIOSK_SESSION_SECRET") ?? "";
-  if (!secret) throw new Error("KIOSK_SESSION_SECRET env var is required");
+  const secret = Deno.env.get("KIOSK_SESSION_SECRET") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!secret) throw new Error("KIOSK_SESSION_SECRET or SUPABASE_SERVICE_ROLE_KEY is required");
   return secret;
 }
 
 export function getPinLookupSecret(): string {
-  const secret = Deno.env.get("KIOSK_PIN_LOOKUP_SECRET") ?? "";
-  if (!secret) throw new Error("KIOSK_PIN_LOOKUP_SECRET env var is required");
+  const secret = Deno.env.get("KIOSK_PIN_LOOKUP_SECRET") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!secret) throw new Error("KIOSK_PIN_LOOKUP_SECRET or SUPABASE_SERVICE_ROLE_KEY is required");
   return secret;
 }
 
