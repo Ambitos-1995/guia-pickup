@@ -11,8 +11,12 @@ const configuredAllowedOrigins = parseAllowedOrigins(
   Deno.env.get("KIOSK_ALLOWED_ORIGINS") || Deno.env.get("EDGE_ALLOWED_ORIGINS"),
 );
 
+if (configuredAllowedOrigins.length === 0) {
+  console.warn("[kiosk] KIOSK_ALLOWED_ORIGINS not set — cross-origin requests will be rejected");
+}
+
 export const corsHeaders: Record<string, string> = {
-  "Access-Control-Allow-Origin": configuredAllowedOrigins[0] || "*",
+  "Access-Control-Allow-Origin": configuredAllowedOrigins[0] || "",
   "Access-Control-Allow-Headers": "authorization, content-type, x-kiosk-clock-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
@@ -20,7 +24,8 @@ export const corsHeaders: Record<string, string> = {
 
 /** Call at the start of every handler to set the correct CORS origin for the request. */
 export function initCors(req: Request): void {
-  if (configuredAllowedOrigins.length <= 1) return;
+  if (configuredAllowedOrigins.length === 0) return;
+  if (configuredAllowedOrigins.length === 1) return;
   const origin = req.headers.get("origin") || "";
   corsHeaders["Access-Control-Allow-Origin"] =
     configuredAllowedOrigins.includes(origin) ? origin : configuredAllowedOrigins[0];
@@ -167,14 +172,14 @@ export function getSupabaseConfig(): { url: string; serviceRoleKey: string } {
 }
 
 export function getSessionSecret(): string {
-  const secret = Deno.env.get("KIOSK_SESSION_SECRET") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-  if (!secret) throw new Error("Missing session secret");
+  const secret = Deno.env.get("KIOSK_SESSION_SECRET") ?? "";
+  if (!secret) throw new Error("KIOSK_SESSION_SECRET env var is required");
   return secret;
 }
 
 export function getPinLookupSecret(): string {
-  const secret = Deno.env.get("KIOSK_PIN_LOOKUP_SECRET") || getSessionSecret();
-  if (!secret) throw new Error("Missing pin lookup secret");
+  const secret = Deno.env.get("KIOSK_PIN_LOOKUP_SECRET") ?? "";
+  if (!secret) throw new Error("KIOSK_PIN_LOOKUP_SECRET env var is required");
   return secret;
 }
 
@@ -860,12 +865,23 @@ export async function fetchJson<T>(url: string, init: RequestInit): Promise<Rest
   };
 }
 
+const ALLOWED_DEBUG_TABLES = new Set([
+  "kiosk_debug_events",
+  "kiosk_debug_schedule_mutations",
+  "kiosk_debug_attendance_attempts",
+  "kiosk_edge_errors",
+]);
+
 async function insertDebugRow(
   supabaseUrl: string,
   key: string,
   table: string,
   row: Record<string, unknown>,
 ): Promise<void> {
+  if (!ALLOWED_DEBUG_TABLES.has(table)) {
+    console.error(`[kiosk] insertDebugRow: disallowed table "${table}"`);
+    return;
+  }
   try {
     await fetch(`${supabaseUrl}/rest/v1/${table}`, {
       method: "POST",

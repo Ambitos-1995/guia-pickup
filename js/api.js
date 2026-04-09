@@ -15,6 +15,10 @@ var Api = (function () {
         : 'https://mzuvkinwebqgmnutchsv.supabase.co';
     var FUNCTIONS_BASE = SUPABASE_PROJECT_URL + '/functions/v1';
 
+    if (typeof window !== 'undefined' && window.__SEUR_CONFIG__ && typeof window.__SEUR_CONFIG__ === 'object') {
+        Object.freeze(window.__SEUR_CONFIG__);
+    }
+
     function postJson(url, body, options) {
         var opts = options || {};
         var headers = { 'Content-Type': 'application/json' };

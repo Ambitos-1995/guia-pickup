@@ -215,7 +215,7 @@ test('supabase function config includes kiosk payment receipt endpoint', () => {
 test('shared kiosk edge helpers support a configurable CORS allowlist', () => {
   assert.match(sharedKiosk, /KIOSK_ALLOWED_ORIGINS/);
   assert.match(sharedKiosk, /EDGE_ALLOWED_ORIGINS/);
-  assert.match(sharedKiosk, /configuredAllowedOrigins\[0\] \|\| "\*"/);
+  assert.match(sharedKiosk, /configuredAllowedOrigins\[0\] \|\| ""/);
 });
 
 test('touch interactions use click for action and pointerdown for visual feedback', () => {
@@ -352,4 +352,29 @@ test('signature images are cropped and placed in pdfs without forced distortion'
   assert.match(receiptFunction, /DOCUMENTO MENSUAL/);
   assert.match(receiptFunction, /FIRMA REGISTRADA/);
   assert.match(receiptFunction, /Recibo validado electronicamente por/);
+});
+
+// ── Security regression tests ────────────────────────────────────────────────
+
+test('admin.js escapeHtml encodes apostrophes', () => {
+  assert.match(adminJs, /replace\(\/'\//);
+});
+
+test('shared kiosk CORS does not fall back to wildcard', () => {
+  assert.doesNotMatch(sharedKiosk, /\|\|\s*["']\*["']/);
+});
+
+test('getSessionSecret does not fall back to SUPABASE_SERVICE_ROLE_KEY', () => {
+  const fnStart = sharedKiosk.indexOf('function getSessionSecret');
+  const fnEnd = sharedKiosk.indexOf('function getPinLookupSecret');
+  const sessionSecretFn = sharedKiosk.slice(fnStart, fnEnd);
+  assert.doesNotMatch(sessionSecretFn, /SUPABASE_SERVICE_ROLE_KEY/);
+});
+
+test('insertDebugRow validates table names against allowlist', () => {
+  assert.match(sharedKiosk, /ALLOWED_DEBUG_TABLES/);
+});
+
+test('api.js freezes window.__SEUR_CONFIG__', () => {
+  assert.match(apiJs, /Object\.freeze/);
 });

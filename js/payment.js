@@ -165,7 +165,7 @@ var Payment = (function () {
 
         if (receipt.status === 'signed') {
             bannerEl.classList.add('receipt-banner--signed');
-            var signedDate = receipt.employee_signed_at ? formatDate(receipt.employee_signed_at) : '';
+            var signedDate = receipt.employee_signed_at ? Utils.escapeHtml(formatDate(receipt.employee_signed_at)) : '';
             textEl.innerHTML = signedDate
                 ? '<strong>Recibo firmado</strong>Registrado el ' + signedDate + '. El documento ha quedado cerrado y disponible para consulta.'
                 : '<strong>Recibo firmado</strong>El documento ha quedado cerrado y disponible para consulta.';
