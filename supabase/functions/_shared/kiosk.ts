@@ -172,14 +172,14 @@ export function getSupabaseConfig(): { url: string; serviceRoleKey: string } {
 }
 
 export function getSessionSecret(): string {
-  const secret = Deno.env.get("KIOSK_SESSION_SECRET") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-  if (!secret) throw new Error("KIOSK_SESSION_SECRET or SUPABASE_SERVICE_ROLE_KEY is required");
+  const secret = Deno.env.get("KIOSK_SESSION_SECRET") ?? "";
+  if (!secret) throw new Error("KIOSK_SESSION_SECRET is required");
   return secret;
 }
 
 export function getPinLookupSecret(): string {
-  const secret = Deno.env.get("KIOSK_PIN_LOOKUP_SECRET") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-  if (!secret) throw new Error("KIOSK_PIN_LOOKUP_SECRET or SUPABASE_SERVICE_ROLE_KEY is required");
+  const secret = Deno.env.get("KIOSK_PIN_LOOKUP_SECRET") ?? "";
+  if (!secret) throw new Error("KIOSK_PIN_LOOKUP_SECRET is required");
   return secret;
 }
 
@@ -266,51 +266,14 @@ export async function resolveEmployeeByPin(
     `&organization_id=eq.${orgId}&pin_lookup_hash=eq.${lookupHash}&limit=1`;
 
   const hashedMatch = await fetch(hashedQuery, { headers: authHeaders(key) });
-  if (hashedMatch.ok) {
-    const hashedRows = await hashedMatch.json() as EmployeeRow[];
-    if (hashedRows[0] && hashedRows[0].pin_hash) {
-      const isValid = await verifyPinHash(pin, hashedRows[0].pin_hash);
-      if (isValid) return hashedRows[0];
-    }
-  }
+  if (!hashedMatch.ok) return null;
 
-  const legacyQuery =
-    `${supabaseUrl}/rest/v1/kiosk_employees?select=id,nombre,apellido,attendance_enabled,role,pin_hash,pin_lookup_hash,pin,pin_migrated_at` +
-    `&organization_id=eq.${orgId}&pin=eq.${encodeURIComponent(pin)}&limit=1`;
+  const hashedRows = await hashedMatch.json() as EmployeeRow[];
+  const employee = hashedRows[0];
+  if (!employee || !employee.pin_hash) return null;
 
-  const legacyMatch = await fetch(legacyQuery, { headers: authHeaders(key) });
-  if (!legacyMatch.ok) return null;
-
-  const legacyRows = await legacyMatch.json() as EmployeeRow[];
-  const legacyEmployee = legacyRows[0];
-  if (!legacyEmployee) return null;
-
-  const pinHash = await hashPin(pin);
-  await fetch(
-    `${supabaseUrl}/rest/v1/kiosk_employees?id=eq.${encodeURIComponent(legacyEmployee.id)}&organization_id=eq.${orgId}`,
-    {
-      method: "PATCH",
-      headers: {
-        ...authHeaders(key),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        pin_hash: pinHash,
-        pin_lookup_hash: lookupHash,
-        pin_algorithm: "argon2id",
-        pin_migrated_at: new Date().toISOString(),
-        pin: null,
-      }),
-    },
-  );
-
-  return {
-    ...legacyEmployee,
-    pin_hash: pinHash,
-    pin_lookup_hash: lookupHash,
-    pin: null,
-    pin_migrated_at: new Date().toISOString(),
-  };
+  const isValid = await verifyPinHash(pin, employee.pin_hash);
+  return isValid ? employee : null;
 }
 
 export async function issueSession(

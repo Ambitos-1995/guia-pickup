@@ -71,6 +71,23 @@ interface UserToAnonymize {
   nombre: string | null;
 }
 
+interface RetentionSettingsRow {
+  organization_id: string;
+  data_retention_days: number | null;
+}
+
+interface OrganizationSettingsRow {
+  organization_id: string;
+  data_retention_days: number | null;
+  admin_notification_email: string | null;
+  notify_admin_on_critical_alert: boolean | null;
+}
+
+interface OrganizationRow {
+  id: string;
+  name: string;
+}
+
 interface ResponseToAnonymize {
   id: string;
   user_id: string;
@@ -442,7 +459,7 @@ async function getOrganizationRetentionConfigs(
       throw new Error(`Failed to fetch organizations: ${orgsResponse.status}`);
     }
 
-    const orgs = await orgsResponse.json();
+    const orgs = (await orgsResponse.json()) as OrganizationRow[];
 
     const [retentionResponse, settingsResponse] = await Promise.all([
       fetch(
@@ -465,17 +482,25 @@ async function getOrganizationRetentionConfigs(
       ),
     ]);
 
-    const retentionSettings = retentionResponse.ok ? await retentionResponse.json() : [];
-    const retentionMap = new Map(retentionSettings.map((setting: any) => [setting.organization_id, setting]));
+    const retentionSettings = retentionResponse.ok
+      ? ((await retentionResponse.json()) as RetentionSettingsRow[])
+      : [];
+    const retentionMap = new Map<string, RetentionSettingsRow>(
+      retentionSettings.map((setting) => [setting.organization_id, setting]),
+    );
 
-    const settings = settingsResponse.ok ? await settingsResponse.json() : [];
-    const settingsMap = new Map(settings.map((setting: any) => [setting.organization_id, setting]));
+    const settings = settingsResponse.ok
+      ? ((await settingsResponse.json()) as OrganizationSettingsRow[])
+      : [];
+    const settingsMap = new Map<string, OrganizationSettingsRow>(
+      settings.map((setting) => [setting.organization_id, setting]),
+    );
 
     return orgs
-      .filter((org: any) => !specificOrganizationId || org.id === specificOrganizationId)
-      .map((org: any) => {
-        const retention = retentionMap.get(org.id) || {};
-        const orgSettings = settingsMap.get(org.id) || {};
+      .filter((org) => !specificOrganizationId || org.id === specificOrganizationId)
+      .map((org) => {
+        const retention: Partial<RetentionSettingsRow> = retentionMap.get(org.id) ?? {};
+        const orgSettings: Partial<OrganizationSettingsRow> = settingsMap.get(org.id) ?? {};
         return {
           organization_id: org.id,
           organization_name: org.name,

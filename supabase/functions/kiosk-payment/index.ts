@@ -56,10 +56,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (action === "my-summary") {
       const auth = await requireSession(req, url, serviceRoleKey, ["respondent"]);
       if (auth instanceof Response) return auth;
-      if (auth.session.organization_id !== orgId || !auth.session.employee_id) {
+      const employeeId = auth.session.employee_id;
+      if (auth.session.organization_id !== orgId || !employeeId) {
         return json({ success: false, message: "Sesion fuera de la organizacion activa" }, 403);
       }
-      return await handleMySummary(url, serviceRoleKey, auth.session, body);
+      return await handleMySummary(url, serviceRoleKey, {
+        organization_id: auth.session.organization_id,
+        employee_id: employeeId,
+      }, body);
     }
 
     const auth = await requireSession(req, url, serviceRoleKey, ["org_admin"]);

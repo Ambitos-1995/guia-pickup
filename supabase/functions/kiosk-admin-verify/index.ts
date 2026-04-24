@@ -19,6 +19,7 @@ import {
 } from "../_shared/kiosk.ts";
 
 const PIN_REGEX = /^[0-9]{4,8}$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ADMIN_IDLE_TIMEOUT_SECONDS = 5 * 60;
 const ADMIN_ABSOLUTE_TIMEOUT_SECONDS = 15 * 60;
 const ADMIN_FAILURE_LIMIT = 5;
@@ -62,6 +63,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
         success: false,
         error: "ORG_REQUIRED",
         message: "Falta la organizacion",
+      }, 400);
+    }
+
+    if (organizationId && !UUID_REGEX.test(organizationId)) {
+      return json({
+        success: false,
+        error: "ORG_INVALID",
+        message: "Identificador de organizacion invalido",
       }, 400);
     }
 
