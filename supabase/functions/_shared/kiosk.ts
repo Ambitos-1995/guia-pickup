@@ -178,8 +178,13 @@ export function getSessionSecret(): string {
 }
 
 export function getPinLookupSecret(): string {
-  const secret = Deno.env.get("KIOSK_PIN_LOOKUP_SECRET") ?? "";
-  if (!secret) throw new Error("KIOSK_PIN_LOOKUP_SECRET is required");
+  // Fallback to SUPABASE_SERVICE_ROLE_KEY preserved because existing
+  // pin_lookup_hash values in DB are bound to that secret. Rotating to a
+  // dedicated KIOSK_PIN_LOOKUP_SECRET requires a coordinated PIN reset
+  // for all migrated employees (Argon2id is one-way — hashes cannot be
+  // regenerated server-side).
+  const secret = Deno.env.get("KIOSK_PIN_LOOKUP_SECRET") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!secret) throw new Error("KIOSK_PIN_LOOKUP_SECRET or SUPABASE_SERVICE_ROLE_KEY is required");
   return secret;
 }
 
