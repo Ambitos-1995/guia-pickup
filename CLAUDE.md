@@ -58,7 +58,9 @@ supabase functions deploy kiosk-pin-migrate
 supabase functions deploy gdpr-retention
 ```
 
-Shared utilities live in `supabase/functions/_shared/kiosk.ts` (auth, rate limiting, audit logging, CORS headers).
+Shared utilities live in `supabase/functions/_shared/kiosk.ts` (auth, rate limiting, audit logging, CORS headers). **Any change here requires redeploying every Edge Function that imports from it** — there is no shared bundle, each function bakes in its own copy at deploy time.
+
+All functions are deployed with `--no-verify-jwt` except `kiosk-pin-migrate` (which runs authenticated admin migrations). The Supabase CLI prints "Docker is not running" warnings during remote deploys; this is cosmetic — Docker is only needed for `supabase start` (local stack).
 
 Local development:
 ```bash
@@ -76,6 +78,18 @@ Migrations live in `supabase/migrations/`. Core kiosk tables: `kiosk_employees`,
 
 ### JWT Disabled
 All Edge Functions have `verify_jwt = false` — the kiosk uses PIN-based auth, not tokens.
+
+### Edge Function Secrets
+
+Managed via `npx supabase secrets set|unset|list`. Required:
+
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_DB_URL` — auto-provisioned.
+- `KIOSK_ALLOWED_ORIGINS` (or `EDGE_ALLOWED_ORIGINS`) — comma-separated; CORS fail-closed if empty.
+- `KIOSK_SESSION_SECRET` — HMAC key for session tokens. Fail-closed (no fallback). Rotating only invalidates active sessions.
+- `KIOSK_PIN_LOOKUP_SECRET` — optional; falls back to `SUPABASE_SERVICE_ROLE_KEY`. **Do not set it to a new value in production**: stored `kiosk_employees.pin_lookup_hash` rows are HMAC-SHA256(secret, `${orgId}:${pin}`) bound to whatever value was active at migration time. A new value breaks login for every migrated employee (Argon2id `pin_hash` is one-way — cannot regenerate lookups without the plaintext PIN). Rotating this secret requires a coordinated PIN reset for all employees.
+- `CRON_SECRET` — required by `gdpr-retention` via `X-Cron-Secret` header.
+
+`supabase secrets list` returns SHA-256 digests, not values. The service_role JWT shown in Dashboard → Settings → API may differ from the `SUPABASE_SERVICE_ROLE_KEY` that Edge Functions actually read at runtime — do not assume they are identical.
 
 ## Architecture
 
@@ -101,6 +115,16 @@ utils.js → legal-templates.js → pin-pad.js → api.js → offline-clock-queu
 
 ### Session State
 `App.session` holds: `{ pin, employeeProfileId, userId, employeeCode, employeeName, photoUrl, currentStatus, role, accessToken }`. Set after PIN verification, cleared on logout. Employee idle timeout: 10 min; admin idle timeout: 5 min. The `accessToken` is a server-side session token sent as `Authorization: Bearer` on API calls that require auth.
+
+### Auth & PIN Data Model
+
+PINs live in `kiosk_employees` with two derived columns:
+- `pin_hash` — Argon2id of the PIN (verification, one-way).
+- `pin_lookup_hash` — HMAC-SHA256 of `${orgId}:${pin}` using `KIOSK_PIN_LOOKUP_SECRET` or `SUPABASE_SERVICE_ROLE_KEY`. Enables constant-time lookup by PIN without full table scan.
+
+The plaintext `pin` column is nullable and stays `NULL` for all migrated employees; new employees are always inserted with `pin_hash` + `pin_lookup_hash` (see `kiosk-employees` handlers). The legacy plaintext fallback was removed from `resolveEmployeeByPin` once all production employees had migrated.
+
+Sessions are server-side: rows with idle + absolute timeouts, issued on PIN verify and carried as `Authorization: Bearer` tokens (HMAC-signed using `KIOSK_SESSION_SECRET`). Offline clock replays use a separate short-lived `X-Kiosk-Clock-Token`.
 
 ### Offline Clock Queue (`js/offline-clock-queue.js`)
 Clock-in/out actions are queued in IndexedDB (`pickup-tmg-offline-clock-v1`) when the network is unavailable. The queue auto-flushes after 1.5s on reconnection and retries every 15s. Queued entries use `X-Kiosk-Clock-Token` for replay auth. A banner shows pending count to the user.
@@ -134,6 +158,7 @@ Hosted on **Vercel** as a static site (no build command). `vercel.json` sets cac
 - **Timezone**: All backend date/time logic uses `Europe/Madrid` (`APP_TIME_ZONE` in `_shared/kiosk.ts`). The frontend displays times as received from the server.
 - **Session auth**: Edge functions use server-side session tokens (not JWTs). Sessions are created on PIN verify, carry a role (`org_admin` | `respondent`), and have both idle and absolute timeouts. Clock operations also support an `X-Kiosk-Clock-Token` header for offline replay.
 - **App version**: `APP_VERSION` in `js/app.js` is a human-readable release tag (e.g. `2026.03.18-r3`). Update it when shipping user-visible changes.
+- **Migrations are append-only**: never edit an applied migration file. To reverse, write a new migration. If applying DDL via MCP (`mcp__supabase__apply_migration`), also write the same SQL to `supabase/migrations/{version}_name.sql` so the repo stays in sync with remote.
 
 ## Screens / Modules Reference
 
