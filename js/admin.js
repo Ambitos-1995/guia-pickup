@@ -73,6 +73,14 @@ var Admin = (function () {
         Utils.bindPress(document.getElementById('admin-pay-save'), savePayment);
         Utils.bindPress(document.getElementById('admin-pay-calculate'), calculatePayments);
 
+        // Mantener el botón "Calcular" sincronizado con el estado de la tarifa:
+        // mientras esté vacía o <= 0, el botón queda deshabilitado para guiar
+        // al admin hacia el flujo nuevo (tarifa fija + cap proporcional).
+        var rateInput = document.getElementById('admin-pay-rate');
+        if (rateInput) {
+            rateInput.addEventListener('input', refreshCalcButtonState);
+        }
+
         var now = new Date();
         currentYear = now.getFullYear();
         currentMonth = now.getMonth() + 1;
@@ -306,10 +314,16 @@ var Admin = (function () {
 
         /* Read-only: fetch existing summary without recalculating */
         Api.getPaymentSummary(currentYear, currentMonth).then(function (res) {
+            var rateEl = document.getElementById('admin-pay-rate');
             if (res && res.success && res.data && res.data.configured) {
                 var data = res.data;
                 amountEl.textContent = formatEuro(data.total_seur_amount || 0);
                 document.getElementById('admin-pay-amount').value = data.total_seur_amount || '';
+                if (rateEl) {
+                    rateEl.value = (data.configured_hourly_rate !== null && data.configured_hourly_rate !== undefined)
+                        ? Number(data.configured_hourly_rate).toFixed(2)
+                        : '';
+                }
 
                 if (data.calculations && data.calculations.length > 0) {
                     statusEl.textContent = 'Calculado';
@@ -324,14 +338,39 @@ var Admin = (function () {
                 statusEl.textContent = 'Sin configurar';
                 statusEl.className = 'admin-pay-summary-badge';
                 document.getElementById('admin-pay-amount').value = '';
+                if (rateEl) rateEl.value = '';
             }
+            refreshCalcButtonState();
         });
+    }
+
+    function refreshCalcButtonState() {
+        var calcBtn = document.getElementById('admin-pay-calculate');
+        if (!calcBtn) return;
+        var closed = isMonthClosed(currentYear, currentMonth);
+        if (!closed) {
+            calcBtn.disabled = true;
+            return;
+        }
+        var rateEl = document.getElementById('admin-pay-rate');
+        var rateVal = rateEl ? parseFloat(rateEl.value) : NaN;
+        // Permitimos calcular sin tarifa solo si ya hay un importe guardado y el
+        // admin acepta el modo legacy (no hacemos esa rama editable desde UI:
+        // el bot\u00F3n se deshabilita si la tarifa est\u00E1 vac\u00EDa para guiar al admin
+        // hacia el flujo nuevo).
+        calcBtn.disabled = !(rateVal > 0);
     }
 
     function savePayment() {
         var amount = parseFloat(document.getElementById('admin-pay-amount').value);
+        var rateEl = document.getElementById('admin-pay-rate');
+        var hourlyRate = rateEl ? parseFloat(rateEl.value) : NaN;
         if (!amount || amount <= 0) {
             showFeedback('admin-pay-feedback', 'error', 'Introduce un importe valido.', 4000);
+            return;
+        }
+        if (!hourlyRate || hourlyRate <= 0) {
+            showFeedback('admin-pay-feedback', 'error', 'Introduce una tarifa por hora valida (mayor que 0).', 5000);
             return;
         }
 
@@ -339,12 +378,12 @@ var Admin = (function () {
         btn.disabled = true;
         btn.textContent = 'Guardando...';
 
-        Api.setPaymentAmount(currentYear, currentMonth, amount).then(function (res) {
+        Api.setPaymentAmount(currentYear, currentMonth, amount, hourlyRate).then(function (res) {
             btn.disabled = false;
             btn.textContent = 'Guardar';
 
             if (res && res.success) {
-                showFeedback('admin-pay-feedback', 'success', 'Importe guardado.', 4000);
+                showFeedback('admin-pay-feedback', 'success', 'Importe y tarifa guardados.', 4000);
                 loadPayMonth();
             } else {
                 showFeedback('admin-pay-feedback', 'error', (res && res.message) || 'No se pudo guardar.', 4000);
@@ -399,9 +438,28 @@ var Admin = (function () {
             });
         }
 
-        tfoot.appendChild(makeFootRow('Tarifa/hora', (data.total_validated_hours || 0) + 'h validadas', formatEuro(data.rate_per_hour || 0) + '/h'));
-        tfoot.appendChild(makeFootRow('Total pagado', '', formatEuro(data.total_paid || 0)));
-        tfoot.appendChild(makeFootRow('En revision', String(data.review_required_count || 0), formatEuro(data.org_keeps || 0) + ' pendiente'));
+        var capApplied = !!data.cap_applied;
+        var baseRate = Number(data.rate_per_hour || 0);
+        var effRate = Number(data.effective_hourly_rate || baseRate);
+
+        tfoot.appendChild(makeFootRow(
+            capApplied ? 'Tarifa base' : 'Tarifa/hora',
+            (data.total_validated_hours || 0) + 'h validadas',
+            formatEuro(baseRate) + '/h'
+        ));
+        if (capApplied) {
+            tfoot.appendChild(makeFootRow(
+                '\u26A0 Ajuste proporcional',
+                'Presupuesto excedido',
+                'Efectiva: ' + formatEuro(effRate) + '/h'
+            ));
+        }
+        tfoot.appendChild(makeFootRow('Total empleados', '', formatEuro(data.total_paid || 0)));
+        tfoot.appendChild(makeFootRow(
+            'Sobrante fundacion',
+            String(data.review_required_count || 0) + ' en revision',
+            formatEuro(data.org_keeps || 0)
+        ));
     }
 
     function makeFootRow(label, middle, value) {

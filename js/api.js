@@ -297,14 +297,18 @@ var Api = (function () {
         }, { requiresAuth: true });
     }
 
-    function setPaymentAmount(year, month, totalAmount) {
-        return postJson(FUNCTIONS_BASE + '/kiosk-payment', {
+    function setPaymentAmount(year, month, totalAmount, hourlyRate) {
+        var payload = {
             action: 'set-amount',
             orgSlug: ORG_SLUG,
             year: year,
             month: month,
             totalAmount: totalAmount
-        }, { requiresAuth: true });
+        };
+        if (hourlyRate !== undefined && hourlyRate !== null && hourlyRate !== '') {
+            payload.hourlyRate = Number(hourlyRate);
+        }
+        return postJson(FUNCTIONS_BASE + '/kiosk-payment', payload, { requiresAuth: true });
     }
 
     function calculatePayments(year, month) {

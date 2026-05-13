@@ -29,9 +29,12 @@ function buildState(overrides = {}) {
     paymentSummary: {
       configured: false,
       total_seur_amount: 0,
+      configured_hourly_rate: null,
       calculations: [],
       total_validated_hours: 0,
       rate_per_hour: 0,
+      effective_hourly_rate: 0,
+      cap_applied: false,
       total_paid: 0,
       review_required_count: 0,
       org_keeps: 0
@@ -287,10 +290,14 @@ async function setupMockApi(page, overrides = {}) {
       }
 
       if (body.action === 'set-amount') {
+        const rate = body.hourlyRate !== undefined && body.hourlyRate !== null && body.hourlyRate !== ''
+          ? Number(body.hourlyRate)
+          : null;
         state.paymentSummary = {
           ...state.paymentSummary,
           configured: true,
-          total_seur_amount: Number(body.totalAmount || 0)
+          total_seur_amount: Number(body.totalAmount || 0),
+          configured_hourly_rate: rate
         };
         return fulfillJson(route, { success: true, data: state.paymentSummary });
       }

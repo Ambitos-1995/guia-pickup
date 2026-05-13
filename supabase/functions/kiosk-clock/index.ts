@@ -219,9 +219,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
         scheduledEnd: dayState.openSlot?.end_time || null,
         message: "Estado de fichaje consultado",
       });
+      // Exponemos todaySlots + slotStates para que el frontend pueda mostrar
+      // un aviso cuando, tras un check_out, el empleado aún tiene otro slot
+      // consecutivo dentro de su ventana de entrada sin fichar (caso TMG).
       return json({
         success: true,
-        data: { employeeName, currentStatus },
+        data: {
+          employeeName,
+          currentStatus,
+          todaySlots: dayState.todaySlots.map((slot) => ({
+            id: slot.id,
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            state: dayState.slotStates[slot.id] || "open",
+          })),
+        },
       });
     }
 

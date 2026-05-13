@@ -22,6 +22,7 @@ interface RequestBody {
   year?: number;
   month?: number;
   totalAmount?: number;
+  hourlyRate?: number;
   notes?: string;
 }
 
@@ -108,6 +109,18 @@ async function handleSetAmount(
   const totalAmount = Number(body.totalAmount);
   const notes = String(body.notes || "").trim();
 
+  // hourly_rate es opcional: si no se envía o es 0/invalid → NULL (compat legacy).
+  // Si se envía, debe ser número finito > 0.
+  const rawHourlyRate = body.hourlyRate;
+  let hourlyRate: number | null = null;
+  if (rawHourlyRate !== undefined && rawHourlyRate !== null && rawHourlyRate !== "" as unknown as number) {
+    const parsed = Number(rawHourlyRate);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return json({ success: false, message: "Tarifa por hora invalida" }, 400);
+    }
+    hourlyRate = round4(parsed);
+  }
+
   if (!year || !month || month < 1 || month > 12) {
     return json({ success: false, message: "Ano o mes invalido" }, 400);
   }
@@ -120,7 +133,7 @@ async function handleSetAmount(
     return json({ success: false, message: "Importe invalido" }, 400);
   }
 
-  const save = await fetchJson<Array<{ id: string; total_amount: string; notes: string }>>(
+  const save = await fetchJson<Array<{ id: string; total_amount: string; hourly_rate: string | null; notes: string }>>(
     `${url}/rest/v1/kiosk_payment_months`,
     {
       method: "POST",
@@ -134,6 +147,7 @@ async function handleSetAmount(
         year,
         month,
         total_amount: totalAmount,
+        hourly_rate: hourlyRate,
         notes,
       }),
     },
@@ -148,7 +162,7 @@ async function handleSetAmount(
     actorSessionId: sessionId,
     actorRole: "org_admin",
     action: "payment_amount_saved",
-    metadata: { year, month, totalAmount },
+    metadata: { year, month, totalAmount, hourlyRate },
   });
 
   return json({ success: true, data: save.data[0] });
@@ -172,8 +186,8 @@ async function handleCalculate(
     return json({ success: false, message: "Solo se puede calcular meses ya cerrados. Disponible a partir del dia 1 del proximo mes." }, 400);
   }
 
-  const amountRes = await fetchJson<Array<{ total_amount: string }>>(
-    `${url}/rest/v1/kiosk_payment_months?select=total_amount&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}&limit=1`,
+  const amountRes = await fetchJson<Array<{ total_amount: string; hourly_rate: string | null }>>(
+    `${url}/rest/v1/kiosk_payment_months?select=total_amount,hourly_rate&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}&limit=1`,
     { headers: authHeaders(key) },
   );
 
@@ -183,6 +197,16 @@ async function handleCalculate(
   }
 
   const totalAmount = Number(paymentMonth.total_amount);
+  // Modo "tarifa fija": el admin definió hourly_rate al guardar el mes.
+  // - Cada empleado cobra hours_worked * fixedHourlyRate.
+  // - Si la suma supera totalAmount, se aplica un cap proporcional.
+  // - Si no, el sobrante queda implícitamente para la fundación.
+  // Modo legacy: hourly_rate IS NULL → tarifa dinámica (total / horas asignadas).
+  const fixedHourlyRate = paymentMonth.hourly_rate !== null && paymentMonth.hourly_rate !== undefined
+    ? Number(paymentMonth.hourly_rate)
+    : null;
+  const isFixedRate = fixedHourlyRate !== null && Number.isFinite(fixedHourlyRate) && fixedHourlyRate > 0;
+
   const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
   const monthEnd = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
 
@@ -200,6 +224,8 @@ async function handleCalculate(
       `${url}/rest/v1/kiosk_schedule_slots?select=id,year,week,day_of_week,start_time,end_time,employee_id,kiosk_employees(id,nombre,apellido)&organization_id=eq.${orgId}&year=in.(${year - 1},${year},${year + 1})`,
       { headers: authHeaders(key) },
     ),
+    // Leemos ambas acciones (check_in y check_out) para poder usar el check_out real
+    // y, en sesiones que abarcan varios slots consecutivos, distribuir por solape.
     fetchJson<Array<{
       employee_id: string;
       slot_id: string | null;
@@ -207,7 +233,7 @@ async function handleCalculate(
       client_date: string;
       action: string;
     }>>(
-      `${url}/rest/v1/kiosk_attendance?select=employee_id,slot_id,recorded_at,client_date,action&organization_id=eq.${orgId}&client_date=gte.${monthStart}&client_date=lte.${monthEnd}&action=eq.check_in`,
+      `${url}/rest/v1/kiosk_attendance?select=employee_id,slot_id,recorded_at,client_date,action&organization_id=eq.${orgId}&client_date=gte.${monthStart}&client_date=lte.${monthEnd}&action=in.(check_in,check_out)`,
       { headers: authHeaders(key) },
     ),
   ]);
@@ -223,7 +249,6 @@ async function handleCalculate(
   const monthSlots = slotsRes.data.filter((slot) => slotFallsInMonth(slot.year, slot.week, slot.day_of_week, year, month));
 
   const slotMap = new Map(monthSlots.map((slot) => [slot.id, slot]));
-  const attendanceBySlot = new Map<string, Array<{ employee_id: string; recorded_at: string }>>();
   const anomalies = new Map<string, string[]>();
   const names = new Map<string, string>();
 
@@ -233,48 +258,127 @@ async function handleCalculate(
     }
   }
 
+  // Empareja check_in con su check_out para construir "sesiones reales".
+  // Clave: ${employee_id}|${client_date}|${slot_id}. Si un slot recibe más de un
+  // check_in, queda como anomalía (igual que antes).
+  interface Session {
+    employee_id: string;
+    slot_id: string | null;
+    client_date: string;
+    in_at: string | null;
+    out_at: string | null;
+  }
+  const sessionsByKey = new Map<string, Session>();
+  const checkInCountBySlot = new Map<string, number>();
+
   for (const row of attendanceRes.data) {
-    if (!row.slot_id) {
-      pushAnomaly(anomalies, row.employee_id, "Fichaje sin franja asociada");
-      continue;
+    const slotKey = row.slot_id || "_no_slot_";
+    const key = `${row.employee_id}|${row.client_date}|${slotKey}`;
+    const existing = sessionsByKey.get(key) || {
+      employee_id: row.employee_id,
+      slot_id: row.slot_id,
+      client_date: row.client_date,
+      in_at: null,
+      out_at: null,
+    };
+    if (row.action === "check_in") {
+      // Si ya había un check_in para este slot/día, marca anomalía.
+      if (existing.in_at !== null && row.slot_id) {
+        const count = (checkInCountBySlot.get(row.slot_id) || 1) + 1;
+        checkInCountBySlot.set(row.slot_id, count);
+      } else if (row.slot_id) {
+        checkInCountBySlot.set(row.slot_id, 1);
+      }
+      // Mantenemos el primer check_in (más temprano) para el cálculo de solape.
+      if (existing.in_at === null || row.recorded_at < existing.in_at) {
+        existing.in_at = row.recorded_at;
+      }
+    } else if (row.action === "check_out") {
+      // Nos quedamos con el check_out más tardío (cubre el rango más amplio).
+      if (existing.out_at === null || row.recorded_at > existing.out_at) {
+        existing.out_at = row.recorded_at;
+      }
     }
-
-    const slot = slotMap.get(row.slot_id);
-    if (!slot) {
-      pushAnomaly(anomalies, row.employee_id, "Fichaje fuera del calendario conciliable");
-      continue;
-    }
-
-    if (!slot.employee_id || slot.employee_id !== row.employee_id) {
-      pushAnomaly(anomalies, row.employee_id, "Fichaje con franja asignada a otra persona");
-      continue;
-    }
-
-    const list = attendanceBySlot.get(row.slot_id) || [];
-    list.push({ employee_id: row.employee_id, recorded_at: row.recorded_at });
-    attendanceBySlot.set(row.slot_id, list);
+    sessionsByKey.set(key, existing);
   }
 
+  const sessions: Session[] = Array.from(sessionsByKey.values());
+
+  // Validación inicial de sesiones: anomalías por slot inválido / persona equivocada.
+  const validSessions: Session[] = [];
+  for (const session of sessions) {
+    if (session.in_at === null) continue; // ignora check_out huérfano
+    if (!session.slot_id) {
+      pushAnomaly(anomalies, session.employee_id, "Fichaje sin franja asociada");
+      continue;
+    }
+    const slot = slotMap.get(session.slot_id);
+    if (!slot) {
+      pushAnomaly(anomalies, session.employee_id, "Fichaje fuera del calendario conciliable");
+      continue;
+    }
+    if (!slot.employee_id || slot.employee_id !== session.employee_id) {
+      pushAnomaly(anomalies, session.employee_id, "Fichaje con franja asignada a otra persona");
+      continue;
+    }
+    if ((checkInCountBySlot.get(session.slot_id) || 0) > 1) {
+      pushAnomaly(anomalies, session.employee_id, "Mas de un fichaje para la misma franja");
+      continue;
+    }
+    validSessions.push(session);
+  }
+
+  // Para cada slot del mes, calcular minutos trabajados sumando el solape con
+  // todas las sesiones del mismo empleado en el mismo día. Esto distribuye una
+  // sesión multi-slot (ej. check_in 16:58 + check_out 18:12 cubriendo slots
+  // 17-18 y 18-19) entre los slots correspondientes.
+  const slotMinutes = new Map<string, number>();
+  for (const slot of monthSlots) {
+    if (!slot.employee_id) continue;
+    const slotDate = isoWeekToDate(slot.year, slot.week, slot.day_of_week);
+    let total = 0;
+    for (const session of validSessions) {
+      if (session.employee_id !== slot.employee_id) continue;
+      if (session.client_date !== formatSlotClientDate(slotDate)) continue;
+      const minutes = computeWorkedMinutes(
+        slotDate,
+        slot.start_time,
+        slot.end_time,
+        session.in_at!,
+        session.out_at,
+      );
+      if (minutes > 0) total += minutes;
+    }
+    if (total > 0) slotMinutes.set(slot.id, total);
+  }
+
+  // Detectar sesiones que NO solapan con ningún slot del empleado en ese día
+  // (ej. fichaje fuera de ventana). Marca anomalía.
+  for (const session of validSessions) {
+    if (!session.slot_id) continue;
+    const slot = slotMap.get(session.slot_id);
+    if (!slot || !slot.employee_id) continue;
+    const slotDate = isoWeekToDate(slot.year, slot.week, slot.day_of_week);
+    const minutes = computeWorkedMinutes(
+      slotDate,
+      slot.start_time,
+      slot.end_time,
+      session.in_at!,
+      session.out_at,
+    );
+    if (minutes <= 0) {
+      pushAnomaly(anomalies, session.employee_id, "Fichaje fuera de la ventana valida del turno");
+    }
+  }
+
+  // Agregado por empleado.
   const perEmployee = new Map<string, { workedMinutes: number; slotCount: number }>();
   for (const slot of monthSlots) {
     if (!slot.employee_id) continue;
-
-    const rows = attendanceBySlot.get(slot.id) || [];
-    if (rows.length === 0) continue;
-    if (rows.length > 1) {
-      pushAnomaly(anomalies, slot.employee_id, "Mas de un fichaje para la misma franja");
-      continue;
-    }
-
-    const slotDate = isoWeekToDate(slot.year, slot.week, slot.day_of_week);
-    const workedMinutes = computeWorkedMinutes(slotDate, slot.start_time, slot.end_time, rows[0].recorded_at);
-    if (workedMinutes <= 0) {
-      pushAnomaly(anomalies, slot.employee_id, "Fichaje fuera de la ventana valida del turno");
-      continue;
-    }
-
+    const minutes = slotMinutes.get(slot.id) || 0;
+    if (minutes <= 0) continue;
     const current = perEmployee.get(slot.employee_id) || { workedMinutes: 0, slotCount: 0 };
-    current.workedMinutes += workedMinutes;
+    current.workedMinutes += minutes;
     current.slotCount += 1;
     perEmployee.set(slot.employee_id, current);
   }
@@ -287,7 +391,22 @@ async function handleCalculate(
   const totalPossibleHours = totalPossibleMinutes / 60;
   const validatedMinutes = Array.from(perEmployee.values()).reduce((sum, item) => sum + item.workedMinutes, 0);
   const validatedHours = validatedMinutes / 60;
-  const hourlyRate = totalPossibleHours > 0 ? totalAmount / totalPossibleHours : 0;
+
+  // Cálculo de la tarifa y el cap.
+  // - Modo legacy: tarifa = total / horas_posibles. Sin cap (siempre cabe).
+  // - Modo tarifa fija: tarifa = fixedHourlyRate. Si suma_cobros > totalAmount,
+  //   se aplica adjustmentFactor proporcional sobre cada amount.
+  const legacyRate = totalPossibleHours > 0 ? totalAmount / totalPossibleHours : 0;
+  const baseHourlyRate = isFixedRate ? fixedHourlyRate! : legacyRate;
+  const rawTotalOwed = Array.from(perEmployee.values()).reduce(
+    (sum, item) => sum + (item.workedMinutes / 60) * baseHourlyRate,
+    0,
+  );
+  const adjustmentFactor = isFixedRate && rawTotalOwed > totalAmount && rawTotalOwed > 0
+    ? totalAmount / rawTotalOwed
+    : 1;
+  const effectiveHourlyRate = baseHourlyRate * adjustmentFactor;
+  const capApplied = isFixedRate && adjustmentFactor < 1;
 
   const affectedEmployeeIds = new Set<string>([
     ...Array.from(perEmployee.keys()),
@@ -299,12 +418,24 @@ async function handleCalculate(
     const anomalyNotes = anomalies.get(employeeId) || [];
     const hasAnomalies = anomalyNotes.length > 0;
     const hoursWorked = round2(entry.workedMinutes / 60);
-    const amountEarned = hoursWorked > 0 ? round2(hoursWorked * hourlyRate) : 0;
-    const status = hasAnomalies
+    const rawAmount = hoursWorked > 0 ? hoursWorked * baseHourlyRate : 0;
+    const amountEarned = hoursWorked > 0 ? round2(rawAmount * adjustmentFactor) : 0;
+
+    // El status pasa a "review_required" si hay anomalías o si se aplicó cap.
+    const status = hasAnomalies || capApplied
       ? "review_required"
       : hoursWorked > 0
       ? "calculated"
       : "pending";
+
+    const notesArr = [...anomalyNotes];
+    if (capApplied && hoursWorked > 0) {
+      notesArr.push(
+        `Ajuste proporcional aplicado (presupuesto excedido). Tarifa efectiva: ${
+          round4(effectiveHourlyRate).toFixed(4)
+        } EUR/h`,
+      );
+    }
 
     return {
       organization_id: orgId,
@@ -313,13 +444,20 @@ async function handleCalculate(
       month,
       status,
       hours_worked: hoursWorked,
-      hourly_rate: hoursWorked > 0 ? round4(hourlyRate) : 0,
+      // Guardamos la tarifa BASE (la decidida por el admin o la legacy), no la
+      // efectiva post-cap. El cap se refleja en amount_earned y en las notas.
+      hourly_rate: hoursWorked > 0 ? round4(baseHourlyRate) : 0,
       amount_earned: amountEarned,
       worked_minutes: entry.workedMinutes,
       slot_count: entry.slotCount,
       employee_name_snapshot: names.get(employeeId) || "",
-      notes: anomalyNotes.join(" | "),
-      meta: { anomalies: anomalyNotes },
+      notes: notesArr.join(" | "),
+      meta: {
+        anomalies: anomalyNotes,
+        cap_applied: capApplied,
+        effective_hourly_rate: capApplied ? round4(effectiveHourlyRate) : null,
+        fixed_rate_mode: isFixedRate,
+      },
     };
   });
 
@@ -374,7 +512,14 @@ async function handleCalculate(
     actorSessionId: sessionId,
     actorRole: "org_admin",
     action: "payments_calculated",
-    metadata: { year, month, reviewCount, totalPaid },
+    metadata: {
+      year,
+      month,
+      reviewCount,
+      totalPaid,
+      fixedRateMode: isFixedRate,
+      capApplied,
+    },
   });
 
   return json({
@@ -383,9 +528,13 @@ async function handleCalculate(
       total_seur_amount: round2(totalAmount),
       total_possible_hours: round2(totalPossibleHours),
       total_validated_hours: round2(validatedHours),
-      rate_per_hour: round2(hourlyRate),
+      fixed_rate_mode: isFixedRate,
+      hourly_rate: round4(baseHourlyRate),
+      rate_per_hour: round2(baseHourlyRate),
+      effective_hourly_rate: capApplied ? round4(effectiveHourlyRate) : round4(baseHourlyRate),
+      cap_applied: capApplied,
       total_paid: totalPaid,
-      org_keeps: round2(totalAmount - totalPaid),
+      org_keeps: round2(Math.max(0, totalAmount - totalPaid)),
       review_required_count: reviewCount,
       calculations,
     },
@@ -463,9 +612,10 @@ async function handleListMonths(
     year: number;
     month: number;
     total_amount: string;
+    hourly_rate: string | null;
     notes: string;
   }>>(
-    `${url}/rest/v1/kiosk_payment_months?select=year,month,total_amount,notes&organization_id=eq.${orgId}&order=year.desc,month.desc`,
+    `${url}/rest/v1/kiosk_payment_months?select=year,month,total_amount,hourly_rate,notes&organization_id=eq.${orgId}&order=year.desc,month.desc`,
     { headers: authHeaders(key) },
   );
 
@@ -490,8 +640,8 @@ async function handleGetSummary(
   }
 
   const [amountRes, settlementsRes] = await Promise.all([
-    fetchJson<Array<{ total_amount: string; notes: string }>>(
-      `${url}/rest/v1/kiosk_payment_months?select=total_amount,notes&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}&limit=1`,
+    fetchJson<Array<{ total_amount: string; hourly_rate: string | null; notes: string }>>(
+      `${url}/rest/v1/kiosk_payment_months?select=total_amount,hourly_rate,notes&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}&limit=1`,
       { headers: authHeaders(key) },
     ),
     fetchJson<Array<{
@@ -502,8 +652,9 @@ async function handleGetSummary(
       amount_earned: number;
       status: string;
       notes: string;
+      meta: Record<string, unknown> | null;
     }>>(
-      `${url}/rest/v1/kiosk_payment_settlements?select=employee_id,employee_name_snapshot,hours_worked,hourly_rate,amount_earned,status,notes&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}`,
+      `${url}/rest/v1/kiosk_payment_settlements?select=employee_id,employee_name_snapshot,hours_worked,hourly_rate,amount_earned,status,notes,meta&organization_id=eq.${orgId}&year=eq.${year}&month=eq.${month}`,
       { headers: authHeaders(key) },
     ),
   ]);
@@ -512,15 +663,36 @@ async function handleGetSummary(
   const settlements = settlementsRes.ok ? settlementsRes.data : [];
 
   if (!paymentMonth) {
-    return json({ success: true, data: { configured: false, total_seur_amount: 0, calculations: [] } });
+    return json({
+      success: true,
+      data: {
+        configured: false,
+        total_seur_amount: 0,
+        configured_hourly_rate: null,
+        calculations: [],
+      },
+    });
   }
 
   const totalAmount = Number(paymentMonth.total_amount);
+  const configuredHourlyRate = paymentMonth.hourly_rate !== null && paymentMonth.hourly_rate !== undefined
+    ? Number(paymentMonth.hourly_rate)
+    : null;
   const totalPaid = settlements.reduce((sum, s) => sum + Number(s.amount_earned || 0), 0);
   const totalHours = settlements.reduce((sum, s) => sum + Number(s.hours_worked || 0), 0);
   const reviewCount = settlements.filter((s) => s.status === "review_required").length;
+  // ratePerHour: tarifa base guardada en los settlements (BASE, no la efectiva).
   const storedRate = settlements.find((s) => Number(s.hourly_rate || 0) > 0);
-  const ratePerHour = storedRate ? Number(storedRate.hourly_rate) : 0;
+  const ratePerHour = storedRate ? Number(storedRate.hourly_rate) : (configuredHourlyRate ?? 0);
+  // effectiveHourlyRate: si algún settlement tiene cap_applied=true en meta, usa esa.
+  const capSettlement = settlements.find((s) => {
+    const meta = s.meta as { cap_applied?: boolean; effective_hourly_rate?: number } | null;
+    return meta && meta.cap_applied === true && typeof meta.effective_hourly_rate === "number";
+  });
+  const effectiveHourlyRate = capSettlement
+    ? Number(((capSettlement.meta as { effective_hourly_rate: number }).effective_hourly_rate))
+    : ratePerHour;
+  const capApplied = capSettlement !== undefined;
 
   const calculations = settlements.map((s) => ({
     employee_id: s.employee_id,
@@ -535,10 +707,13 @@ async function handleGetSummary(
     data: {
       configured: true,
       total_seur_amount: round2(totalAmount),
+      configured_hourly_rate: configuredHourlyRate !== null ? round4(configuredHourlyRate) : null,
       total_validated_hours: round2(totalHours),
       rate_per_hour: round2(ratePerHour),
+      effective_hourly_rate: round4(effectiveHourlyRate),
+      cap_applied: capApplied,
       total_paid: round2(totalPaid),
-      org_keeps: round2(totalAmount - totalPaid),
+      org_keeps: round2(Math.max(0, totalAmount - totalPaid)),
       review_required_count: reviewCount,
       calculations,
     },
@@ -573,4 +748,16 @@ function round2(value: number): number {
 
 function round4(value: number): number {
   return Math.round(value * 10000) / 10000;
+}
+
+/**
+ * Convierte un Date construido por isoWeekToDate (UTC components = fecha civil
+ * Madrid, hora 00:00 UTC) al formato YYYY-MM-DD que usa client_date de
+ * kiosk_attendance.
+ */
+function formatSlotClientDate(slotDate: Date): string {
+  const y = slotDate.getUTCFullYear();
+  const m = String(slotDate.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(slotDate.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }

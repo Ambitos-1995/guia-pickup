@@ -911,14 +911,25 @@ export function slotHours(startTime: string, endTime: string): number {
   return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
 }
 
-export function computeWorkedMinutes(slotDate: Date, startTime: string, endTime: string, checkInIso: string): number {
+export function computeWorkedMinutes(
+  slotDate: Date,
+  startTime: string,
+  endTime: string,
+  checkInIso: string,
+  checkOutIso?: string | null,
+): number {
   const slotDateIso = toUtcDateIso(slotDate);
   const slotStart = buildMadridDateTime(slotDateIso, startTime);
   const slotEnd = buildMadridDateTime(slotDateIso, endTime);
 
   const checkIn = new Date(checkInIso);
   const effectiveStart = new Date(Math.max(slotStart.getTime(), checkIn.getTime()));
-  const effectiveEnd = slotEnd;
+
+  // Si hay check_out real, capear effectiveEnd al min(slotEnd, checkOut).
+  // Si no, asumir que el empleado se queda hasta slot_end (comportamiento legacy).
+  const effectiveEnd = checkOutIso
+    ? new Date(Math.min(slotEnd.getTime(), new Date(checkOutIso).getTime()))
+    : slotEnd;
 
   if (effectiveStart >= effectiveEnd) return 0;
   return Math.round((effectiveEnd.getTime() - effectiveStart.getTime()) / 60000);

@@ -490,7 +490,7 @@ test('admin can open the same four base sections from the main menu', async ({ p
   await expect(page.locator('#screen-payment.active')).toBeVisible();
 });
 
-test('admin can load payments and save a configured amount', async ({ page }) => {
+test('admin can load payments and save a configured amount with hourly rate', async ({ page }) => {
   await setupMockApi(page);
   await page.goto('/');
   await expect(page.locator('#screen-pin.active')).toBeVisible();
@@ -504,12 +504,19 @@ test('admin can load payments and save a configured amount', async ({ page }) =>
   await page.locator('#admin-pay-prev').click();
   await expect(page.locator('#admin-pay-summary-status')).toContainText('Sin configurar');
 
+  // Sin tarifa, el guardado debe avisar y el botón de calcular seguir deshabilitado.
   await page.locator('#admin-pay-amount').fill('1250');
   await page.locator('#admin-pay-save').click();
+  await expect(page.locator('#admin-pay-feedback')).toContainText('tarifa por hora');
+  await expect(page.locator('#admin-pay-calculate')).toBeDisabled();
 
-  await expect(page.locator('#admin-pay-feedback')).toContainText('Importe guardado.');
+  // Con tarifa, se guarda y el cálculo queda habilitado.
+  await page.locator('#admin-pay-rate').fill('2.5');
+  await page.locator('#admin-pay-save').click();
+  await expect(page.locator('#admin-pay-feedback')).toContainText('Importe y tarifa guardados');
   await expect(page.locator('#admin-pay-summary-amount')).toContainText('1250.00');
   await expect(page.locator('#admin-pay-summary-status')).toContainText('Configurado');
+  await expect(page.locator('#admin-pay-calculate')).toBeEnabled();
 });
 
 test('admin can create a new employee from ajustes empleados', async ({ page }) => {

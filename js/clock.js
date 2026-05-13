@@ -163,9 +163,52 @@ var Clock = (function () {
             }
             App.setSession(session);
             refreshStatus();
+
+            // Aviso TMG: si el empleado ya hizo check_out hoy pero aún tiene
+            // otro slot consecutivo abierto dentro de su ventana de entrada,
+            // mostrarle un mensaje claro para evitar el caso Liu Yuhang (slot
+            // 18-19 sin fichar tras salir del 17-18).
+            maybeShowNextSlotPrompt(session.currentStatus, res.data.todaySlots);
         }).catch(function () {});
 
         loadTodaySlot();
+    }
+
+    function maybeShowNextSlotPrompt(currentStatus, todaySlots) {
+        if (currentStatus !== 'checked_out') return;
+        if (!Array.isArray(todaySlots) || todaySlots.length === 0) return;
+
+        var now = new Date();
+        var openSlot = null;
+        for (var i = 0; i < todaySlots.length; i++) {
+            var slot = todaySlots[i];
+            if (!slot || slot.state === 'closed') continue;
+            var startStr = (slot.start_time || '').slice(0, 5);
+            var endStr = (slot.end_time || '').slice(0, 5);
+            if (!startStr || !endStr) continue;
+            var parts = startStr.split(':');
+            var endParts = endStr.split(':');
+            var startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+            var endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(endParts[0], 10), parseInt(endParts[1], 10), 0, 0);
+            var windowStart = new Date(startDate.getTime() - 15 * 60000);
+            if (now >= windowStart && now <= endDate) {
+                openSlot = { start: startStr, end: endStr };
+                break;
+            }
+        }
+
+        if (!openSlot) return;
+
+        feedbackEl.classList.remove('hidden', 'feedback-success', 'feedback-error');
+        feedbackEl.classList.add('feedback-warning');
+        feedbackMsg.textContent =
+            'Tienes otro turno hoy de ' + openSlot.start + ' a ' + openSlot.end +
+            '. Pulsa Entrada para fichar el siguiente.';
+        // Re-activamos el botón Entrada para que pueda fichar el siguiente turno.
+        btnIn.classList.remove('hidden');
+        btnOut.classList.add('hidden');
+        statusEl.className = 'clock-status status-pending-in';
+        statusEl.textContent = 'Siguiente turno disponible';
     }
 
     function doCheckIn() {
